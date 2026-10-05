@@ -2,13 +2,12 @@ package com.example.magicdefense;
 
 import android.os.Bundle;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import com.example.magicdefense.view.GameView;
 
 public class MainActivity extends AppCompatActivity {
+
     private GameView gameView;
 
     @Override
@@ -19,14 +18,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected  void onResume() {
+    protected void onResume() {
         super.onResume();
-        gameView.startGame();
+        gameView.startGame();   // l'écran redevient visible
     }
 
     @Override
     protected void onPause() {
-        gameView.stopGame();
+        gameView.stopGame();    // l'appli passe en arrière-plan
         super.onPause();
     }
 }
