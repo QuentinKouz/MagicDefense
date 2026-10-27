@@ -1,9 +1,20 @@
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
+# Fichiers générés par Gradle / Android Studio
+.gradle/
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
+
+# Propres à chaque PC
+/local.properties
+*.iml
+.idea/
+.DS_Store
+
+# APK et clé de signature (l'APK est publié dans les Releases GitHub)
+app/release/
+*.jks
+*.keystore
+*.apk
+*.aab
