@@ -148,11 +148,49 @@ public class ContentV2Test {
     public void reactions_none() {
         assertEquals(Reaction.NONE, Reaction.between(Mage.FIRE, Mage.FIRE));
         assertEquals(Reaction.NONE, Reaction.between(Enemy.NO_MARK, Mage.FIRE));
-        assertEquals(Reaction.NONE, Reaction.between(Mage.LIGHTNING, Mage.EARTH));
-        assertEquals(Reaction.NONE, Reaction.between(Mage.WATER, Mage.SUMMONER));
-        assertFalse(Reaction.leavesMark(Mage.SUMMONER));
+        assertTrue(Reaction.leavesMark(Mage.SUMMONER)); // marque arcanique
         assertTrue(Reaction.leavesMark(Mage.POISON));
         assertEquals(Reaction.COUNT, Reaction.NAMES.length);
+    }
+
+    @Test
+    public void reactions_everyPairOfElementsHasItsOwnReaction() {
+        boolean[] used = new boolean[Reaction.COUNT];
+        int pairs = 0;
+        for (int a = 0; a < Mage.TYPE_COUNT; a++) {
+            for (int b = a + 1; b < Mage.TYPE_COUNT; b++) {
+                int r = Reaction.between(a, b);
+                assertTrue("paire sans réaction : " + a + " + " + b, r != Reaction.NONE);
+                assertEquals("l'ordre ne compte pas", r, Reaction.between(b, a));
+                assertFalse("réaction en double : " + Reaction.NAMES[r], used[r]);
+                used[r] = true;
+                pairs++;
+            }
+        }
+        assertEquals(21, pairs);
+        assertEquals(Reaction.COUNT, pairs);
+        assertEquals(Reaction.WISPS, Reaction.between(Mage.FIRE, Mage.SUMMONER));
+        assertEquals(Reaction.VORTEX, Reaction.between(Mage.SUMMONER, Mage.AIR));
+        assertEquals(Reaction.ACID, Reaction.between(Mage.POISON, Mage.EARTH));
+    }
+
+    @Test
+    public void enemy_vulnerable_and_strongestSlow() {
+        Enemy e = new Enemy(0, 10, 2, 100);
+        assertFalse(e.isVulnerable());
+        e.makeVulnerable(10);
+        assertTrue(e.isVulnerable());
+        for (int i = 0; i < 10; i++) {
+            e.tickStatus();
+        }
+        assertFalse(e.isVulnerable());
+
+        e.y = 100;
+        e.slow(0.5f, 30);
+        e.slow(0.3f, 10);   // plus fort : l'emporte
+        e.slow(0.8f, 10);   // plus faible : ignoré
+        e.update(1f);
+        assertEquals(100 + 2 * 0.3f, e.y, 1e-4);
     }
 
     // ---------- Boss et biomes ----------

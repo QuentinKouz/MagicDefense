@@ -34,6 +34,22 @@ public class Projectile {
         this.stunFrames = mage.getStunFrames();
     }
 
+    // Projectile créé par une réaction (Feux follets) : il n'a pas d'élément, donc ne pose pas de marque
+    public boolean fromReaction = false;
+
+    public Projectile(float x, float y, Enemy target, int type, int level, float damage, float speedDp, float density) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.type = type;
+        this.level = level;
+        this.damage = damage;
+        this.speed = speedDp * density;
+        this.aoeRadius = 0;
+        this.radius = 6 * density;
+        this.fromReaction = true;
+    }
+
     // Avance vers la cible. Retourne true si elle est atteinte.
     public boolean update() {
         age++;

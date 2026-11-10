@@ -56,16 +56,33 @@ On emmène **4 mages** en partie : sur l'écran MAGES, toucher le portrait d'un 
 
 ### Réactions élémentaires
 
-Chaque coup laisse une **marque** de son élément sur l'ennemi pendant 3 s (point de couleur à côté de sa barre de vie). Un second élément compatible déclenche une réaction :
+Chaque coup laisse une **marque** de son élément sur l'ennemi pendant 3 s (point de couleur à côté de sa barre de vie ; l'esprit de l'Invocateur laisse une marque *arcanique*). **N'importe quel autre élément** déclenche alors une réaction : les 21 paires des 7 éléments ont chacune la leur.
 
 | Réaction | Éléments | Effet |
 |---|---|---|
-| **Électrocution** | Eau + Foudre | dégâts doublés, étourdissement, arcs vers 3 ennemis proches |
-| **Lave** | Terre + Feu | flaque de lave qui brûle pendant 4 s |
 | **Vapeur** | Eau + Feu | nuage qui ralentit de moitié et blesse légèrement |
-| **Explosion toxique** | Poison + Feu | explosion de zone (2 × le coup) |
-| **Nuage toxique** | Poison + Air | le poison se propage aux ennemis proches |
+| **Boue** | Eau + Terre | grande zone qui ralentit fortement |
+| **Électrocution** | Eau + Foudre | dégâts doublés, étourdissement, arcs vers 3 ennemis proches |
+| **Marécage** | Eau + Poison | zone qui empoisonne ceux qui la traversent |
+| **Gel** | Eau + Air | gel de zone (≈ 1,2 s) |
+| **Geyser** | Eau + Invocateur | la cible est projetée vers la forêt, éclaboussures autour |
+| **Lave** | Feu + Terre | flaque de lave qui brûle pendant 4 s |
+| **Surcharge** | Feu + Foudre | explosion qui repousse |
+| **Explosion toxique** | Feu + Poison | explosion de zone (2 × le coup) |
+| **Embrasement** | Feu + Air | anneau de flammes qui brûle |
+| **Feux follets** | Feu + Invocateur | 3 boules de feu chassent les ennemis proches |
+| **Cristallisation** | Terre + Foudre | grosse frappe, long étourdissement |
+| **Acide** | Terre + Poison | dégâts doublés, cible **vulnérable** 4 s |
 | **Tempête de sable** | Terre + Air | recul et étourdissement de zone |
+| **Éboulement** | Terre + Invocateur | rochers de zone, court étourdissement |
+| **Paralysie** | Foudre + Poison | étourdissement, le poison redouble |
+| **Orage** | Foudre + Air | la foudre frappe 5 ennemis du terrain |
+| **Chaîne spectrale** | Foudre + Invocateur | arc qui rebondit sur 5 ennemis |
+| **Nuage toxique** | Poison + Air | le poison se propage aux ennemis proches |
+| **Malédiction** | Poison + Invocateur | ennemis proches **vulnérables** |
+| **Vortex** | Air + Invocateur | aspire les ennemis vers la cible et les étourdit |
+
+Un ennemi **vulnérable** (liseré orange autour de sa barre de vie) subit 50 % de dégâts en plus.
 
 ### Progression
 

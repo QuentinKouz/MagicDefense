@@ -1,9 +1,12 @@
 package com.example.magicdefense.model;
 
-// Zone au sol laissée par une réaction : flaque de Lave (brûle) ou nuage de Vapeur (ralentit)
+// Zone au sol laissée par une réaction : elle agit sur les ennemis qui s'y trouvent
 public class Zone {
-    public static final int LAVA = 0;
-    public static final int STEAM = 1;
+    public static final int LAVA = 0;     // brûle (dégâts par seconde)
+    public static final int STEAM = 1;    // ralentit de moitié
+    public static final int MUD = 2;      // ralentit fortement
+    public static final int BOG = 3;      // empoisonne
+    public static final int FIRE = 4;     // anneau de flammes : brûle
 
     public final float x;
     public final float y;

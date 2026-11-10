@@ -28,7 +28,23 @@ public class Palette {
             Color.rgb(180, 240, 60),   // Explosion toxique
             Color.rgb(130, 200, 80),   // Nuage toxique
             Color.rgb(225, 195, 125),  // Tempête de sable
+            Color.rgb(150, 110, 70),   // Boue
+            Color.rgb(100, 170, 90),   // Marécage
+            Color.rgb(190, 235, 255),  // Gel
+            Color.rgb(110, 190, 255),  // Geyser
+            Color.rgb(255, 190, 60),   // Surcharge
+            Color.rgb(255, 90, 40),    // Embrasement
+            Color.rgb(255, 160, 220),  // Feux follets
+            Color.rgb(150, 240, 220),  // Cristallisation
+            Color.rgb(200, 230, 40),   // Acide
+            Color.rgb(170, 140, 100),  // Éboulement
+            Color.rgb(230, 255, 120),  // Paralysie
+            Color.rgb(200, 180, 255),  // Orage
+            Color.rgb(240, 130, 255),  // Chaîne spectrale
+            Color.rgb(170, 80, 200),   // Malédiction
+            Color.rgb(210, 220, 240),  // Vortex
     };
+    public static final int VULNERABLE = Color.rgb(255, 150, 40); // ennemi vulnérable (Acide, Malédiction)
 
     // Ennemis
     public static final int BOSS_BAR = Color.rgb(200, 40, 60);

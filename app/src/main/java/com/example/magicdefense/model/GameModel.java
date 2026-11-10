@@ -747,15 +747,26 @@ public class GameModel {
             }
         }
 
-        // Zones au sol : la lave brûle, la vapeur ralentit
+        // Zones au sol : la lave et les flammes brûlent, la vapeur et la boue ralentissent,
+        // le marécage empoisonne
         for (int i = zones.size() - 1; i >= 0; i--) {
             Zone z = zones.get(i);
             for (Enemy e : enemies) {
                 if (z.contains(e)) {
-                    if (z.type == Zone.LAVA) {
-                        e.hp -= z.dps / 60f;
-                    } else {
-                        e.slowTimer = Math.max(e.slowTimer, 5);
+                    switch (z.type) {
+                        case Zone.LAVA:
+                        case Zone.FIRE:
+                            hurt(e, z.dps / 60f);
+                            break;
+                        case Zone.STEAM:
+                            e.slow(Reaction.STEAM_SLOW, 5);
+                            break;
+                        case Zone.MUD:
+                            e.slow(Reaction.MUD_SLOW, 5);
+                            break;
+                        case Zone.BOG:
+                            e.poison(z.dps, 60);
+                            break;
                     }
                 }
             }
@@ -907,6 +918,8 @@ public class GameModel {
                             applyHit(e, p.damage, p.type, 0, 0, 0);
                         }
                     }
+                } else if (p.fromReaction) {
+                    hurt(p.target, p.damage); // feu follet : pas de marque, pas de nouvelle réaction
                 } else {
                     applyHit(p.target, p.damage, p.type, p.poisonDps, p.knockback, p.stunFrames);
                     hits.add(new HitEffect(p.target.x, p.target.y, p.type, p.level)); // explosion, éclats...
@@ -948,7 +961,7 @@ public class GameModel {
 
     // Un coup d'élément `element` touche l'ennemi : dégâts, effets, puis marque ou réaction
     private void applyHit(Enemy e, float damage, int element, float poisonDps, float knockback, int stun) {
-        e.hp -= damage;
+        hurt(e, damage);
         if (poisonDps > 0) {
             e.poison(poisonDps, Mage.POISON_DURATION);
         }
@@ -978,7 +991,7 @@ public class GameModel {
         float ringRadius = 60 * d;
         switch (r) {
             case Reaction.ELECTROCUTION: {
-                e.hp -= dmg * Reaction.ELECTRO_BONUS;
+                hurt(e, dmg * Reaction.ELECTRO_BONUS);
                 e.stun(Reaction.ELECTRO_STUN);
                 // Arcs électriques vers les ennemis les plus proches
                 float range = Reaction.ELECTRO_RANGE * d;
@@ -991,7 +1004,7 @@ public class GameModel {
                 near.sort((a, b) -> Float.compare(dist2(a, e), dist2(b, e)));
                 for (int k = 0; k < Math.min(Reaction.ELECTRO_TARGETS, near.size()); k++) {
                     Enemy o = near.get(k);
-                    o.hp -= dmg;
+                    hurt(o, dmg);
                     o.stun(Reaction.ELECTRO_STUN / 2);
                     bolts.add(new Bolt(e.x, e.y, o.x, o.y, 3));
                 }
@@ -1042,6 +1055,144 @@ public class GameModel {
                 ringRadius = rad;
                 break;
             }
+            case Reaction.MUD: {          // Eau + Terre : boue qui englue
+                float rad = Reaction.MUD_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.MUD, 0, Reaction.MUD_DURATION));
+                damageAround(e.x, e.y, rad, dmg * Reaction.MUD_DAMAGE);
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.BOG: {          // Eau + Poison : marécage empoisonné
+                float rad = Reaction.BOG_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.BOG, Math.max(1f, dmg * Reaction.BOG_DPS_FACTOR),
+                        Reaction.BOG_DURATION));
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.FREEZE: {       // Eau + Air : gel de zone
+                float rad = Reaction.FREEZE_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.stun(Reaction.FREEZE_STUN);
+                }
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.GEYSER: {       // Eau + Invocateur : la cible est projetée, éclaboussures
+                float rad = Reaction.GEYSER_RADIUS * d;
+                damageAround(e.x, e.y, rad, dmg * Reaction.GEYSER_DAMAGE);
+                splashes.add(new Splash(e.x, e.y, rad, 4));
+                e.knockBack(Reaction.GEYSER_KNOCKBACK * d);
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.OVERLOAD: {     // Feu + Foudre : explosion qui repousse
+                float rad = Reaction.OVERLOAD_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    hurt(o, dmg * Reaction.OVERLOAD_DAMAGE);
+                    o.knockBack(Reaction.OVERLOAD_KNOCKBACK * d);
+                }
+                hits.add(new HitEffect(e.x, e.y, Mage.FIRE, 5));
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.WILDFIRE: {     // Feu + Air : anneau de flammes
+                float rad = Reaction.WILDFIRE_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.FIRE, dmg * Reaction.WILDFIRE_DPS_FACTOR,
+                        Reaction.WILDFIRE_DURATION));
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.WISPS: {        // Feu + Invocateur : feux follets lancés vers les ennemis proches
+                ArrayList<Enemy> near = enemiesNear(e.x, e.y, Reaction.WISPS_RANGE * d, e);
+                for (int k = 0; k < Reaction.WISPS_COUNT; k++) {
+                    Enemy target = near.isEmpty() ? e : near.get(k % near.size());
+                    projectiles.add(new Projectile(e.x, e.y - 10 * d, target, Mage.FIRE, 2,
+                            dmg * Reaction.WISPS_DAMAGE, 6, d));
+                }
+                break;
+            }
+            case Reaction.CRYSTALLIZE:    // Terre + Foudre : la cible est figée dans le cristal
+                hurt(e, dmg * Reaction.CRYSTALLIZE_DAMAGE);
+                e.stun(Reaction.CRYSTALLIZE_STUN);
+                hits.add(new HitEffect(e.x, e.y, Mage.EARTH, 5));
+                break;
+            case Reaction.ACID:           // Terre + Poison : ronge l'armure
+                hurt(e, dmg * Reaction.ACID_DAMAGE);
+                e.makeVulnerable(Reaction.VULNERABLE_DURATION);
+                break;
+            case Reaction.ROCKFALL: {     // Terre + Invocateur : éboulement
+                float rad = Reaction.ROCKFALL_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    hurt(o, dmg * Reaction.ROCKFALL_DAMAGE);
+                    o.stun(Reaction.ROCKFALL_STUN);
+                    hits.add(new HitEffect(o.x, o.y, Mage.EARTH, 3));
+                }
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.PARALYSIS:      // Foudre + Poison : paralysie, le poison redouble
+                e.stun(Reaction.PARALYSIS_STUN);
+                if (e.isPoisoned()) {
+                    e.poisonDps *= 2;
+                } else {
+                    e.poison(dmg, Mage.POISON_DURATION);
+                }
+                break;
+            case Reaction.THUNDERSTORM: { // Foudre + Air : la foudre tombe sur 5 ennemis du terrain
+                ArrayList<Enemy> pool = new ArrayList<>();
+                for (Enemy o : enemies) {
+                    if (!o.isDead() && o.y > 0) {
+                        pool.add(o);
+                    }
+                }
+                for (int k = 0; k < Reaction.THUNDERSTORM_TARGETS && !pool.isEmpty(); k++) {
+                    Enemy o = pool.remove(random.nextInt(pool.size()));
+                    hurt(o, dmg * Reaction.THUNDERSTORM_DAMAGE);
+                    bolts.add(new Bolt(o.x + (random.nextFloat() - 0.5f) * 40 * d, 0, o.x, o.y, 4));
+                    hits.add(new HitEffect(o.x, o.y, Mage.LIGHTNING, 4));
+                }
+                break;
+            }
+            case Reaction.SPECTRAL_CHAIN: { // Foudre + Invocateur : arc qui rebondit d'ennemi en ennemi
+                Enemy from = e;
+                ArrayList<Enemy> done = new ArrayList<>();
+                done.add(e);
+                for (int k = 0; k < Reaction.CHAIN_JUMPS; k++) {
+                    Enemy next = null;
+                    for (Enemy o : enemiesNear(from.x, from.y, Reaction.CHAIN_RANGE * d, from)) {
+                        if (!done.contains(o)) {
+                            next = o;
+                            break;
+                        }
+                    }
+                    if (next == null) {
+                        break;
+                    }
+                    hurt(next, dmg * Reaction.CHAIN_DAMAGE);
+                    bolts.add(new Bolt(from.x, from.y, next.x, next.y, 2));
+                    done.add(next);
+                    from = next;
+                }
+                break;
+            }
+            case Reaction.CURSE: {        // Poison + Invocateur : les ennemis proches deviennent vulnérables
+                float rad = Reaction.CURSE_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.makeVulnerable(Reaction.CURSE_DURATION);
+                }
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.VORTEX: {       // Air + Invocateur : aspire les ennemis vers la cible
+                float rad = Reaction.VORTEX_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, e)) {
+                    o.pullTowards(e.x, e.y, Reaction.VORTEX_PULL);
+                    o.stun(Reaction.VORTEX_STUN);
+                }
+                e.stun(Reaction.VORTEX_STUN);
+                ringRadius = rad;
+                break;
+            }
         }
         reactions.add(new Reaction(e.x, e.y, r, ringRadius));
         if (listener != null) {
@@ -1054,9 +1205,29 @@ public class GameModel {
             float dx = o.x - x;
             float dy = o.y - y;
             if (dx * dx + dy * dy <= radius * radius) {
-                o.hp -= damage;
+                hurt(o, damage);
             }
         }
+    }
+
+    // Dégâts subis par un ennemi : +50 % s'il est vulnérable (Acide, Malédiction)
+    private void hurt(Enemy e, float damage) {
+        e.hp -= e.isVulnerable() ? damage * Reaction.VULNERABLE_MULT : damage;
+    }
+
+    // Ennemis vivants à portée d'un point (hors `except`), du plus proche au plus loin
+    private ArrayList<Enemy> enemiesNear(float x, float y, float radius, Enemy except) {
+        ArrayList<Enemy> near = new ArrayList<>();
+        for (Enemy o : enemies) {
+            float dx = o.x - x;
+            float dy = o.y - y;
+            if (o != except && !o.isDead() && dx * dx + dy * dy <= radius * radius) {
+                near.add(o);
+            }
+        }
+        near.sort((a, b) -> Float.compare((a.x - x) * (a.x - x) + (a.y - y) * (a.y - y),
+                (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y)));
+        return near;
     }
 
     private static float dist2(Enemy a, Enemy b) {

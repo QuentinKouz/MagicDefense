@@ -35,7 +35,9 @@ public class Enemy {
     // États
     public float poisonDps = 0;   // dégâts par seconde du poison
     public int poisonTimer = 0;
-    public int slowTimer = 0;     // > 0 : ralenti de moitié (Vapeur)
+    public int slowTimer = 0;     // > 0 : ralenti (Vapeur, Boue)
+    public float slowFactor = 1f; // vitesse pendant le ralentissement (0,5 = moitié)
+    public int vulnerableTimer = 0; // > 0 : subit plus de dégâts (Acide, Malédiction)
     public int stunTimer = 0;     // > 0 : étourdi (esprit, Électrocution, Tempête de sable)
     public int mark = NO_MARK;    // dernier élément reçu (pour les réactions)
     public int markTimer = 0;
@@ -66,11 +68,37 @@ public class Enemy {
             stunTimer--;
             return;
         }
-        float mult = slowTimer > 0 ? 0.5f : 1f;
+        float mult = slowTimer > 0 ? slowFactor : 1f;
         if (slowTimer > 0) {
             slowTimer--;
+            if (slowTimer == 0) {
+                slowFactor = 1f;
+            }
         }
         y += speed * speedMult * mult;
+    }
+
+    // Ralentissement : le plus fort l'emporte
+    public void slow(float factor, int frames) {
+        if (slowTimer == 0 || factor < slowFactor) {
+            slowFactor = factor;
+        }
+        slowTimer = Math.max(slowTimer, frames);
+    }
+
+    public void makeVulnerable(int frames) {
+        vulnerableTimer = Math.max(vulnerableTimer, frames);
+    }
+
+    public boolean isVulnerable() {
+        return vulnerableTimer > 0;
+    }
+
+    // Aspiré vers un point (Vortex) : rapproché d'une fraction de la distance (le boss résiste)
+    public void pullTowards(float px, float py, float fraction) {
+        float f = isBoss() ? fraction * 0.3f : fraction;
+        x += (px - x) * f;
+        y += (py - y) * f;
     }
 
     // États qui s'écoulent à chaque image (même pendant l'ultime) : poison et marque
@@ -81,6 +109,9 @@ public class Enemy {
             if (poisonTimer == 0) {
                 poisonDps = 0;
             }
+        }
+        if (vulnerableTimer > 0) {
+            vulnerableTimer--;
         }
         if (markTimer > 0) {
             markTimer--;

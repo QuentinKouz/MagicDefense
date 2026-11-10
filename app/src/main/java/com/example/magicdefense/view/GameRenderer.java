@@ -612,6 +612,12 @@ public class GameRenderer {
         float barHeight = enemy.radius * 0.25f;
         float barLeft = enemy.x - enemy.radius;
         float barTop = top - barHeight * 1.5f;
+        // Vulnérable (Acide, Malédiction) : liseré orange autour de la barre
+        if (enemy.isVulnerable()) {
+            float pad = 1.5f * density;
+            paint.setColor(Palette.VULNERABLE);
+            canvas.drawRect(barLeft - pad, barTop - pad, barLeft + barWidth + pad, barTop + barHeight + pad, paint);
+        }
         paint.setColor(Color.DKGRAY);
         canvas.drawRect(barLeft, barTop, barLeft + barWidth, barTop + barHeight, paint);
         // Vert acide quand il est empoisonné

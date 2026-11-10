@@ -805,14 +805,55 @@ public class AttackRenderer {
             float px = r.x + (float) Math.cos(a) * dist;
             float py = r.y + (float) Math.sin(a) * dist;
             paint.setColor(withAlpha(c, alpha));
-            if (r.type == Reaction.ELECTROCUTION) {
-                paint.setStrokeWidth(2 * density);
-                canvas.drawLine(px, py, px + (float) Math.cos(a + 1) * 6 * density,
-                        py + (float) Math.sin(a + 1) * 6 * density, paint);
-            } else if (r.type == Reaction.SANDSTORM) {
-                canvas.drawRect(px - 2 * density, py - 2 * density, px + 2 * density, py + 2 * density, paint);
-            } else {
-                canvas.drawCircle(px, py, 3 * density * (1 - t) + density, paint);
+            float k = 3 * density * (1 - t) + density;
+            switch (r.type) {
+                case Reaction.ELECTROCUTION:
+                case Reaction.PARALYSIS:
+                case Reaction.THUNDERSTORM:
+                    // étincelles en trait
+                    paint.setStrokeWidth(2 * density);
+                    canvas.drawLine(px, py, px + (float) Math.cos(a + 1) * 6 * density,
+                            py + (float) Math.sin(a + 1) * 6 * density, paint);
+                    break;
+                case Reaction.SANDSTORM:
+                case Reaction.ROCKFALL:
+                case Reaction.MUD:
+                    // grains, rochers, mottes de boue
+                    float sq = r.type == Reaction.ROCKFALL ? k * 1.6f : k * 0.8f;
+                    canvas.drawRect(px - sq, py - sq, px + sq, py + sq, paint);
+                    break;
+                case Reaction.FREEZE:
+                    // flocons : petite croix
+                    paint.setStrokeWidth(1.6f * density);
+                    canvas.drawLine(px - k * 1.5f, py, px + k * 1.5f, py, paint);
+                    canvas.drawLine(px, py - k * 1.5f, px, py + k * 1.5f, paint);
+                    break;
+                case Reaction.CRYSTALLIZE: {
+                    // éclats de cristal
+                    float s = k * 1.6f;
+                    canvas.drawLine(px, py - s, px + s * 0.6f, py, paint);
+                    canvas.drawLine(px + s * 0.6f, py, px, py + s, paint);
+                    canvas.drawLine(px, py + s, px - s * 0.6f, py, paint);
+                    canvas.drawLine(px - s * 0.6f, py, px, py - s, paint);
+                    break;
+                }
+                case Reaction.VORTEX: {
+                    // spirale qui se resserre vers le centre
+                    double sa = a + t * 6;
+                    float sd = r.radius * (1 - t);
+                    canvas.drawCircle(r.x + (float) Math.cos(sa) * sd, r.y + (float) Math.sin(sa) * sd, k, paint);
+                    break;
+                }
+                case Reaction.CURSE:
+                    // petits crânes : un rond et deux yeux
+                    canvas.drawCircle(px, py, k * 1.3f, paint);
+                    paint.setColor(Color.argb(alpha, 30, 10, 40));
+                    canvas.drawCircle(px - k * 0.45f, py - k * 0.1f, k * 0.3f, paint);
+                    canvas.drawCircle(px + k * 0.45f, py - k * 0.1f, k * 0.3f, paint);
+                    break;
+                default:
+                    canvas.drawCircle(px, py, k, paint);
+                    break;
             }
         }
 
@@ -835,6 +876,44 @@ public class AttackRenderer {
         float t = z.getProgress();
         float fade = t > 0.8f ? (1 - t) / 0.2f : 1f; // s'estompe sur la fin
         int age = z.getAge();
+        if (z.type == Zone.MUD || z.type == Zone.BOG) {
+            // Boue brune ou marécage vert, avec des bulles qui remontent
+            boolean bog = z.type == Zone.BOG;
+            tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
+            paint.setColor(bog ? Color.argb((int) (170 * fade), 50, 90, 40) : Color.argb((int) (190 * fade), 90, 60, 35));
+            canvas.drawOval(tmpRect, paint);
+            tmpRect.inset(z.radius * 0.18f, z.radius * 0.12f);
+            paint.setColor(bog ? Color.argb((int) (170 * fade), 90, 150, 60) : Color.argb((int) (200 * fade), 125, 88, 52));
+            canvas.drawOval(tmpRect, paint);
+            for (int j = 0; j < 6; j++) {
+                float bt = ((age + j * 11) % 45) / 45f;
+                float bx = z.x + (float) Math.cos(j * 1.9) * z.radius * 0.55f;
+                float by = z.y + (float) Math.sin(j * 1.3) * z.radius * 0.3f;
+                paint.setColor(bog ? Color.argb((int) (220 * fade * (1 - bt)), 170, 240, 90)
+                        : Color.argb((int) (200 * fade * (1 - bt)), 160, 120, 80));
+                canvas.drawCircle(bx, by - bt * 6 * density, z.radius * 0.08f * (0.5f + bt) + density, paint);
+            }
+            return;
+        }
+        if (z.type == Zone.FIRE) {
+            // Anneau de flammes qui dansent
+            int flames = 14;
+            for (int j = 0; j < flames; j++) {
+                double a = j * 2 * Math.PI / flames + age * 0.02;
+                float fx = z.x + (float) Math.cos(a) * z.radius * 0.8f;
+                float fy = z.y + (float) Math.sin(a) * z.radius * 0.5f;
+                float flick = 0.7f + 0.3f * (float) Math.sin(age * 0.5 + j * 1.7);
+                float fh = z.radius * 0.28f * flick;
+                paint.setColor(Color.argb((int) (200 * fade), 255, 90, 30));
+                canvas.drawCircle(fx, fy - fh * 0.3f, fh * 0.55f, paint);
+                paint.setColor(Color.argb((int) (230 * fade), 255, 200, 70));
+                canvas.drawCircle(fx, fy - fh * 0.5f, fh * 0.3f, paint);
+            }
+            tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
+            paint.setColor(Color.argb((int) (50 * fade), 255, 120, 40));
+            canvas.drawOval(tmpRect, paint);
+            return;
+        }
         if (z.type == Zone.LAVA) {
             tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
             paint.setColor(Color.argb((int) (200 * fade), 120, 30, 10));
