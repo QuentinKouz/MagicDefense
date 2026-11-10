@@ -17,6 +17,9 @@ Projet réalisé en binôme dans le cadre du TP d'IHM (M2) — application Andro
 **[⬇️ Télécharger MagicDefense.apk](https://github.com/QuentinKouz/MagicDefense/releases/latest/download/MagicDefense.apk)**  
 (toutes les versions : [page des releases](https://github.com/QuentinKouz/MagicDefense/releases))
 
+**Version 2 (branche `v2`)** : l'APK est directement dans le dépôt, [`apk/MagicDefense-v2.apk`](https://github.com/QuentinKouz/MagicDefense/raw/v2/apk/MagicDefense-v2.apk).  
+Si une version précédente est installée et qu'Android refuse la mise à jour (« application non installée »), désinstallez d'abord l'ancienne version : elles ne sont pas signées avec la même clé.
+
 1. Ouvrez le lien ci-dessus **depuis votre téléphone Android** (ou transférez-y le fichier).
 2. Ouvrez `MagicDefense.apk` une fois téléchargé.
 3. Android demande d'autoriser l'installation depuis cette source (navigateur, gestionnaire de fichiers…) : acceptez, puis **Installer**.

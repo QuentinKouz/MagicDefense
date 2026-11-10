@@ -18,3 +18,5 @@ app/release/
 *.keystore
 *.apk
 *.aab
+# Exception (branche v2) : l'APK de la V2 est versionné dans le dépôt
+!/apk/MagicDefense-v2.apk
