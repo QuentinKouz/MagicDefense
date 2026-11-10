@@ -41,8 +41,16 @@ public class TerrainRenderer {
     private final RectF dst = new RectF();
     private float wallTop; // haut du rempart, en pixels de l'écran
 
+    // Teinte de chaque biome (Prairie = décor d'origine, sans filtre)
+    private final android.graphics.ColorFilter[] biomeFilters =
+            new android.graphics.ColorFilter[Palette.BIOME_TERRAIN_FILTER.length];
+
     public TerrainRenderer() {
         pixelPaint.setFilterBitmap(false); // pixels nets, comme les sprites
+        for (int b = 1; b < biomeFilters.length; b++) {
+            biomeFilters[b] = new android.graphics.LightingColorFilter(
+                    Palette.BIOME_TERRAIN_FILTER[b][0], Palette.BIOME_TERRAIN_FILTER[b][1]);
+        }
     }
 
     // À appeler quand la taille de l'écran est connue (après board.resize)
@@ -67,9 +75,16 @@ public class TerrainRenderer {
     }
 
     public void draw(Canvas canvas, boolean night) {
+        draw(canvas, night, 0);
+    }
+
+    // biome : teinte du décor (désert, toundra, marais, volcan, crépuscule)
+    public void draw(Canvas canvas, boolean night, int biome) {
         Bitmap bmp = night ? nightBitmap : dayBitmap;
         if (bmp != null) {
+            pixelPaint.setColorFilter(biome > 0 && biome < biomeFilters.length ? biomeFilters[biome] : null);
             canvas.drawBitmap(bmp, null, dst, pixelPaint);
+            pixelPaint.setColorFilter(null);
         }
     }
 

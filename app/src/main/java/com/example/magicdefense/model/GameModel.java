@@ -1,13 +1,14 @@
 package com.example.magicdefense.model;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 // Tout l'état de la partie et ses règles. Aucun dessin, aucun toucher ici.
 public class GameModel {
 
-    // Événements du jeu, pour les retours (vibrations, sauvegarde, et plus tard les sons)
+    // Événements du jeu, pour les retours (vibrations, sons, sauvegarde)
     public interface GameListener {
         void onCastleHit();
         void onUltimateTriggered();
@@ -16,6 +17,13 @@ public class GameModel {
         void onGameOver();
         void onEnemyKilled();
         void onRecruit();
+        void onChestOpened();     // le couvercle saute (première carte du coffre)
+        void onChestCardRevealed(); // une carte suivante sort du coffre
+        void onMageUpgraded();
+        void onUnitBought();
+        void onReaction();
+        void onBossArrived();
+        void onProgressChanged(); // progression permanente modifiée : à sauvegarder
     }
 
     private GameListener listener;
@@ -28,9 +36,8 @@ public class GameModel {
     public static final int START_GOLD = 20;
     public static final int MAGE_COST = 10;
     public static final int GOLD_PER_KILL = 5;
-    public static final int MAX_LEVEL = 5;
+    public static final int MAX_LEVEL = 5;                 // niveau de fusion maximal d'un mage
     public static final boolean SAME_TYPE_REQUIRED = true; // fusion du même élément uniquement
-    private static final int SPAWN_DELAY = 60;             // ≈ 1 s entre deux ennemis
     public static final int ULTIMATE_KILLS_REQUIRED = 20; // ennemis à tuer pour remplir la jauge
     public static final int STUN_DURATION = 240; // ≈ 4 s d'étourdissement
     // Château
@@ -38,11 +45,27 @@ public class GameModel {
     public static final float STARS_3_MIN = 0.70f; // à partir de 70 % de PV : 3 étoiles
     public static final float STARS_2_MIN = 0.40f; // à partir de 40 % de PV : 2 étoiles
     private static final int HIT_FLASH_DURATION = 20; // ≈ 0,3 s de flash rouge
+    // Plafonds : au-delà du niveau 6, seuls les PV des gobelins continuent de grimper
+    private static final float MAX_ENEMY_SPEED = 4.2f;   // vitesse max (≈ celle du niveau 6)
+    private static final int MAX_ENEMY_DAMAGE = 5000;    // dégâts max d'un gobelin normal
+    private static final float MAX_HIT_RATIO = 0.6f;     // aucun coup (même du boss) ne dépasse 60 % des PV
 
     // Nuit : plus dur, mais un peu plus rentable
     public static final float NIGHT_SPEED_MULT = 1.3f; // ennemis 30 % plus rapides
     public static final int GOLD_PER_KILL_NIGHT = 6;   // 20 % d'or en plus
     private static final int MODE_BANNER_DURATION = 120; // bandeau affiché ≈ 2 s
+    private static final int ANNOUNCE_DURATION = 150;    // bandeau boss / biome ≈ 2,5 s
+
+    // Carte : les niveaux (sans fin) sont affichés par pages de 6
+    public static final int LEVELS_PER_PAGE = 6;
+    // Écran MAGES : 4 éléments par page
+    public static final int UPGRADE_ROWS_PER_PAGE = 4;
+
+    // Ouverture de coffre, carte par carte (façon jeu de cartes) :
+    // le coffre tombe (CHEST_INTRO_FRAMES), puis chaque toucher fait sortir une carte, puis récapitulatif
+    public static final int CHEST_INTRO_FRAMES = 45;
+    public static final int CARD_GEMS = -2;              // « type » de la carte des gemmes
+
     // ---------- État ----------
     private final Board board;
     private final Random random = new Random();
@@ -56,21 +79,45 @@ public class GameModel {
     private int wave = 0;
     private int enemiesLeftToSpawn = 0;
     private int spawnTimer = 0;
+    private boolean bossPending = false; // le boss arrive en dernier dans cette vague
     // Ultime
     private int ultimateCharge = 0; // ennemis tués depuis le dernier ultime
     private int stunTimer = 0; // > 0 : les ennemis sont étourdis
     private boolean nightMode = false;
     private boolean nightModeDisabled = false; // option du joueur
     private boolean musicEnabled = true;       // option du joueur : musique de fond
+    private boolean leftHanded = false;        // option du joueur : interface en miroir
     private int castleHp = CASTLE_MAX_HP;
     private int castleHitTimer = 0; // > 0 : le château vient d'être touché
     private int level = 1;
+    private LevelSpec spec = LevelSpec.forLevel(1); // description du niveau en cours
     private final ArrayList<Splash> splashes = new ArrayList<>();
-    public static final int MAX_LEVELS = 6;
+    private final ArrayList<Zone> zones = new ArrayList<>();          // lave, vapeur
+    private final ArrayList<Reaction> reactions = new ArrayList<>();  // effets visuels des réactions
 
-    private int unlockedLevel = 1;                           // plus haut niveau jouable
-    private final int[] bestStars = new int[MAX_LEVELS + 1]; // index = numéro du niveau
-    private int selectedLevel = 1;                           // niveau choisi sur la carte
+    private int unlockedLevel = 1;          // plus haut niveau jouable (sans limite)
+    private int[] bestStars = new int[LEVELS_PER_PAGE + 1]; // index = numéro du niveau, agrandi au besoin
+    private int selectedLevel = 1;          // niveau choisi sur la carte
+    private int mapPage = 0;                // page de la carte affichée (0 = niveaux 1 à 6)
+    private int upgradePage = 0;            // page de l'écran MAGES
+
+    // Progression permanente (coffres, fragments, rangs, gemmes, équipe) et fin de partie
+    private final Progression progression = new Progression();
+    private int lastChestsEarned = 0;       // coffres gagnés à la dernière fin de partie
+    private boolean endlessRewarded = false; // la partie infinie en cours a déjà été récompensée
+    private boolean lastEndlessRecord = false; // la dernière partie infinie a battu le record
+    private int chestAnimFrame = 0;          // images depuis l'ouverture du coffre
+    private int chestCardFrame = 0;          // images depuis la dernière carte sortie
+    private int chestRevealed = 0;           // cartes déjà sorties du coffre
+    private boolean chestSummary = false;    // récapitulatif affiché
+    private int[] chestCardTypes = new int[0];   // contenu du coffre, dans l'ordre de sortie
+    private int[] chestCardAmounts = new int[0];
+
+    // Bandeau d'annonce (boss, nouveau biome)
+    private int announceTimer = 0;
+    private String announceTitle = "";
+    private String announceSubtitle = "";
+    private boolean announceBoss = false;
 
     private float soundVolume = 1f; // position du curseur, de 0 à 1
 
@@ -79,7 +126,6 @@ public class GameModel {
 
     private final ArrayList<Bolt> bolts = new ArrayList<>();
     private final ArrayList<HitEffect> hits = new ArrayList<>();
-
 
 
     public GameModel(Board board) {
@@ -94,6 +140,41 @@ public class GameModel {
     public int getGold() { return gold; }
     public int getWave() { return wave; }
     public boolean canAffordMage() { return gold >= MAGE_COST; }
+    public Progression getProgression() { return progression; }
+    public boolean isEndless() { return spec.endless; }
+    public LevelSpec getSpec() { return spec; }
+    public int getLastChestsEarned() { return lastChestsEarned; }
+    public boolean isLastEndlessRecord() { return lastEndlessRecord; }
+    public List<Zone> getZones() { return zones; }
+    public List<Reaction> getReactions() { return reactions; }
+
+    // Biome du décor en cours (change toutes les 10 vagues en mode infini)
+    public int getBiome() {
+        return spec.biome(Math.max(1, wave));
+    }
+
+    // Boss vivant sur le terrain (pour sa grande barre de vie), ou null
+    public Enemy getBoss() {
+        for (Enemy e : enemies) {
+            if (e.isBoss() && !e.isDead()) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    // Bandeau d'annonce : 1 quand il apparaît, 0 quand il a disparu
+    public float getAnnounce() { return announceTimer / (float) ANNOUNCE_DURATION; }
+    public String getAnnounceTitle() { return announceTitle; }
+    public String getAnnounceSubtitle() { return announceSubtitle; }
+    public boolean isAnnounceBoss() { return announceBoss; }
+
+    private void announce(String title, String subtitle, boolean boss) {
+        announceTitle = title;
+        announceSubtitle = subtitle;
+        announceBoss = boss;
+        announceTimer = ANNOUNCE_DURATION;
+    }
 
     // Remplissage de la jauge, entre 0 et 1 (pour l'affichage)
     public float getUltimateCharge() {
@@ -146,6 +227,18 @@ public class GameModel {
         musicEnabled = !musicEnabled;
     }
 
+    public boolean isLeftHanded() {
+        return leftHanded;
+    }
+
+    public void setLeftHanded(boolean on) {
+        leftHanded = on;
+    }
+
+    public void toggleLeftHanded() {
+        leftHanded = !leftHanded;
+    }
+
     // Pause ou accueil → Options (on retient d'où l'on vient)
     public void openOptions() {
         if (state == GameState.PAUSED || state == GameState.START) {
@@ -183,40 +276,79 @@ public class GameModel {
         return castleHitTimer / (float) HIT_FLASH_DURATION;
     }
 
-    // Dégâts d'un ennemi qui atteint le château : plus forts à chaque vague
-    private int enemyDamage() {
-        return (int) (1000 + (difficulty() - 1) * 100);
+    // Dégâts d'un ennemi qui atteint le château : plus forts à chaque vague (plafonnés)
+    private int enemyDamage(Enemy enemy) {
+        float base = Math.min(MAX_ENEMY_DAMAGE, 1000 + (difficulty() - 1) * 100);
+        float dmg = base * Enemy.CASTLE_DAMAGE_MULT[enemy.kind];
+        return (int) Math.min(dmg, CASTLE_MAX_HP * MAX_HIT_RATIO);
     }
 
     public int getLevel() {
         return level;
     }
 
-    // Difficulté : la vague 1 reste facile, mais chaque niveau accélère la progression
+    // Difficulté de la vague en cours (voir LevelSpec)
     private float difficulty() {
-        return wave * (1 + 0.75f * (level - 1));
+        return spec.difficulty(wave);
     }
 
-    // Niveau 1 = 3 vagues, niveau 2 = 4, niveau 3 = 5...
+    // Nombre de vagues du niveau en cours (0 en mode infini)
     public int getWavesInLevel() {
-        return wavesForLevel(level);
+        return spec.waves;
     }
 
 
     public List<Splash> getSplashes() {
         return splashes;
     }
-    // Nombre de vagues d'un niveau : 1 → 3 vagues, 2 → 4...
+    // Nombre de vagues d'un niveau : 1 → 3 vagues, 2 → 4... puis généré à partir du niveau 7
     public static int wavesForLevel(int lv) {
-        return lv + 2;
+        return LevelSpec.forLevel(lv).waves;
     }
 
     public int getUnlockedLevel() { return unlockedLevel; }
-    public int getBestStars(int lv) { return bestStars[lv]; }
     public int getSelectedLevel() { return selectedLevel; }
 
+    public int getBestStars(int lv) {
+        return lv >= 1 && lv < bestStars.length ? bestStars[lv] : 0;
+    }
+
+    // Les niveaux sont infinis : il y a toujours un niveau suivant (sauf en mode infini)
     public boolean hasNextLevel() {
-        return level < MAX_LEVELS;
+        return !spec.endless;
+    }
+
+    // ---------- Carte des niveaux (pages de 6) ----------
+    public int getMapPage() { return mapPage; }
+
+    // Dernière page consultable : celle qui contient le plus haut niveau débloqué
+    public int getMaxMapPage() {
+        return (unlockedLevel - 1) / LEVELS_PER_PAGE;
+    }
+
+    // Biome de la page de carte affichée
+    public int getMapBiome() {
+        return LevelSpec.biomeForLevel(levelAtSlot(1));
+    }
+
+    // Numéro du niveau affiché dans la case `slot` (1 à 6) de la page en cours
+    public int levelAtSlot(int slot) {
+        return mapPage * LEVELS_PER_PAGE + slot;
+    }
+
+    public boolean canChangeMapPage(int delta) {
+        int target = mapPage + delta;
+        return target >= 0 && target <= getMaxMapPage();
+    }
+
+    public void changeMapPage(int delta) {
+        if (canChangeMapPage(delta)) {
+            mapPage += delta;
+        }
+    }
+
+    private void showPageOf(int lv) {
+        mapPage = (lv - 1) / LEVELS_PER_PAGE;
     }
 
     // Toucher un niveau sur la carte : seulement s'il est débloqué
@@ -228,26 +360,50 @@ public class GameModel {
 
     // Chargement de la sauvegarde
     public void loadProgress(int unlocked, int[] stars, boolean nightDisabled) {
-        unlockedLevel = Math.max(1, Math.min(unlocked, MAX_LEVELS));
-        for (int lv = 1; lv <= MAX_LEVELS; lv++) {
+        unlockedLevel = Math.max(1, unlocked);
+        bestStars = new int[Math.max(unlockedLevel, LEVELS_PER_PAGE) + 1];
+        for (int lv = 1; lv < stars.length && lv < bestStars.length; lv++) {
             bestStars[lv] = stars[lv];
         }
         nightModeDisabled = nightDisabled;
         selectedLevel = unlockedLevel;
+        showPageOf(selectedLevel);
     }
 
-    // Fin de niveau réussie : on garde le meilleur score et on débloque la suite
+    // Fin de niveau réussie : on garde le meilleur score, on débloque la suite, on donne les coffres
     private void recordVictory() {
         int stars = getStars();
+        if (level >= bestStars.length) {
+            bestStars = Arrays.copyOf(bestStars, level * 2 + 1); // tableau agrandi
+        }
         if (stars > bestStars[level]) {
             bestStars[level] = stars;
         }
-        if (level == unlockedLevel && level < MAX_LEVELS) {
+        if (level == unlockedLevel) {
             unlockedLevel = level + 1;
         }
-        selectedLevel = hasNextLevel() ? level + 1 : level;
+        selectedLevel = level + 1;
+        showPageOf(selectedLevel);
+
+        lastChestsEarned = Progression.chestsForLevel(level);
+        progression.addChests(lastChestsEarned);
         if (listener != null) {
             listener.onLevelCompleted();
+        }
+    }
+
+    // Fin d'une partie infinie (game over, abandon) : coffres et record, une seule fois par partie
+    private void finishEndlessRun() {
+        if (!spec.endless || endlessRewarded) {
+            return;
+        }
+        endlessRewarded = true;
+        int wavesCleared = wave - 1; // la vague en cours n'a pas été repoussée
+        lastChestsEarned = Progression.chestsForEndless(wavesCleared);
+        progression.addChests(lastChestsEarned);
+        lastEndlessRecord = progression.recordEndlessWave(wave);
+        if (listener != null) {
+            listener.onProgressChanged();
         }
     }
 
@@ -274,12 +430,25 @@ public class GameModel {
 
     // ---------- Transitions d'état ----------
     public void startLevel(int newLevel) {
-        level = newLevel;
+        level = Math.max(1, newLevel);
+        startRun(LevelSpec.forLevel(level));
+    }
+
+    // Mode vague infinie : les vagues s'enchaînent jusqu'à la chute du château
+    public void startEndless() {
+        level = 1;
+        startRun(LevelSpec.endless());
+    }
+
+    private void startRun(LevelSpec newSpec) {
+        spec = newSpec;
         enemies.clear();
         projectiles.clear();
         splashes.clear();
         bolts.clear();
         hits.clear();
+        zones.clear();
+        reactions.clear();
         grid = new Mage[Board.ROWS][Board.COLS];
         gold = START_GOLD;
         wave = 0;
@@ -288,9 +457,12 @@ public class GameModel {
         castleHp = CASTLE_MAX_HP;
         castleHitTimer = 0;
         modeBannerTimer = 0;
+        announceTimer = 0;
+        lastChestsEarned = 0;
+        endlessRewarded = false;
+        lastEndlessRecord = false;
         startNextWave();
         state = GameState.PLAYING;
-
     }
 
     // Depuis l'accueil : on commence au niveau 1
@@ -298,9 +470,14 @@ public class GameModel {
         startLevel(1);
     }
 
-    // Recommencer le niveau en cours (pause, game over)
+    // Recommencer la partie en cours (pause, game over)
     public void restartLevel() {
-        startLevel(level);
+        if (spec.endless) {
+            finishEndlessRun(); // l'abandon garde les coffres déjà mérités
+            startEndless();
+        } else {
+            startLevel(level);
+        }
     }
 
     public void nextLevel() {
@@ -323,14 +500,217 @@ public class GameModel {
 
     // Retour à la carte, avec le niveau en cours sélectionné
     public void quitToMenu() {
-        if (state != GameState.VICTORY) {
+        if (spec.endless) {
+            finishEndlessRun();
+        } else if (state != GameState.VICTORY) {
             selectedLevel = level;
+            showPageOf(level);
         }
         state = GameState.START;
     }
 
+    // ---------- Écran MAGES : coffres, rangs, équipe ----------
+    public void openUpgrades() {
+        if (state == GameState.START) {
+            upgradePage = 0;
+            state = GameState.UPGRADES;
+        }
+    }
+
+    public void closeUpgrades() {
+        if (state == GameState.UPGRADES) {
+            state = GameState.START;
+        }
+    }
+
+    public int getUpgradePage() { return upgradePage; }
+
+    public int getUpgradePageCount() {
+        int owned = progression.ownedCount();
+        return Math.max(1, (owned + UPGRADE_ROWS_PER_PAGE - 1) / UPGRADE_ROWS_PER_PAGE);
+    }
+
+    public boolean canChangeUpgradePage(int delta) {
+        int target = upgradePage + delta;
+        return target >= 0 && target < getUpgradePageCount();
+    }
+
+    public void changeUpgradePage(int delta) {
+        if (canChangeUpgradePage(delta)) {
+            upgradePage += delta;
+        }
+    }
+
+    // Élément affiché sur la ligne `row` de la page en cours (seulement les mages possédés), ou -1
+    public int upgradeTypeAtRow(int row) {
+        int index = upgradePage * UPGRADE_ROWS_PER_PAGE + row;
+        int n = 0;
+        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
+            if (progression.isOwned(t)) {
+                if (n == index) {
+                    return t;
+                }
+                n++;
+            }
+        }
+        return -1;
+    }
+
+    // Ouvre un coffre et lance l'animation (depuis l'écran MAGES, ou « encore » à la fin de l'animation)
+    public boolean openChest() {
+        boolean fromAnim = state == GameState.CHEST_OPENING && isChestRevealComplete();
+        if ((state != GameState.UPGRADES && !fromAnim) || !progression.openChest(random)) {
+            return false;
+        }
+        state = GameState.CHEST_OPENING;
+        chestAnimFrame = 0;
+        chestCardFrame = 0;
+        chestRevealed = 0;
+        chestSummary = false;
+        buildChestCards();
+        if (listener != null) {
+            listener.onProgressChanged(); // sauvegardé tout de suite (même si l'appli est fermée pendant l'animation)
+        }
+        return true;
+    }
+
+    // Cartes du coffre : une par élément obtenu (de la plus petite à la plus grosse), les gemmes en dernier
+    private void buildChestCards() {
+        int n = getChestCardCount();
+        chestCardTypes = new int[n];
+        chestCardAmounts = new int[n];
+        int k = 0;
+        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
+            if (progression.getLastChestReward(t) > 0) {
+                chestCardTypes[k] = t;
+                chestCardAmounts[k] = progression.getLastChestReward(t);
+                k++;
+            }
+        }
+        // Tri par quantité croissante : le suspense monte jusqu'à la dernière carte
+        for (int i = 1; i < k; i++) {
+            for (int j = i; j > 0 && chestCardAmounts[j] < chestCardAmounts[j - 1]; j--) {
+                int ta = chestCardTypes[j];
+                chestCardTypes[j] = chestCardTypes[j - 1];
+                chestCardTypes[j - 1] = ta;
+                int aa = chestCardAmounts[j];
+                chestCardAmounts[j] = chestCardAmounts[j - 1];
+                chestCardAmounts[j - 1] = aa;
+            }
+        }
+        if (progression.getLastChestGems() > 0) {
+            chestCardTypes[k] = CARD_GEMS;
+            chestCardAmounts[k] = progression.getLastChestGems();
+        }
+    }
+
+    public int getChestAnimFrame() { return chestAnimFrame; }
+    public int getChestCardFrame() { return chestCardFrame; }
+    public int getChestRevealed() { return chestRevealed; }
+    public boolean isChestIntroDone() { return chestAnimFrame >= CHEST_INTRO_FRAMES; }
+
+    // Carte i (dans l'ordre de sortie) : élément (ou CARD_GEMS) et quantité
+    public int getChestCardType(int i) { return chestCardTypes[i]; }
+    public int getChestCardAmount(int i) { return chestCardAmounts[i]; }
+
+    // Nombre de cartes de récompense : une par élément obtenu, plus les gemmes
+    public int getChestCardCount() {
+        int n = progression.getLastChestGems() > 0 ? 1 : 0;
+        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
+            if (progression.getLastChestReward(t) > 0) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    // Toutes les cartes sont sorties et le récapitulatif est affiché
+    public boolean isChestRevealComplete() {
+        return chestSummary;
+    }
+
+    // Toucher pendant l'ouverture : arrivée du coffre → carte suivante → récapitulatif → fermer
+    public void tapChestOpening() {
+        if (state != GameState.CHEST_OPENING) {
+            return;
+        }
+        if (!isChestIntroDone()) {
+            chestAnimFrame = CHEST_INTRO_FRAMES; // le coffre se pose tout de suite
+        } else if (chestRevealed < chestCardTypes.length) {
+            if (listener != null) {
+                if (chestRevealed == 0) {
+                    listener.onChestOpened();       // le couvercle saute
+                } else {
+                    listener.onChestCardRevealed(); // carte suivante
+                }
+            }
+            chestRevealed++;
+            chestCardFrame = 0;
+        } else if (!chestSummary) {
+            chestSummary = true;
+            chestCardFrame = 0;
+        } else {
+            state = GameState.UPGRADES;
+        }
+    }
+
+    private void updateChestAnimation() {
+        chestAnimFrame++;
+        chestCardFrame++;
+    }
+
+    public boolean upgradeMage(int type) {
+        if (state != GameState.UPGRADES || !progression.upgrade(type)) {
+            return false;
+        }
+        if (listener != null) {
+            listener.onMageUpgraded();
+            listener.onProgressChanged();
+        }
+        return true;
+    }
+
+    // Toucher le portrait d'un mage : il rejoint ou quitte l'équipe
+    public boolean toggleTeam(int type) {
+        if (state != GameState.UPGRADES || !progression.toggleTeam(type)) {
+            return false;
+        }
+        if (listener != null) {
+            listener.onProgressChanged();
+        }
+        return true;
+    }
+
+    // ---------- Marché ----------
+    public void openMarket() {
+        if (state == GameState.START) {
+            state = GameState.MARKET;
+        }
+    }
+
+    public void closeMarket() {
+        if (state == GameState.MARKET) {
+            state = GameState.START;
+        }
+    }
+
+    public boolean buyUnit(int type) {
+        if (state != GameState.MARKET || !progression.buy(type)) {
+            return false;
+        }
+        if (listener != null) {
+            listener.onUnitBought();
+            listener.onProgressChanged();
+        }
+        return true;
+    }
+
     // ---------- Une étape de jeu (appelée ≈ 60 fois/s) ----------
     public void update() {
+        if (state == GameState.CHEST_OPENING) {
+            updateChestAnimation();
+            return;
+        }
         if (state != GameState.PLAYING) {
             return;
         }
@@ -338,19 +718,19 @@ public class GameModel {
         if (castleHitTimer > 0) {
             castleHitTimer--;
         }
-
-
         if (modeBannerTimer > 0) {
             modeBannerTimer--;
         }
+        if (announceTimer > 0) {
+            announceTimer--;
+        }
 
-        // Les éclaboussures s'estompent puis disparaissent
+        // Les effets s'estompent puis disparaissent
         for (int i = splashes.size() - 1; i >= 0; i--) {
             if (splashes.get(i).update()) {
                 splashes.remove(i);
             }
         }
-
         for (int i = bolts.size() - 1; i >= 0; i--) {
             if (bolts.get(i).update()) {
                 bolts.remove(i);
@@ -361,43 +741,91 @@ public class GameModel {
                 hits.remove(i);
             }
         }
-
-        // 1. Apparition des ennemis de la vague
-        if (enemiesLeftToSpawn > 0) {
-            spawnTimer--;
-            if (spawnTimer <= 0) {
-                spawnEnemy();
-                enemiesLeftToSpawn--;
-                spawnTimer = SPAWN_DELAY;
+        for (int i = reactions.size() - 1; i >= 0; i--) {
+            if (reactions.get(i).update()) {
+                reactions.remove(i);
             }
         }
 
-        // 2. Déplacement des ennemis (sauf s'ils sont étourdis)
+        // Zones au sol : la lave brûle, la vapeur ralentit
+        for (int i = zones.size() - 1; i >= 0; i--) {
+            Zone z = zones.get(i);
+            for (Enemy e : enemies) {
+                if (z.contains(e)) {
+                    if (z.type == Zone.LAVA) {
+                        e.hp -= z.dps / 60f;
+                    } else {
+                        e.slowTimer = Math.max(e.slowTimer, 5);
+                    }
+                }
+            }
+            if (z.update()) {
+                zones.remove(i);
+            }
+        }
+
+        // Poison et marques élémentaires (s'écoulent même pendant l'ultime)
+        for (Enemy e : enemies) {
+            e.tickStatus();
+        }
+
+        // 1. Apparition des ennemis de la vague (le boss en dernier)
+        if (enemiesLeftToSpawn > 0) {
+            spawnTimer--;
+            if (spawnTimer <= 0) {
+                if (bossPending && enemiesLeftToSpawn == 1) {
+                    spawnBoss();
+                } else {
+                    spawnEnemy(spec.rollKind(wave, random));
+                }
+                enemiesLeftToSpawn--;
+                spawnTimer = spec.spawnDelay(wave);
+            }
+        }
+
+        // 2. Déplacement des ennemis (sauf pendant l'ultime) et invocations
         if (stunTimer > 0) {
             stunTimer--;
         } else {
+            ArrayList<Enemy> summoned = null;
             for (int i = enemies.size() - 1; i >= 0; i--) {
                 Enemy enemy = enemies.get(i);
                 enemy.update(nightMode ? NIGHT_SPEED_MULT : 1f);
 
+                // Chamans et boss : invoquent des diablotins à intervalle régulier
+                if (Enemy.SUMMON_DELAY[enemy.kind] > 0 && enemy.stunTimer == 0 && enemy.y > 0) {
+                    enemy.summonTimer--;
+                    if (enemy.summonTimer <= 0) {
+                        enemy.summonTimer = Enemy.SUMMON_DELAY[enemy.kind];
+                        if (summoned == null) {
+                            summoned = new ArrayList<>();
+                        }
+                        summonImps(enemy, summoned);
+                    }
+                }
+
                 if (enemy.y + enemy.radius >= board.gridTop) {
                     enemies.remove(i);              // l'ennemi s'écrase sur le château
-                    castleHp -= enemyDamage();
+                    castleHp -= enemyDamage(enemy);
                     castleHitTimer = HIT_FLASH_DURATION;
 
                     if (listener != null) {
-                        listener.onCastleHit();     // vibration (et plus tard un son)
+                        listener.onCastleHit();     // vibration et son
                     }
 
                     if (castleHp <= 0) {
                         castleHp = 0;
                         state = GameState.GAME_OVER;
+                        finishEndlessRun(); // mode infini : coffres selon la vague atteinte
                         if (listener != null) {
                             listener.onGameOver();
                         }
                         return;
                     }
                 }
+            }
+            if (summoned != null) {
+                enemies.addAll(summoned);
             }
         }
 
@@ -423,7 +851,7 @@ public class GameModel {
                 switch (mage.type) {
                     case Mage.LIGHTNING:
                         // Foudre : l'éclair relie instantanément le bâton à la cible
-                        target.hp -= mage.getDamage();
+                        applyHit(target, mage.getDamage(), Mage.LIGHTNING, 0, 0, 0);
                         bolts.add(new Bolt(tipX, tipY, target.x, target.y, mage.level));
                         hits.add(new HitEffect(target.x, target.y, Mage.LIGHTNING, mage.level));
                         break;
@@ -440,7 +868,8 @@ public class GameModel {
                         break;
 
                     default:
-                        // Feu et Terre : tirés depuis l'embout du bâton (Terre : salve en éventail)
+                        // Feu, Terre, Poison, Air, Invocateur : tirés depuis l'embout du bâton
+                        // (Terre : salve en éventail)
                         int shots = mage.getShots();
                         for (int k = 0; k < shots; k++) {
                             float offset = (k - (shots - 1) / 2f) * 12 * board.density;
@@ -469,16 +898,17 @@ public class GameModel {
                 if (p.aoeRadius > 0) {
                     splashes.add(new Splash(p.target.x, p.target.y, p.aoeRadius, p.level)); // effet visuel
                     // Eau : touche tous les ennemis dans la zone autour de l'impact
+                    float cx = p.target.x;
+                    float cy = p.target.y;
                     for (Enemy e : enemies) {
-                        float dx = e.x - p.target.x;
-                        float dy = e.y - p.target.y;
+                        float dx = e.x - cx;
+                        float dy = e.y - cy;
                         if (dx * dx + dy * dy <= p.aoeRadius * p.aoeRadius) {
-                            e.hp -= p.damage;
+                            applyHit(e, p.damage, p.type, 0, 0, 0);
                         }
                     }
-
                 } else {
-                    p.target.hp -= p.damage;
+                    applyHit(p.target, p.damage, p.type, p.poisonDps, p.knockback, p.stunFrames);
                     hits.add(new HitEffect(p.target.x, p.target.y, p.type, p.level)); // explosion, éclats...
                 }
                 projectiles.remove(i);
@@ -487,9 +917,11 @@ public class GameModel {
 
         // 5. Retrait des ennemis morts et gain de PO
         for (int i = enemies.size() - 1; i >= 0; i--) {
-            if (enemies.get(i).isDead()) {
+            Enemy dead = enemies.get(i);
+            if (dead.isDead()) {
                 enemies.remove(i);
-                gold += nightMode ? GOLD_PER_KILL_NIGHT : GOLD_PER_KILL;
+                int base = nightMode ? GOLD_PER_KILL_NIGHT : GOLD_PER_KILL;
+                gold += Math.max(1, Math.round(base * Enemy.GOLD_MULT[dead.kind]));
                 if (listener != null) {
                     listener.onEnemyKilled();
                 }
@@ -499,16 +931,138 @@ public class GameModel {
             }
         }
 
-        // 6. Vague terminée : vague suivante, ou victoire si c'était la dernière
+        // 6. Vague terminée : vague suivante, ou victoire si c'était la dernière (jamais en mode infini)
         if (enemiesLeftToSpawn == 0 && enemies.isEmpty()) {
-            if (wave >= getWavesInLevel()) {
+            if (!spec.endless && wave >= spec.waves) {
                 projectiles.clear();
-                recordVictory();
+                zones.clear();
                 state = GameState.VICTORY;
+                recordVictory();
             } else {
                 startNextWave();
             }
         }
+    }
+
+    // ---------- Coups et réactions élémentaires ----------
+
+    // Un coup d'élément `element` touche l'ennemi : dégâts, effets, puis marque ou réaction
+    private void applyHit(Enemy e, float damage, int element, float poisonDps, float knockback, int stun) {
+        e.hp -= damage;
+        if (poisonDps > 0) {
+            e.poison(poisonDps, Mage.POISON_DURATION);
+        }
+        if (knockback > 0) {
+            e.knockBack(knockback);
+        }
+        if (stun > 0) {
+            e.stun(stun);
+        }
+        if (!Reaction.leavesMark(element)) {
+            return;
+        }
+        int r = Reaction.between(e.mark, element);
+        if (r != Reaction.NONE) {
+            e.mark = Enemy.NO_MARK;
+            e.markTimer = 0;
+            triggerReaction(r, e, damage);
+        } else {
+            e.mark = element;
+            e.markTimer = Enemy.MARK_DURATION;
+        }
+    }
+
+    // Effet de la réaction autour de l'ennemi e (dmg = dégâts du coup qui l'a déclenchée)
+    private void triggerReaction(int r, Enemy e, float dmg) {
+        float d = board.density;
+        float ringRadius = 60 * d;
+        switch (r) {
+            case Reaction.ELECTROCUTION: {
+                e.hp -= dmg * Reaction.ELECTRO_BONUS;
+                e.stun(Reaction.ELECTRO_STUN);
+                // Arcs électriques vers les ennemis les plus proches
+                float range = Reaction.ELECTRO_RANGE * d;
+                ArrayList<Enemy> near = new ArrayList<>();
+                for (Enemy o : enemies) {
+                    if (o != e && !o.isDead() && dist2(o, e) <= range * range) {
+                        near.add(o);
+                    }
+                }
+                near.sort((a, b) -> Float.compare(dist2(a, e), dist2(b, e)));
+                for (int k = 0; k < Math.min(Reaction.ELECTRO_TARGETS, near.size()); k++) {
+                    Enemy o = near.get(k);
+                    o.hp -= dmg;
+                    o.stun(Reaction.ELECTRO_STUN / 2);
+                    bolts.add(new Bolt(e.x, e.y, o.x, o.y, 3));
+                }
+                ringRadius = range * 0.6f;
+                break;
+            }
+            case Reaction.LAVA:
+                zones.add(new Zone(e.x, e.y, Reaction.LAVA_RADIUS * d, Zone.LAVA,
+                        dmg * Reaction.LAVA_DPS_FACTOR, Reaction.LAVA_DURATION));
+                ringRadius = Reaction.LAVA_RADIUS * d;
+                break;
+            case Reaction.STEAM: {
+                float rad = Reaction.STEAM_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.STEAM, 0, Reaction.STEAM_DURATION));
+                damageAround(e.x, e.y, rad, dmg * Reaction.STEAM_DAMAGE);
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.TOXIC_BLAST: {
+                float rad = Reaction.TOXIC_BLAST_RADIUS * d;
+                damageAround(e.x, e.y, rad, dmg * Reaction.TOXIC_BLAST_DAMAGE);
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.TOXIC_CLOUD: {
+                float rad = Reaction.TOXIC_CLOUD_RADIUS * d;
+                float dps = Math.max(e.poisonDps, dmg);
+                for (Enemy o : enemies) {
+                    if (dist2(o, e) <= rad * rad) {
+                        o.poison(dps, Mage.POISON_DURATION);
+                    }
+                }
+                ringRadius = rad;
+                break;
+            }
+            case Reaction.SANDSTORM: {
+                float rad = Reaction.SANDSTORM_RADIUS * d;
+                float ex = e.x;
+                float ey = e.y;
+                for (Enemy o : enemies) {
+                    float dx = o.x - ex;
+                    float dy = o.y - ey;
+                    if (dx * dx + dy * dy <= rad * rad) {
+                        o.knockBack(Reaction.SANDSTORM_KNOCKBACK * d);
+                        o.stun(Reaction.SANDSTORM_STUN);
+                    }
+                }
+                ringRadius = rad;
+                break;
+            }
+        }
+        reactions.add(new Reaction(e.x, e.y, r, ringRadius));
+        if (listener != null) {
+            listener.onReaction();
+        }
+    }
+
+    private void damageAround(float x, float y, float radius, float damage) {
+        for (Enemy o : enemies) {
+            float dx = o.x - x;
+            float dy = o.y - y;
+            if (dx * dx + dy * dy <= radius * radius) {
+                o.hp -= damage;
+            }
+        }
+    }
+
+    private static float dist2(Enemy a, Enemy b) {
+        float dx = a.x - b.x;
+        float dy = a.y - b.y;
+        return dx * dx + dy * dy;
     }
 
     // Ennemis visibles, du plus proche du château au plus éloigné
@@ -553,23 +1107,76 @@ public class GameModel {
     }
 
     private void startNextWave() {
+        int previousBiome = spec.biome(Math.max(1, wave));
         wave++;
-        enemiesLeftToSpawn = 3 + wave * 2; // 5, 7, 9... ennemis
+        bossPending = spec.hasBoss(wave);
+        enemiesLeftToSpawn = spec.enemiesInWave(wave) + (bossPending ? 1 : 0); // 5, 7, 9... (+ le boss)
         spawnTimer = 0;
+        // Mode infini : nouveau décor toutes les 10 vagues
+        if (spec.endless && wave > 1 && spec.biome(wave) != previousBiome) {
+            announce(LevelSpec.BIOME_NAMES[spec.biome(wave)].toUpperCase(), "Nouveau territoire", false);
+        }
     }
 
-    private void spawnEnemy() {
-        float radius = 20 * board.density;
-        // Apparition au hasard dans la largeur de la colonne de jeu
-        float x = board.playLeft + radius + random.nextFloat() * (board.playWidth - 2 * radius);
+    // Crée un ennemi du type donné en haut de l'écran (selon la difficulté de la vague)
+    private Enemy createEnemy(int kind, float x) {
+        float radius = 20 * board.density * Enemy.RADIUS_MULT[kind];
         float d = difficulty();
         // Vitesse ajustée à la hauteur de l'écran : même temps de traversée sur tous les appareils
-        float speed = (1f + d * 0.08f) * board.density * board.fieldScale();
-        float hp = 2 + d;
-        enemies.add(new Enemy(x, radius, speed, hp));
+        float baseSpeed = Math.min(1f + d * 0.08f, MAX_ENEMY_SPEED);
+        float speed = baseSpeed * Enemy.SPEED_MULT[kind] * board.density * board.fieldScale();
+        float hp = (2 + d) * Enemy.HP_MULT[kind];
+        return new Enemy(x, radius, speed, hp, kind);
+    }
+
+    private void spawnEnemy(int kind) {
+        float radius = 20 * board.density * Enemy.RADIUS_MULT[kind];
+        // Apparition au hasard dans la largeur de la colonne de jeu
+        float x = board.playLeft + radius + random.nextFloat() * (board.playWidth - 2 * radius);
+        enemies.add(createEnemy(kind, x));
+    }
+
+    private void spawnBoss() {
+        bossPending = false;
+        enemies.add(createEnemy(Enemy.BOSS, board.centerX())); // le boss arrive au centre
+        announce("UN BOSS APPROCHE !", "Le chef gobelin et ses diablotins", true);
+        if (listener != null) {
+            listener.onBossArrived();
+        }
+    }
+
+    // Diablotins invoqués autour d'un chaman ou du boss
+    private void summonImps(Enemy summoner, List<Enemy> out) {
+        int count = Enemy.SUMMON_COUNT[summoner.kind];
+        for (int k = 0; k < count; k++) {
+            float offset = (k - (count - 1) / 2f) * summoner.radius * 1.1f;
+            float minX = board.playLeft + 10 * board.density;
+            float maxX = board.playRight() - 10 * board.density;
+            float x = Math.max(minX, Math.min(maxX, summoner.x + offset));
+            Enemy imp = createEnemy(Enemy.IMP, x);
+            imp.y = summoner.y + summoner.radius * 0.5f; // juste devant l'invocateur
+            out.add(imp);
+        }
     }
 
     // ---------- Actions du joueur ----------
+
+    // Le bouton `slot` (0 à 3) de la barre de recrutement : le mage de cet emplacement d'équipe
+    public int teamTypeAt(int slot) {
+        return progression.getTeamSlot(slot);
+    }
+
+    public boolean canRecruitSlot(int slot) {
+        return canAffordMage() && teamTypeAt(slot) != Progression.NO_UNIT;
+    }
+
+    // Recrute le mage de l'emplacement d'équipe `slot`
+    public void recruitSlot(int slot) {
+        int type = teamTypeAt(slot);
+        if (type != Progression.NO_UNIT) {
+            recruitMage(type);
+        }
+    }
 
     // Place un mage du type donné sur une case libre au hasard
     public void recruitMage(int type) {
@@ -590,7 +1197,7 @@ public class GameModel {
         }
 
         int[] cell = freeCells.get(random.nextInt(freeCells.size()));
-        grid[cell[0]][cell[1]] = new Mage(type);
+        grid[cell[0]][cell[1]] = new Mage(type, progression.getRank(type)); // rang permanent de l'élément
         gold -= MAGE_COST;
         if (listener != null) {
             listener.onRecruit();

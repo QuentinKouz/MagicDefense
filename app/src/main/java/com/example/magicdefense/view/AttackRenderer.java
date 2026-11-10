@@ -13,7 +13,9 @@ import com.example.magicdefense.model.Bolt;
 import com.example.magicdefense.model.HitEffect;
 import com.example.magicdefense.model.Mage;
 import com.example.magicdefense.model.Projectile;
+import com.example.magicdefense.model.Reaction;
 import com.example.magicdefense.model.Splash;
+import com.example.magicdefense.model.Zone;
 
 import java.util.Random;
 
@@ -121,6 +123,107 @@ public class AttackRenderer {
             case Mage.WATER:
                 drawWater(canvas, p);
                 break;
+            case Mage.POISON:
+                drawPoison(canvas, p, size);
+                break;
+            case Mage.AIR:
+                drawGust(canvas, p, size);
+                break;
+            case Mage.SUMMONER:
+                drawSpirit(canvas, p, size);
+                break;
+        }
+    }
+
+    // ---------- Poison ----------
+
+    // Boule toxique : halo, cœur vert foncé, reflets, et bulles qui s'échappent derrière
+    private void drawPoison(Canvas canvas, Projectile p, float size) {
+        for (int k = 1; k <= 2 + p.level; k++) {
+            float t = ((p.age + k * 5) % 18) / 18f;
+            float dist = size * (1.2f + 2.5f * t);
+            float side = (float) Math.sin(k * 2.3 + p.age * 0.2) * size * 0.6f;
+            paint.setColor(Color.argb((int) (200 * (1 - t)), 160, 230, 80));
+            canvas.drawCircle(p.x - p.dirX * dist - p.dirY * side, p.y - p.dirY * dist + p.dirX * side,
+                    size * 0.28f * (1 - t * 0.5f), paint);
+        }
+        paint.setColor(Color.argb(60, 140, 230, 60));
+        canvas.drawCircle(p.x, p.y, size * 1.7f, paint);
+        paint.setColor(Color.rgb(70, 140, 40));
+        canvas.drawCircle(p.x, p.y, size, paint);
+        paint.setColor(Color.rgb(150, 220, 70));
+        canvas.drawCircle(p.x - size * 0.15f, p.y - size * 0.15f, size * 0.7f, paint);
+        paint.setColor(Color.argb(220, 230, 255, 200));
+        canvas.drawCircle(p.x - size * 0.35f, p.y - size * 0.35f, size * 0.22f, paint);
+        if (p.level >= 4) { // poison concentré : petit crâne d'épines autour
+            paint.setColor(Color.argb(200, 200, 255, 120));
+            for (int j = 0; j < 5; j++) {
+                double a = p.age * 0.15 + j * 2 * Math.PI / 5;
+                canvas.drawCircle(p.x + (float) Math.cos(a) * size * 1.4f,
+                        p.y + (float) Math.sin(a) * size * 1.4f, size * 0.18f, paint);
+            }
+        }
+    }
+
+    // ---------- Air ----------
+
+    // Rafale : croissants blancs qui tournent, et traits de vitesse derrière
+    private void drawGust(Canvas canvas, Projectile p, float size) {
+        float r = size * 1.3f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        // Traits de vitesse
+        paint.setStrokeWidth(1.5f * density);
+        paint.setColor(Color.argb(150, 220, 240, 255));
+        for (int k = -1; k <= 1; k++) {
+            float ox = -p.dirY * k * r * 0.6f;
+            float oy = p.dirX * k * r * 0.6f;
+            canvas.drawLine(p.x - p.dirX * r * 1.2f + ox, p.y - p.dirY * r * 1.2f + oy,
+                    p.x - p.dirX * r * (2.2f + 0.4f * p.level) + ox, p.y - p.dirY * r * (2.2f + 0.4f * p.level) + oy, paint);
+        }
+        // Croissants en rotation (un de plus tous les 2 niveaux)
+        int arcs = 2 + p.level / 2;
+        for (int k = 0; k < arcs; k++) {
+            float rr = r * (0.5f + 0.25f * k);
+            tmpRect.set(p.x - rr, p.y - rr, p.x + rr, p.y + rr);
+            paint.setStrokeWidth((2.5f - 0.3f * k) * density);
+            paint.setColor(Color.argb(230 - k * 40, 245, 250, 255));
+            canvas.drawArc(tmpRect, p.age * 18f + k * 90, 200, false, paint);
+        }
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    // ---------- Invocateur ----------
+
+    // Esprit : halo magenta, tête ronde, queue qui ondule derrière, deux yeux
+    private void drawSpirit(Canvas canvas, Projectile p, float size) {
+        float s = size * 1.2f;
+        paint.setColor(Color.argb(55, 230, 100, 200));
+        canvas.drawCircle(p.x, p.y, s * 2.2f, paint);
+        // Queue : cercles de plus en plus petits qui ondulent
+        for (int k = 5; k >= 1; k--) {
+            float dist = k * s * 0.55f;
+            float wobble = (float) Math.sin(p.age * 0.4 + k) * s * 0.35f;
+            paint.setColor(Color.argb(200 - k * 25, 240, 170, 230));
+            canvas.drawCircle(p.x - p.dirX * dist - p.dirY * wobble, p.y - p.dirY * dist + p.dirX * wobble,
+                    s * (1f - k * 0.13f), paint);
+        }
+        paint.setColor(Color.rgb(250, 215, 245));
+        canvas.drawCircle(p.x, p.y, s, paint);
+        // Yeux, tournés vers la direction du vol
+        float ex = p.dirX * s * 0.3f;
+        float ey = p.dirY * s * 0.3f;
+        paint.setColor(Color.rgb(120, 30, 110));
+        canvas.drawCircle(p.x + ex - p.dirY * s * 0.35f, p.y + ey + p.dirX * s * 0.35f, s * 0.18f, paint);
+        canvas.drawCircle(p.x + ex + p.dirY * s * 0.35f, p.y + ey - p.dirX * s * 0.35f, s * 0.18f, paint);
+        if (p.level >= 5) { // grand esprit : couronne d'étincelles
+            paint.setColor(Color.argb(230, 255, 230, 120));
+            for (int j = 0; j < 3; j++) {
+                double a = p.age * 0.3 + j * 2 * Math.PI / 3;
+                canvas.drawCircle(p.x + (float) Math.cos(a) * s * 1.6f,
+                        p.y + (float) Math.sin(a) * s * 1.6f, s * 0.2f, paint);
+            }
         }
     }
 
@@ -637,6 +740,129 @@ public class AttackRenderer {
                             hit.x + (float) Math.cos(a) * r2, hit.y + (float) Math.sin(a) * r2, paint);
                 }
                 break;
+
+            case Mage.POISON:
+                // Éclaboussure toxique : gouttes vertes projetées
+                paint.setColor(Color.argb(alpha / 2, 120, 200, 60));
+                canvas.drawCircle(hit.x, hit.y, u * (1.5f + 2.5f * t), paint);
+                paint.setColor(Color.argb(alpha, 170, 240, 90));
+                for (int j = 0; j < count; j++) {
+                    double a = j * 2 * Math.PI / count + hit.x * 0.1;
+                    float r = u * (1 + 4 * t);
+                    canvas.drawCircle(hit.x + (float) Math.cos(a) * r, hit.y + (float) Math.sin(a) * r,
+                            u * 0.35f * (1 - t) + 1, paint);
+                }
+                break;
+
+            case Mage.AIR:
+                // Anneaux de vent qui s'élargissent
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(2 * density);
+                paint.setColor(Color.argb(alpha, 235, 248, 255));
+                canvas.drawCircle(hit.x, hit.y, u * (1 + 4 * t), paint);
+                paint.setColor(Color.argb(alpha / 2, 235, 248, 255));
+                canvas.drawCircle(hit.x, hit.y, u * (2 + 5 * t), paint);
+                paint.setStyle(Paint.Style.FILL);
+                break;
+
+            case Mage.SUMMONER:
+                // Éclat d'étoile magenta
+                paint.setColor(Color.argb(alpha / 2, 230, 100, 200));
+                canvas.drawCircle(hit.x, hit.y, u * (2 + 3 * t), paint);
+                paint.setColor(Color.argb(alpha, 255, 210, 245));
+                paint.setStrokeWidth(2.5f * density);
+                for (int j = 0; j < 6; j++) {
+                    double a = j * Math.PI / 3 + 0.3;
+                    float r2 = u * (2 + 4 * t);
+                    canvas.drawLine(hit.x, hit.y, hit.x + (float) Math.cos(a) * r2,
+                            hit.y + (float) Math.sin(a) * r2, paint);
+                }
+                break;
+        }
+    }
+
+    // =====================================================================
+    //  Réactions élémentaires
+    // =====================================================================
+
+    // Anneau qui s'élargit, nom de la réaction qui monte, et particules propres à chaque réaction
+    public void drawReaction(Canvas canvas, Reaction r) {
+        float t = r.getProgress();
+        int alpha = (int) (255 * (1 - t));
+        int c = Palette.REACTION_COLORS[r.type];
+
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4 * density * (1 - t) + density);
+        paint.setColor(withAlpha(c, alpha));
+        canvas.drawCircle(r.x, r.y, r.radius * (0.3f + 0.7f * t), paint);
+        paint.setStyle(Paint.Style.FILL);
+
+        // Particules
+        int n = 8;
+        for (int j = 0; j < n; j++) {
+            double a = j * 2 * Math.PI / n + r.type;
+            float dist = r.radius * (0.2f + 0.8f * t);
+            float px = r.x + (float) Math.cos(a) * dist;
+            float py = r.y + (float) Math.sin(a) * dist;
+            paint.setColor(withAlpha(c, alpha));
+            if (r.type == Reaction.ELECTROCUTION) {
+                paint.setStrokeWidth(2 * density);
+                canvas.drawLine(px, py, px + (float) Math.cos(a + 1) * 6 * density,
+                        py + (float) Math.sin(a + 1) * 6 * density, paint);
+            } else if (r.type == Reaction.SANDSTORM) {
+                canvas.drawRect(px - 2 * density, py - 2 * density, px + 2 * density, py + 2 * density, paint);
+            } else {
+                canvas.drawCircle(px, py, 3 * density * (1 - t) + density, paint);
+            }
+        }
+
+        // Nom de la réaction, qui monte et s'efface (contour sombre pour rester lisible)
+        float ty = r.y - 30 * density - 30 * density * t;
+        float size = 14 * density * (t < 0.15f ? 0.7f + 2f * t : 1f);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(size);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3 * density);
+        paint.setColor(Color.argb(alpha * 3 / 4, 20, 15, 30));
+        canvas.drawText(Reaction.NAMES[r.type], r.x, ty, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(c, alpha));
+        canvas.drawText(Reaction.NAMES[r.type], r.x, ty, paint);
+    }
+
+    // Flaque de lave (bulles qui éclatent) ou nuage de vapeur (bouffées qui ondulent)
+    public void drawZone(Canvas canvas, Zone z) {
+        float t = z.getProgress();
+        float fade = t > 0.8f ? (1 - t) / 0.2f : 1f; // s'estompe sur la fin
+        int age = z.getAge();
+        if (z.type == Zone.LAVA) {
+            tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
+            paint.setColor(Color.argb((int) (200 * fade), 120, 30, 10));
+            canvas.drawOval(tmpRect, paint);
+            tmpRect.inset(z.radius * 0.15f, z.radius * 0.1f);
+            paint.setColor(Color.argb((int) (220 * fade), 255, 110, 20));
+            canvas.drawOval(tmpRect, paint);
+            tmpRect.inset(z.radius * 0.25f, z.radius * 0.15f);
+            paint.setColor(Color.argb((int) (200 * fade), 255, 210, 80));
+            canvas.drawOval(tmpRect, paint);
+            // Bulles
+            for (int j = 0; j < 5; j++) {
+                float bt = ((age + j * 13) % 40) / 40f;
+                float bx = z.x + (float) Math.cos(j * 2.1) * z.radius * 0.5f;
+                float by = z.y + (float) Math.sin(j * 1.7) * z.radius * 0.3f;
+                paint.setColor(Color.argb((int) (230 * fade * (1 - bt)), 255, 230, 140));
+                canvas.drawCircle(bx, by, z.radius * 0.12f * bt + density, paint);
+            }
+        } else {
+            for (int j = 0; j < 7; j++) {
+                double a = j * 2 * Math.PI / 7 + age * 0.02;
+                float d = z.radius * 0.5f;
+                float puff = z.radius * (0.4f + 0.08f * (float) Math.sin(age * 0.1 + j));
+                paint.setColor(Color.argb((int) (55 * fade), 230, 232, 240));
+                canvas.drawCircle(z.x + (float) Math.cos(a) * d, z.y + (float) Math.sin(a) * d * 0.6f, puff, paint);
+            }
+            paint.setColor(Color.argb((int) (70 * fade), 245, 245, 250));
+            canvas.drawCircle(z.x, z.y, z.radius * 0.5f, paint);
         }
     }
 

@@ -73,6 +73,9 @@ public class TouchController {
                         mutePressed = true;
                     } else {
                         pressedButton = hud.buttonAt(tx, ty);
+                        if (pressedButton != -1 && model.teamTypeAt(pressedButton) == -1) {
+                            pressedButton = -2; // emplacement d'équipe vide : ni recrutement, ni glisser
+                        }
                         if (pressedButton == -1) {
                             startDrag(tx, ty); // pas un bouton : peut-être un mage
                         }
@@ -171,8 +174,58 @@ public class TouchController {
                         if (onToggleMute != null) {
                             onToggleMute.run();
                         }
+                    } else if (pressedMenuButton == Hud.HOME_ENDLESS) {
+                        model.startEndless();
+                    } else if (pressedMenuButton == Hud.HOME_UPGRADES) {
+                        model.openUpgrades();
+                    } else if (pressedMenuButton == Hud.HOME_MARKET) {
+                        model.openMarket();
+                    } else if (pressedMenuButton == Hud.HOME_PREV_PAGE) {
+                        model.changeMapPage(-1);
+                    } else if (pressedMenuButton == Hud.HOME_NEXT_PAGE) {
+                        model.changeMapPage(1);
                     } else {
-                        model.selectLevel(pressedMenuButton); // numéro du niveau touché
+                        // Emplacement touché (1 à 6) → numéro réel du niveau sur cette page
+                        model.selectLevel(model.levelAtSlot(pressedMenuButton));
+                    }
+                }
+                break;
+
+            case UPGRADES:
+                if (pressedMenuButton != -1 && menuButtonAt(tx, ty) == pressedMenuButton) {
+                    int b = pressedMenuButton;
+                    if (b == Hud.UPGRADE_BACK) {
+                        model.closeUpgrades();
+                    } else if (b == Hud.UPGRADE_OPEN_CHEST) {
+                        model.openChest(); // lance l'animation d'ouverture
+                    } else if (b == Hud.UPGRADE_PREV) {
+                        model.changeUpgradePage(-1);
+                    } else if (b == Hud.UPGRADE_NEXT) {
+                        model.changeUpgradePage(1);
+                    } else if (b >= Hud.UPGRADE_TEAM_0) {
+                        model.toggleTeam(model.upgradeTypeAtRow(b - Hud.UPGRADE_TEAM_0)); // portrait
+                    } else {
+                        model.upgradeMage(model.upgradeTypeAtRow(b)); // +1 RANG de la ligne
+                    }
+                }
+                break;
+
+            case CHEST_OPENING:
+                if (pressedMenuButton != -1 && menuButtonAt(tx, ty) == pressedMenuButton) {
+                    if (pressedMenuButton == Hud.CHEST_AGAIN) {
+                        model.openChest(); // coffre suivant
+                    } else {
+                        model.tapChestOpening(); // passer l'animation, ou fermer
+                    }
+                }
+                break;
+
+            case MARKET:
+                if (pressedMenuButton != -1 && menuButtonAt(tx, ty) == pressedMenuButton) {
+                    if (pressedMenuButton == Hud.MARKET_BACK) {
+                        model.closeMarket();
+                    } else {
+                        model.buyUnit(Mage.BASE_TYPES + pressedMenuButton); // Poison, Air, Invocateur
                     }
                 }
                 break;
@@ -194,8 +247,8 @@ public class TouchController {
                     if (onToggleMute != null) {
                         onToggleMute.run();
                     }
-                } else if (pressedButton != -1 && hud.buttonAt(tx, ty) == pressedButton) {
-                    model.recruitMage(pressedButton);
+                } else if (pressedButton >= 0 && hud.buttonAt(tx, ty) == pressedButton) {
+                    model.recruitSlot(pressedButton); // emplacement d'équipe → mage de cet élément
                 }
                 break;
 
@@ -225,6 +278,8 @@ public class TouchController {
                         model.toggleNightModeDisabled();
                     } else if (pressedMenuButton == Hud.OPTIONS_MUSIC_TOGGLE) {
                         model.toggleMusic();
+                    } else if (pressedMenuButton == Hud.OPTIONS_LEFT_HANDED) {
+                        model.toggleLeftHanded(); // l'interface passe en miroir (GameView refait la mise en page)
                     } else if (pressedMenuButton == Hud.OPTIONS_BACK) {
                         model.closeOptions();
                     }
@@ -253,9 +308,41 @@ public class TouchController {
             case VICTORY:
                 return hud.victoryButtonAt(x, y);
             case START:
-                return hud.homeButtonAt(x, y);
+                int b = hud.homeButtonAt(x, y);
+                // Flèche de page sans page de ce côté : elle est cachée, donc inactive
+                if ((b == Hud.HOME_PREV_PAGE && !model.canChangeMapPage(-1))
+                        || (b == Hud.HOME_NEXT_PAGE && !model.canChangeMapPage(1))) {
+                    return -1;
+                }
+                return b;
             case GAME_OVER:
                 return hud.victoryButtonAt(x, y); // même fenêtre que la victoire
+            case UPGRADES: {
+                int u = hud.upgradeButtonAt(x, y);
+                // Boutons sans effet possible : pas de clic ni de retour d'appui
+                if ((u == Hud.UPGRADE_PREV && !model.canChangeUpgradePage(-1))
+                        || (u == Hud.UPGRADE_NEXT && !model.canChangeUpgradePage(1))) {
+                    return -1;
+                }
+                if (u >= 0 && u < Hud.UPGRADE_ROWS && model.upgradeTypeAtRow(u) == -1) {
+                    return -1; // ligne vide
+                }
+                if (u >= Hud.UPGRADE_TEAM_0 && model.upgradeTypeAtRow(u - Hud.UPGRADE_TEAM_0) == -1) {
+                    return -1;
+                }
+                return u;
+            }
+            case CHEST_OPENING: {
+                int c = hud.chestButtonAt(x, y);
+                // OUVRIR ENCORE n'existe qu'à la fin de l'animation, s'il reste des coffres
+                if (c == Hud.CHEST_AGAIN && !(model.isChestRevealComplete()
+                        && model.getProgression().getChests() > 0)) {
+                    return Hud.CHEST_CONTINUE;
+                }
+                return c;
+            }
+            case MARKET:
+                return hud.marketButtonAt(x, y);
             default:
                 return -1;
         }

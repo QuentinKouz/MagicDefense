@@ -13,6 +13,9 @@ public class Projectile {
     public float dirX = 0;        // direction du dernier déplacement (pour les traînées)
     public float dirY = -1;       // par défaut : vers le haut (vers les ennemis)
     public int age = 0;           // images depuis le tir (animations)
+    public float poisonDps;       // Poison : dégâts par seconde à l'impact
+    public float knockback;       // Air : recul en pixels
+    public int stunFrames;        // Invocateur : étourdissement
     public Enemy target;
 
     // Le projectile reprend les caractéristiques du mage qui l'a tiré
@@ -26,6 +29,9 @@ public class Projectile {
         this.speed = mage.getProjectileSpeed() * density;
         this.aoeRadius = mage.getAoeRadius() * density;
         this.radius = 6 * density;
+        this.poisonDps = mage.getPoisonDps();
+        this.knockback = mage.getKnockback() * density;
+        this.stunFrames = mage.getStunFrames();
     }
 
     // Avance vers la cible. Retourne true si elle est atteinte.

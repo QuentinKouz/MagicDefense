@@ -102,6 +102,46 @@ public class GameView extends View {
             public void onRecruit() {
                 sounds.recruit();
             }
+
+            @Override
+            public void onChestOpened() {
+                haptics.merge();
+                sounds.victory();
+            }
+
+            @Override
+            public void onChestCardRevealed() {
+                haptics.merge();
+                sounds.merge();
+            }
+
+            @Override
+            public void onMageUpgraded() {
+                haptics.merge();
+                sounds.merge();
+            }
+
+            @Override
+            public void onUnitBought() {
+                haptics.merge();
+                sounds.victory();
+            }
+
+            @Override
+            public void onReaction() {
+                // Pas de son : les réactions peuvent s'enchaîner plusieurs fois par seconde
+            }
+
+            @Override
+            public void onBossArrived() {
+                haptics.castleHit();
+                sounds.ultimate();
+            }
+
+            @Override
+            public void onProgressChanged() {
+                saveManager.save(model); // coffres, fragments, rangs : sauvegardés tout de suite
+            }
         });
         model.setSoundVolume(sounds.getSystemVolume()); // le curseur part du volume actuel du téléphone
     }
@@ -119,6 +159,7 @@ public class GameView extends View {
             return;
         }
         board.resize(w, h);
+        hud.setLeftHanded(model.isLeftHanded());
         hud.resize(w, h);
         renderer.onResize(); // décor regénéré à la bonne taille
     }
@@ -153,6 +194,9 @@ public class GameView extends View {
                 model.setSoundVolume(sounds.getSystemVolume());
             }
             music.setEnabled(model.isMusicEnabled()); // option "Musique" des réglages
+            if (hud.isLeftHanded() != model.isLeftHanded()) {
+                relayout(getWidth(), getHeight()); // option "Mode gaucher" : interface en miroir
+            }
             model.setNightMode(lightSensor.isNight());
             model.update();
             // Pendant une secousse (jauge pleine) : une impulsion toutes les 8 images (≈ 7 par seconde)

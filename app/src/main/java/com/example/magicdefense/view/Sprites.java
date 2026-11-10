@@ -63,6 +63,9 @@ public final class Sprites {
             {".G..", ".GgG", "gGgg", "gGGg", ".gg.", "..T."},   // Feu : flamme
             {"..g.", ".gGg", "gGGg", ".gGg", ".gg.", "..T."},   // Terre : feuille
             {"..gG", ".gG.", "gGGg", "..Gg", ".Gg.", "..T."},   // Foudre : éclair
+            {".g.g", "g.G.", ".gGg", "gGGg", ".gg.", "..T."},   // Poison : bulles toxiques
+            {"gGg.", "...g", ".gG.", "g...", ".gGg", "..T."},   // Air : spirale de vent
+            {".gg.", "gGGg", "gKGg", "gGGg", ".gg.", "..T."},   // Invocateur : orbe avec un œil
     };
     private static final String[] SMALL_TIP = {"....", "....", "..g.", ".gGg", "..g.", "..T."};
 
@@ -72,6 +75,9 @@ public final class Sprites {
             "rgrgrYYrgrgrr",   // Feu : braises
             "rrGrrYYrrGrrr",   // Terre : feuilles
             "rGrrrYYrrrGrr",   // Foudre : étincelles
+            "rGrrgYYrgrrGr",   // Poison : gouttes
+            "rGrGrYYrGrGrr",   // Air : rafales
+            "rgrrGYYGrrgrr",   // Invocateur : runes
     };
 
     // Couleurs propres à chaque élément : robe, robe ombrée, embout clair, embout foncé
@@ -80,6 +86,9 @@ public final class Sprites {
             {Color.rgb(225, 80, 45), Color.rgb(160, 45, 30), Color.rgb(255, 220, 90), Color.rgb(255, 120, 30)},
             {Color.rgb(140, 105, 60), Color.rgb(95, 70, 40), Color.rgb(120, 190, 80), Color.rgb(70, 130, 50)},
             {Color.rgb(150, 80, 230), Color.rgb(95, 45, 165), Color.rgb(255, 245, 140), Color.rgb(250, 200, 40)},
+            {Color.rgb(90, 170, 60), Color.rgb(55, 115, 35), Color.rgb(200, 255, 120), Color.rgb(110, 190, 40)},
+            {Color.rgb(185, 215, 232), Color.rgb(120, 160, 185), Color.rgb(255, 255, 255), Color.rgb(160, 210, 240)},
+            {Color.rgb(200, 80, 160), Color.rgb(130, 45, 105), Color.rgb(255, 190, 240), Color.rgb(230, 110, 200)},
     };
 
     public static final int MAGE_WIDTH = 19;
@@ -201,6 +210,46 @@ public final class Sprites {
             ".......KlK..KlK....",
             "......KKK....KKK...",
     };
+
+    // ---------- Coffre : 16 pixels de large, couvercle (6 lignes) et caisse (8 lignes) séparés ----------
+    // Le couvercle est une image à part pour pouvoir se soulever et basculer à l'ouverture.
+    private static final String[] CHEST_LID = {
+            "..KKKKKKKKKKKK..",
+            ".KLLLLLYYLLLLLK.",
+            "KLLLLLLYYLLLLLLK",
+            "KlLLLLLYYLLLLLlK",
+            "KllllllYYllllllK",
+            "KKKKKKKYYKKKKKKK",
+    };
+    private static final String[] CHEST_BODY = {
+            "KWWWWWYYYYWWWWWK",
+            "KYWWWWYyyYWWWWYK",
+            "KWwWWWYKKYWWWwWK",
+            "KWWWWWYyyYWWWWWK",
+            "KWWwWWWYYWWWwWWK",
+            "KwwwwwwYYwwwwwwK",
+            "KYwwwwwYYwwwwwYK",
+            "KKKKKKKKKKKKKKKK",
+    };
+    public static final int CHEST_WIDTH = 16;
+    public static final int CHEST_LID_HEIGHT = 6;
+    public static final int CHEST_BODY_HEIGHT = 8;
+
+    private static int[] chestPalette() {
+        int[] p = commonPalette();
+        p['L'] = Color.rgb(176, 110, 52);   // couvercle
+        p['l'] = Color.rgb(132, 80, 38);    // couvercle ombré
+        p['W'] = Color.rgb(146, 88, 42);    // caisse
+        p['w'] = Color.rgb(106, 62, 30);    // caisse ombrée
+        p['y'] = Color.rgb(176, 128, 36);   // or ombré
+        return p;
+    }
+
+    // { couvercle, caisse }
+    public static Bitmap[] buildChest() {
+        int[] p = chestPalette();
+        return new Bitmap[]{toBitmap(CHEST_LID, p), toBitmap(CHEST_BODY, p)};
+    }
 
     public static final int GOBLIN_WIDTH = 19;
     public static final int GOBLIN_HEIGHT = 16;

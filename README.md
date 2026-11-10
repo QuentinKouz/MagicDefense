@@ -36,7 +36,7 @@ Les gobelins sortent de la forêt et marchent vers le rempart. Vos mages, placé
 - **Gagner de l'or** : chaque gobelin tué rapporte des pièces d'or.
 - **Protéger le château** : il a 10 000 PV. Les étoiles obtenues dépendent des PV restants à la fin du niveau (3 étoiles à partir de 70 %, 2 à partir de 40 %).
 
-### Les quatre éléments
+### Les éléments
 
 | Élément | Spécificité | Évolution visuelle |
 |---|---|---|
@@ -44,10 +44,61 @@ Les gobelins sortent de la forêt et marchent vers le rempart. Vos mages, placé
 | **Feu** | Dégâts qui augmentent fortement à chaque fusion | braise → boule de feu → flamme bleue → aura dorée |
 | **Terre** | Une salve de projectiles par tir (autant que son niveau), concentrée sur une cible | caillou → ambre → émeraude → cristaux dorés |
 | **Foudre** | Tir instantané et cadence rapide | éclair violet → ramifications → double éclair doré |
+| **Poison** *(exclusif)* | Faibles dégâts directs, empoisonne 3 s (dégâts sur la durée) | boule toxique → épines en orbite |
+| **Air** *(exclusif)* | Rafale qui repousse l'ennemi vers la forêt | croissants de vent qui tournent |
+| **Invocateur** *(exclusif)* | Esprit lent qui frappe fort et étourdit | esprit magenta → couronne d'étincelles |
+
+Les unités exclusives s'achètent au **Marché** avec des gemmes (Poison 15, Air 25, Invocateur 40).
+
+### Équipe
+
+On emmène **4 mages** en partie : sur l'écran MAGES, toucher le portrait d'un mage l'ajoute à l'équipe ou l'en retire (cadre vert « ÉQUIPE »). La barre de recrutement affiche les mages de l'équipe.
+
+### Réactions élémentaires
+
+Chaque coup laisse une **marque** de son élément sur l'ennemi pendant 3 s (point de couleur à côté de sa barre de vie). Un second élément compatible déclenche une réaction :
+
+| Réaction | Éléments | Effet |
+|---|---|---|
+| **Électrocution** | Eau + Foudre | dégâts doublés, étourdissement, arcs vers 3 ennemis proches |
+| **Lave** | Terre + Feu | flaque de lave qui brûle pendant 4 s |
+| **Vapeur** | Eau + Feu | nuage qui ralentit de moitié et blesse légèrement |
+| **Explosion toxique** | Poison + Feu | explosion de zone (2 × le coup) |
+| **Nuage toxique** | Poison + Air | le poison se propage aux ennemis proches |
+| **Tempête de sable** | Terre + Air | recul et étourdissement de zone |
 
 ### Progression
 
-6 niveaux débloqués l'un après l'autre sur une carte. Chaque niveau a plus de vagues (niveau 1 : 3 vagues, niveau 2 : 4 vagues…) et des gobelins plus résistants. Les meilleures étoiles de chaque niveau sont sauvegardées.
+Des niveaux **sans fin**, débloqués l'un après l'autre sur une carte affichée par pages de 6 (flèches ◀ ▶). Les meilleures étoiles de chaque niveau sont sauvegardées.
+
+- **Niveaux 1 à 6** : faits à la main (niveau 1 : 3 vagues, niveau 2 : 4 vagues…).
+- **Niveaux 7 et +** : générés automatiquement. Chaque niveau est toujours le même (il dépend de son numéro) et a un profil : **Horde** (beaucoup de gobelins rapides), **Siège** (beaucoup de costauds) ou **Mêlée**. La vitesse et les dégâts des gobelins sont plafonnés ; seuls leurs PV continuent de grimper : il faut améliorer ses mages pour avancer.
+
+| Ennemi | Vitesse | PV | Dégâts au château | Particularité |
+|---|---|---|---|---|
+| Gobelin | ×1 | ×1 | ×1 | vert |
+| Rapide | ×1,5 | ×0,6 | ×1 | petit, orangé |
+| Costaud | ×0,7 | ×2,5 | ×1,5 | gros, rouge sombre |
+| Chaman (invocateur) | ×0,8 | ×1,6 | ×1 | violet, invoque 2 diablotins toutes les ≈ 3 s |
+| Diablotin | ×1,6 | ×0,35 | ×0,4 | minuscule, rouge, invoqué |
+| **Chef gobelin (boss)** | ×0,45 | ×12 | ×3 (max 60 % des PV) | couronne, grande barre de vie, invoque 3 diablotins, résiste au recul et à l'étourdissement |
+
+**Boss** : à la dernière vague des niveaux 10, 20, 30… et toutes les 10 vagues en mode infini (bandeau « UN BOSS APPROCHE ! »). Les chamans apparaissent dans les niveaux générés et à partir de la vague 7 du mode infini.
+
+### Biomes
+
+L'accueil change de décor à chaque page de la carte : **Prairie** (1-6), **Désert** (7-12), **Toundra** (13-18), **Marais** (19-24), **Volcan** (25-30), **Crépuscule** (31-36), puis le cycle recommence. Chaque biome a son ciel, ses collines, son décor (arbres, cactus, sapins enneigés, roseaux, rochers et lave, cristaux) et ses particules animées (lucioles, poussière, neige, braises). Le terrain de jeu prend la teinte du biome ; en mode infini, le biome change toutes les 10 vagues.
+
+### Mode infini
+
+Bouton **INFINI** de l'accueil : les vagues s'enchaînent, de plus en plus fortes et variées, jusqu'à la chute du château. Le record (vague atteinte) est sauvegardé.
+
+### Coffres et améliorations permanentes
+
+- **Coffres** : 1 coffre par niveau terminé (+1 tous les 4 niveaux : 2 coffres à partir du niveau 5, 3 à partir du 9…). En mode infini, 1 coffre toutes les 3 vagues repoussées, même en abandonnant la partie.
+- **Ouverture carte par carte** : le coffre (pixel art) tombe puis attend. Chaque toucher fait sortir **une** carte : elle jaillit du coffre de dos, se retourne, s'affiche en grand avec des rayons de sa couleur et son nombre qui monte. Une pastille indique les cartes restantes ; les gemmes sortent en dernier. Un récapitulatif « BUTIN » clôt l'ouverture, avec « OUVRIR ENCORE » s'il reste des coffres.
+- **Contenu** : 3 lots de 4 à 8 fragments (chacun d'un élément possédé tiré au hasard) et 1 à 3 **gemmes**.
+- **Rangs** (écran **MAGES**) : chaque élément a un rang permanent, de 1 à 999. Passer du rang *n* au rang *n + 1* coûte **10 × n fragments** de cet élément. Chaque rang donne **+10 % de dégâts** et **+1 % de cadence** (plafonnée à +30 %) à tous les mages de cet élément, dans toutes les parties. L'apparence du mage sur l'écran MAGES évolue tous les 10 rangs.
 
 ---
 
@@ -67,6 +118,9 @@ Les gobelins sortent de la forêt et marchent vers le rempart. Vos mages, placé
 
 Les capteurs sont coupés quand l'application passe en arrière-plan.
 
+### Style de l'interface
+Toute l'interface reprend la direction artistique pixel art médiéval-fantasy du décor (classe `UiKit`) : boutons en **tuiles en relief** qui s'enfoncent à l'appui, boutons ronds en **médaillons dorés**, fenêtres en **planches de bois cloutées** avec un **ruban** de titre, listes en **alcôves creusées**, barres encadrées, texte gras à contour sombre, curseurs en pièces d'or, bulle de la carte en parchemin.
+
 ### Retours
 - **Visuels** : feedback d'appui sur tous les boutons, flash rouge du rempart, bandeau jour/nuit, étoiles animées à la victoire.
 - **Sonores** : bruitages (recrutement, fusion, élimination, château touché, ultime, victoire, défaite, clic) et musique de fond médiévale en boucle, désactivable.
@@ -75,6 +129,7 @@ Les capteurs sont coupés quand l'application passe en arrière-plan.
 ### Options
 - Désactiver le mode nuit (Non / Oui)
 - Musique (Non / Oui)
+- **Mode gaucher** (Non / Oui) : interface en miroir pour jouer d'une main avec la main gauche (pause, options et son à gauche, jauge d'ultime à droite, ordre des boutons de recrutement inversé)
 - Volume (curseur synchronisé avec les boutons de volume du téléphone)
 - Bouton de coupure du son à l'accueil et en jeu
 
@@ -103,9 +158,12 @@ com.example.magicdefense
 ├── MainActivity           Plein écran, cycle de vie (pause / reprise)
 ├── model/                 Règles du jeu, sans dessin ni toucher
 │   ├── GameModel          État de la partie, vagues, tirs, fusion, victoire, événements
-│   ├── GameState          START, PLAYING, PAUSED, OPTIONS, VICTORY, GAME_OVER
+│   ├── GameState          START, PLAYING, PAUSED, OPTIONS, VICTORY, GAME_OVER, UPGRADES
 │   ├── Board              Géométrie : colonne de jeu, damier, adaptation à l'écran
-│   ├── Mage, Enemy        Unités (caractéristiques par élément et par niveau)
+│   ├── LevelSpec          Description d'un niveau : faits main (1-6), générés (7+), mode infini, boss, biomes
+│   ├── Progression        Progression permanente : coffres, fragments, rangs, gemmes, unités, équipe, record
+│   ├── Reaction, Zone     Réactions élémentaires et zones au sol (lave, vapeur)
+│   ├── Mage, Enemy        Unités (caractéristiques par élément, niveau, rang ; types de gobelins)
 │   └── Projectile, Bolt, Splash, HitEffect   Attaques et effets
 ├── view/                  Affichage et retours
 │   ├── GameView           Vue Android : boucle de jeu (~60 images/s), relie tout
@@ -113,7 +171,8 @@ com.example.magicdefense
 │   ├── AttackRenderer     Dessin des attaques selon l'élément et le niveau
 │   ├── TerrainRenderer    Décor pixel art généré (forêt, prairie, rempart, cour)
 │   ├── Sprites            Mages et gobelins en pixel art
-│   ├── Hud                Position de tous les boutons et fenêtres
+│   ├── Hud                Position de tous les boutons et fenêtres (miroir en mode gaucher)
+│   ├── UiKit              Style de l'interface : tuiles, médaillons, fenêtres en bois, rubans
 │   ├── Palette            Couleurs
 │   ├── SoundManager       Bruitages (SoundPool)
 │   ├── MusicPlayer        Musique de fond (MediaPlayer)
@@ -123,7 +182,7 @@ com.example.magicdefense
 │   ├── ShakeDetector      Accéléromètre → ultime
 │   └── LightSensor        Luminosité → mode nuit
 └── data/
-    └── SaveManager        Sauvegarde (SharedPreferences) : niveaux, étoiles, options
+    └── SaveManager        Sauvegarde (SharedPreferences) : niveaux, étoiles, options, coffres, fragments, rangs
 ```
 
 Le modèle prévient la vue de ce qui se passe (château touché, fusion, victoire…) par l'interface `GameModel.GameListener`, ce qui déclenche sons, vibrations et sauvegarde.
@@ -145,4 +204,4 @@ Permission utilisée : `VIBRATE`.
 
 ## Ressources
 
-Graphismes (pixel art), bruitages et musique créés pour le projet, générés par code : aucune ressource externe.
+Graphismes (pixel art), bruitages et musique créés pour le projet, générés par code : aucune ressource externe. L'icône de l'application (chapeau de mage sur ciel de nuit) est une icône adaptative vectorielle.

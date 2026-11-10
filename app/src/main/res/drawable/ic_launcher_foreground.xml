@@ -1,30 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Premier plan de l'icône : chapeau de mage (dans la zone sûre de 66 dp au centre) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    <!-- Bord du chapeau -->
     <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:fillColor="#FF4A2396"
+        android:pathData="M54,74m-27,0a27,7.5 0,1 1,54 0a27,7.5 0,1 1,-54 0" />
+    <!-- Cône, pointe courbée vers la droite -->
+    <path
+        android:fillColor="#FF7B3FE0"
+        android:pathData="M35,73 C40,58 45,44 49,33 C52,25 58,20 70,19 C62,24 59,29 59.5,36 C61,48 66,60 73,73 Z" />
+    <!-- Ombre du côté gauche du cône -->
+    <path
+        android:fillColor="#FF6431C4"
+        android:pathData="M35,73 C40,58 45,44 49,33 C50,40 48,56 46,73 Z" />
+    <!-- Bande dorée -->
+    <path
+        android:fillColor="#FFF0C040"
+        android:pathData="M37.2,66 L71,66 L73,73 L35,73 Z" />
+    <!-- Étoile dorée sur le chapeau -->
+    <path
+        android:fillColor="#FFFFD95A"
+        android:pathData="M54,44 L55.9,48.6 L60.8,48.9 L57,52 L58.2,56.8 L54,54.2 L49.8,56.8 L51,52 L47.2,48.9 L52.1,48.6 Z" />
+    <!-- Étincelles magiques -->
+    <path
+        android:fillColor="#FFFFF2B0"
+        android:pathData="M76,14 L77.2,17.8 L81,19 L77.2,20.2 L76,24 L74.8,20.2 L71,19 L74.8,17.8 Z" />
+    <path
+        android:fillColor="#FFFFF2B0"
+        android:pathData="M32,38 L32.8,40.2 L35,41 L32.8,41.8 L32,44 L31.2,41.8 L29,41 L31.2,40.2 Z" />
+    <path
+        android:fillColor="#CCFFF2B0"
+        android:pathData="M80,50 L80.6,51.4 L82,52 L80.6,52.6 L80,54 L79.4,52.6 L78,52 L79.4,51.4 Z" />
 </vector>
