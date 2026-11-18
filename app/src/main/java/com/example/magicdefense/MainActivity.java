@@ -9,11 +9,13 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import com.example.magicdefense.data.UpdateChecker;
 import com.example.magicdefense.view.GameView;
 
 public class MainActivity extends AppCompatActivity {
 
     private GameView gameView;
+    private UpdateChecker updateChecker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,12 +24,18 @@ public class MainActivity extends AppCompatActivity {
         EdgeToEdge.enable(this); // le jeu occupe tout l'écran, y compris sous les barres
         gameView = new GameView(this);
         setContentView(gameView);
+        // Nouvelle version sur GitHub ? (une fois par lancement, en arrière-plan)
+        updateChecker = new UpdateChecker(this);
+        if (savedInstanceState == null) {
+            updateChecker.check();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         hideSystemBars();
+        updateChecker.onResume(); // retour des réglages « installer des applis inconnues »
         gameView.startGame();
     }
 
