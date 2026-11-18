@@ -26,7 +26,8 @@ public class Progression {
 
     // Marché (gemmes)
     public static final int CHEST_PRICE = 10;             // un coffre
-    public static final int SPEED3_PRICE = 300;           // vitesse ×3, achat définitif
+    public static final int SPEED2_PRICE = 120;           // vitesse ×2, achat définitif
+    public static final int SPEED3_PRICE = 300;           // vitesse ×3, achat définitif (après ×2)
     // Prix des unités exclusives (indice = type ; 0 = possédé dès le départ)
     private static final int[] PRICES = {0, 0, 0, 0, 60, 100, 160};
 
@@ -50,6 +51,7 @@ public class Progression {
 
     private final boolean[] ultimates = new boolean[Ultimate.COUNT];
     private int equippedUltimate = Ultimate.STUN;
+    private boolean speed2 = false;
     private boolean speed3 = false;
     private int castleHpLevel = 0;
     private int castleResLevel = 0;
@@ -199,20 +201,47 @@ public class Progression {
         return true;
     }
 
-    // ---------- Vitesse ×3 ----------
+    // ---------- Vitesse ×2 et ×3 (achats définitifs ; ×3 demande d'avoir ×2) ----------
+    public boolean hasSpeed2() { return speed2; }
     public boolean hasSpeed3() { return speed3; }
 
+    public boolean hasSpeed(int speed) {
+        return speed <= 1 || (speed == 2 && speed2) || (speed == 3 && speed3);
+    }
+
+    // Vitesse la plus rapide débloquée
+    public int maxSpeed() {
+        return speed3 ? 3 : speed2 ? 2 : 1;
+    }
+
+    public static int speedPrice(int speed) {
+        return speed == 3 ? SPEED3_PRICE : SPEED2_PRICE;
+    }
+
+    public boolean canBuySpeed(int speed) {
+        boolean prerequisite = speed == 2 || (speed == 3 && speed2);
+        return prerequisite && !hasSpeed(speed) && gems >= speedPrice(speed);
+    }
+
+    public boolean buySpeed(int speed) {
+        if (!canBuySpeed(speed)) {
+            return false;
+        }
+        gems -= speedPrice(speed);
+        if (speed == 2) {
+            speed2 = true;
+        } else {
+            speed3 = true;
+        }
+        return true;
+    }
+
     public boolean canBuySpeed3() {
-        return !speed3 && gems >= SPEED3_PRICE;
+        return canBuySpeed(3);
     }
 
     public boolean buySpeed3() {
-        if (!canBuySpeed3()) {
-            return false;
-        }
-        gems -= SPEED3_PRICE;
-        speed3 = true;
-        return true;
+        return buySpeed(3);
     }
 
     // ---------- Coffres achetés ----------
@@ -574,9 +603,10 @@ public class Progression {
         equippedUltimate = equipped >= 0 && equipped < Ultimate.COUNT && ultimates[equipped] ? equipped : Ultimate.STUN;
     }
 
-    public void loadCastle(int hpLevel, int resLevel, boolean speed3) {
+    public void loadCastle(int hpLevel, int resLevel, boolean speed2, boolean speed3) {
         castleHpLevel = Math.max(0, Math.min(CASTLE_HP_MAX_LEVEL, hpLevel));
         castleResLevel = Math.max(0, Math.min(CASTLE_RES_MAX_LEVEL, resLevel));
+        this.speed2 = speed2 || speed3;
         this.speed3 = speed3;
     }
 

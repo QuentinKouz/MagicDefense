@@ -1042,10 +1042,13 @@ public class GameRenderer {
     // Boutons ronds de la partie : vitesse, mode automatique, soin, mage au hasard
     private void drawGameButtons(Canvas canvas, GameModel model, int pressed) {
         // Vitesse ×1 / ×2 / ×3
+        // (grisé tant qu'aucune vitesse n'est achetée au Marché)
         RectF s = hud.speedButton;
         int speed = model.getGameSpeed();
+        boolean speedUnlocked = model.getProgression().maxSpeed() > 1;
         ui.medallion(canvas, s.centerX(), s.centerY(), s.width() / 2,
-                speed > 1 ? Palette.MARKET : Palette.MENU_BUTTON, pressed == Hud.GAME_SPEED, 215);
+                !speedUnlocked ? Palette.DISABLED : speed > 1 ? Palette.MARKET : Palette.MENU_BUTTON,
+                speedUnlocked && pressed == Hud.GAME_SPEED, 215);
         ui.text(canvas, "×" + speed, s.centerX(), s.centerY() + 6 * density + sink(pressed == Hud.GAME_SPEED), 16,
                 Color.WHITE, Paint.Align.CENTER);
 
@@ -1906,18 +1909,20 @@ public class GameRenderer {
                 break;
             }
             case MenuList.SHOP_SPEED: {
-                ui.medallion(canvas, iconCx, iconCy, 24 * density, Palette.MARKET, false, 255);
-                ui.text(canvas, "×3", iconCx, iconCy + 7 * density, 19, Color.WHITE, Paint.Align.CENTER);
-                title = "Vitesse ×3";
+                boolean owned = prog.hasSpeed(a);
+                ui.medallion(canvas, iconCx, iconCy, 24 * density, owned ? Palette.MARKET : Palette.DISABLED, false, 255);
+                ui.text(canvas, "×" + a, iconCx, iconCy + 7 * density, 19, Color.WHITE, Paint.Align.CENTER);
+                title = "Vitesse ×" + a;
                 titleColor = Palette.GOLD;
-                desc = "Bouton de vitesse en partie : ×1, ×2, ×3";
-                if (prog.hasSpeed3()) {
+                desc = a == 2 ? "Le jeu va 2 fois plus vite" : "Le jeu va 3 fois plus vite";
+                if (owned) {
                     statusColor = Palette.TEAM;
-                    status = "Achat définitif";
+                    status = "Achat définitif · bouton en partie";
                     drawSmallButton(canvas, btnRect, "ACQUIS", Palette.TEAM, false, 13);
                 } else {
-                    status = "Achat définitif (×2 est gratuit)";
-                    drawPriceButton(canvas, btnRect, Progression.SPEED3_PRICE, prog.canBuySpeed3(), mainPressed);
+                    boolean locked = a == 3 && !prog.hasSpeed2();
+                    status = locked ? "Débloquez d'abord la vitesse ×2" : "Achat définitif";
+                    drawPriceButton(canvas, btnRect, Progression.speedPrice(a), prog.canBuySpeed(a), mainPressed);
                 }
                 break;
             }

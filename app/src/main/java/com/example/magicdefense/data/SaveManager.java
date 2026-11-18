@@ -38,6 +38,7 @@ public class SaveManager {
     // Ajouts de la mise à jour
     private static final String KEY_ULTIMATE = "ultimate_";       // ultimate_1 (Rage)...
     private static final String KEY_ULTIMATE_EQUIPPED = "ultimate_equipped";
+    private static final String KEY_SPEED2 = "speed2";
     private static final String KEY_SPEED3 = "speed3";
     private static final String KEY_CASTLE_HP = "castle_hp_level";
     private static final String KEY_CASTLE_RES = "castle_res_level";
@@ -103,7 +104,7 @@ public class SaveManager {
         }
         p.loadUltimates(ultimates, prefs.getInt(KEY_ULTIMATE_EQUIPPED, Ultimate.STUN));
         p.loadCastle(prefs.getInt(KEY_CASTLE_HP, 0), prefs.getInt(KEY_CASTLE_RES, 0),
-                prefs.getBoolean(KEY_SPEED3, false));
+                prefs.getBoolean(KEY_SPEED2, false), prefs.getBoolean(KEY_SPEED3, false));
 
         boolean[] artifacts = new boolean[Artifact.COUNT];
         for (int i = 0; i < Artifact.COUNT; i++) {
@@ -164,6 +165,7 @@ public class SaveManager {
             editor.putBoolean(KEY_ULTIMATE + i, p.ownsUltimate(i));
         }
         editor.putInt(KEY_ULTIMATE_EQUIPPED, p.getEquippedUltimate());
+        editor.putBoolean(KEY_SPEED2, p.hasSpeed2());
         editor.putBoolean(KEY_SPEED3, p.hasSpeed3());
         editor.putInt(KEY_CASTLE_HP, p.getCastleHpLevel());
         editor.putInt(KEY_CASTLE_RES, p.getCastleResLevel());

@@ -74,7 +74,8 @@ public class MenuList {
                     add(SHOP_ULTIMATE, u, null, 88);
                 }
                 add(HEADER, 0, "Bonus", 34);
-                add(SHOP_SPEED, 0, null, 88);
+                add(SHOP_SPEED, 2, null, 88);   // vitesse ×2
+                add(SHOP_SPEED, 3, null, 88);   // vitesse ×3 (après ×2)
                 break;
             case GameModel.PAGE_MAGES:
                 add(INFO, 0, "Portrait : équipe · bandeau : artefact", 22);

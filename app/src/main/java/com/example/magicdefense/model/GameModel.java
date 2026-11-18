@@ -360,13 +360,13 @@ public class GameModel {
     }
 
     public void setGameSpeed(int speed) {
-        int max = progression.hasSpeed3() ? 3 : 2;
+        int max = progression.maxSpeed();
         gameSpeed = Math.max(1, Math.min(max, speed));
     }
 
     // ×1 → ×2 → ×3 (si achetée) → ×1
     public void cycleGameSpeed() {
-        int max = progression.hasSpeed3() ? 3 : 2;
+        int max = progression.maxSpeed();
         gameSpeed = gameSpeed >= max ? 1 : gameSpeed + 1;
     }
 
@@ -923,7 +923,16 @@ public class GameModel {
     }
 
     public boolean buySpeed3() {
-        return afterPurchase(inMenu() && progression.buySpeed3());
+        return buySpeed(3);
+    }
+
+    // Vitesse ×2 ou ×3 : achat définitif au Marché
+    public boolean buySpeed(int speed) {
+        boolean ok = afterPurchase(inMenu() && progression.buySpeed(speed));
+        if (ok) {
+            gameSpeed = speed; // la nouvelle vitesse est choisie tout de suite
+        }
+        return ok;
     }
 
     // ---------- Page Château ----------

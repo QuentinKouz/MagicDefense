@@ -38,7 +38,7 @@ Les gobelins sortent de la forêt et marchent vers le rempart. Vos mages, placé
 - **Recruter** : chaque bouton du bas place un mage de l'élément choisi sur une case libre (10 PO). Le bouton **dé** (sous la jauge) place un mage **au hasard** de l'équipe pour 7 PO.
 - **Cases bloquées** : la rangée du fond du damier (4 cases) est enchaînée au début de chaque partie. Touchez une case pour la débloquer avec des PO (30, puis 50, 80, 120).
 - **Soigner** : le bouton **+** (sous la jauge) rend 25 % des PV max du château, sans jamais dépasser le maximum. 3 soins par partie (50, 75, puis 100 PO).
-- **Vitesse ×1 / ×2 / ×3** : bouton sous le son. ×2 est gratuit, ×3 s'achète une fois pour toutes au Marché.
+- **Vitesse ×1 / ×2 / ×3** : bouton sous le son. ×2 (120 gemmes) puis ×3 (300 gemmes) s'achètent une fois pour toutes au Marché ; sans achat, le bouton reste à ×1 (grisé).
 - **AUTO** : le mode automatique lance seul l'ultime et les compétences dès qu'ils sont prêts.
 - **Fusionner** : glissez un mage sur un autre **du même élément et du même niveau** → il passe au niveau supérieur (niveau 5 maximum). Glisser sur une case vide déplace le mage.
 - **Gagner de l'or** : chaque gobelin tué rapporte des pièces d'or.
@@ -97,7 +97,7 @@ L'accueil se parcourt en **glissant le doigt** vers la gauche ou la droite (ou a
 
 **Marché · Mages · Campagne · Infini · Château** (le jeu s'ouvre sur la Campagne, au centre).
 
-- **Marché** (liste qui défile) : coffres (10 gemmes), unités exclusives, ultimes, vitesse ×3 (300 gemmes).
+- **Marché** (liste qui défile) : coffres (10 gemmes), unités exclusives, ultimes, vitesses ×2 (120 gemmes) et ×3 (300 gemmes, après ×2).
 - **Mages** (liste qui défile) : ouvrir les coffres **×1, ×5 ou ×10**, monter les rangs, composer l'équipe, changer d'artefact.
 - **Campagne** : la carte des niveaux et JOUER.
 - **Infini** : choix de la difficulté et records.

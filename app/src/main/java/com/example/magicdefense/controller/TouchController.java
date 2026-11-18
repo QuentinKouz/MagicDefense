@@ -453,7 +453,7 @@ public class TouchController {
                 model.buyUltimate(a);
                 break;
             case MenuList.SHOP_SPEED:
-                model.buySpeed3();
+                model.buySpeed(a);
                 break;
             case MenuList.CASTLE_HP:
                 model.upgradeCastleHp();

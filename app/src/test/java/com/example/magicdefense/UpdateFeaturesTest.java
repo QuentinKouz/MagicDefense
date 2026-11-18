@@ -37,6 +37,7 @@ public class UpdateFeaturesTest {
         assertEquals(0, Ultimate.price(Ultimate.STUN));
         assertTrue(Ultimate.price(Ultimate.METEOR) > Ultimate.price(Ultimate.FURY));
         assertEquals(10, Progression.CHEST_PRICE);
+        assertEquals(120, Progression.SPEED2_PRICE);
         assertEquals(300, Progression.SPEED3_PRICE);
     }
 
@@ -54,16 +55,27 @@ public class UpdateFeaturesTest {
     }
 
     @Test
-    public void speed3_needsPurchase() {
+    public void speeds_needPurchase_x2BeforeX3() {
         GameModel m = newModel();
         m.setGameSpeed(3);
-        assertEquals(2, m.getGameSpeed());
+        assertEquals(1, m.getGameSpeed());     // rien d'acheté : ×1 seulement
         m.cycleGameSpeed();
         assertEquals(1, m.getGameSpeed());
-        m.getProgression().addGems(300);
-        assertTrue(m.buySpeed3());
+        m.getProgression().addGems(1000);
+        assertFalse(m.buySpeed(3));             // ×3 demande ×2
+        assertTrue(m.buySpeed(2));
+        assertEquals(1000 - Progression.SPEED2_PRICE, m.getProgression().getGems());
+        assertFalse(m.buySpeed(2));             // déjà acheté
         m.setGameSpeed(3);
+        assertEquals(2, m.getGameSpeed());
+        assertTrue(m.buySpeed(3));
+        m.setGameSpeed(1);
+        m.cycleGameSpeed();
+        assertEquals(2, m.getGameSpeed());
+        m.cycleGameSpeed();
         assertEquals(3, m.getGameSpeed());
+        m.cycleGameSpeed();
+        assertEquals(1, m.getGameSpeed());
     }
 
     @Test
@@ -93,7 +105,7 @@ public class UpdateFeaturesTest {
         assertEquals(1.1f, p.castleHpMultiplier(), 1e-6);
         assertEquals(0.97f, p.castleDamageFactor(), 1e-6);
         GameModel m = newModel();
-        m.getProgression().loadCastle(5, 0, false);
+        m.getProgression().loadCastle(5, 0, false, false);
         m.startLevel(1);
         assertEquals(15000, m.getCastleMaxHp());
     }
