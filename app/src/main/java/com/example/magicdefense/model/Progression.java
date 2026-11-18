@@ -29,7 +29,7 @@ public class Progression {
     public static final int SPEED2_PRICE = 120;           // vitesse ×2, achat définitif
     public static final int SPEED3_PRICE = 300;           // vitesse ×3, achat définitif (après ×2)
     // Prix des unités exclusives (indice = type ; 0 = possédé dès le départ)
-    private static final int[] PRICES = {0, 0, 0, 0, 60, 100, 160};
+    private static final int[] PRICES = {0, 0, 0, 0, 60, 100, 160, 0, 0, 0}; // 3 derniers : cartes (lot 3)
 
     // Château (gemmes) : PV max et résistance
     public static final int CASTLE_HP_MAX_LEVEL = 20;

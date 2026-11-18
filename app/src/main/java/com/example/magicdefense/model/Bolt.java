@@ -9,7 +9,14 @@ public class Bolt {
     public final float toX;
     public final float toY;
     public final int level;               // niveau du mage : l'éclair évolue avec lui
+    public int type = Mage.LIGHTNING;     // Foudre (zigzag), Lumière (rayon droit) ou Ténèbres (éclair noir)
     private int timer = DURATION;
+
+    // Rayon de lumière, éclair noir... : même trajet, autre dessin
+    public Bolt as(int type) {
+        this.type = type;
+        return this;
+    }
 
     public Bolt(float fromX, float fromY, float toX, float toY, int level) {
         this.fromX = fromX;

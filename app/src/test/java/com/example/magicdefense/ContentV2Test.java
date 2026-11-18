@@ -159,6 +159,9 @@ public class ContentV2Test {
         int pairs = 0;
         for (int a = 0; a < Mage.TYPE_COUNT; a++) {
             for (int b = a + 1; b < Mage.TYPE_COUNT; b++) {
+                if (a == Mage.LIGHT && b == Mage.DARK) {
+                    continue; // Lumière + Ténèbres : pas de réaction (testé dans NewMagesTest)
+                }
                 int r = Reaction.between(a, b);
                 assertTrue("paire sans réaction : " + a + " + " + b, r != Reaction.NONE);
                 assertEquals("l'ordre ne compte pas", r, Reaction.between(b, a));
@@ -167,7 +170,7 @@ public class ContentV2Test {
                 pairs++;
             }
         }
-        assertEquals(21, pairs);
+        assertEquals(44, pairs);
         assertEquals(Reaction.COUNT, pairs);
         assertEquals(Reaction.WISPS, Reaction.between(Mage.FIRE, Mage.SUMMONER));
         assertEquals(Reaction.VORTEX, Reaction.between(Mage.SUMMONER, Mage.AIR));

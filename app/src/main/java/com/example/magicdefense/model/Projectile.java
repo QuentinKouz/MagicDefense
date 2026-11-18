@@ -16,6 +16,8 @@ public class Projectile {
     public float poisonDps;       // Poison : dégâts par seconde à l'impact
     public float knockback;       // Air : recul en pixels
     public int stunFrames;        // Invocateur : étourdissement
+    public float slow = 1f;       // Ténèbres : vitesse des ennemis touchés (1 = pas de ralenti)
+    public float executeRatio;    // Ténèbres : exécute sous cette part des PV max (0 = jamais)
     public Enemy target;
 
     // Le projectile reprend les caractéristiques du mage qui l'a tiré
@@ -32,6 +34,8 @@ public class Projectile {
         this.poisonDps = mage.getPoisonDps();
         this.knockback = mage.getKnockback() * density;
         this.stunFrames = 0;
+        this.slow = mage.getSlow();
+        this.executeRatio = mage.getExecuteRatio();
     }
 
     // Dégâts multipliés (Rage arcanique)
