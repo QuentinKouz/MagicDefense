@@ -50,9 +50,10 @@ public class Hud {
     public static final int OPTIONS_VOLUME = 2;
     public static final int OPTIONS_MUSIC_TOGGLE = 3;
     public static final int OPTIONS_LEFT_HANDED = 4;
+    public static final int OPTIONS_CODE = 5;   // seulement depuis l'accueil (pas dans la pause)
 
     public final RectF optionsPopup = new RectF();
-    public final RectF[] optionsButtons = new RectF[5];
+    public final RectF[] optionsButtons = new RectF[6];
     public final RectF volumeTrack = new RectF(); // rail du curseur (seuls left, right et centerY servent)
     // Hauteur (depuis le haut de la fenêtre) du titre de chaque réglage, en dp
     public static final float OPT_VIBRATION_Y = 95, OPT_MUSIC_Y = 185, OPT_LEFT_Y = 275, OPT_VOLUME_Y = 365;
@@ -231,7 +232,7 @@ public class Hud {
         }
 
         // Fenêtre d'options : vibrations, musique, mode gaucher, volume, retour
-        float oH = 525 * d;
+        float oH = 595 * d;
         float oTop = popupTop(h, oH);
         optionsPopup.set(pLeft, oTop, pLeft + pw, oTop + oH);
 
@@ -249,6 +250,7 @@ public class Hud {
         // RETOUR
         float backW = pw * 0.6f;
         optionsButtons[OPTIONS_BACK].set(cx - backW / 2, oTop + oH - 70 * d, cx + backW / 2, oTop + oH - 18 * d);
+        optionsButtons[OPTIONS_CODE].set(cx - backW / 2, oTop + oH - 132 * d, cx + backW / 2, oTop + oH - 84 * d);
 
         // Fenêtre de victoire (et de game over) : titre, 3 étoiles, coffres, artefact, puis 2 boutons
         float vH = 380 * d;

@@ -47,6 +47,8 @@ public class GameView extends View {
             sounds.setSystemVolume(model.getSoundVolume()); // applique le volume avant l'aperçu
             sounds.click();
         });
+        // Bouton CODE des options : petite fenêtre Android avec un champ de texte
+        touchController.setOnEnterCode(() -> showCodeDialog(context));
         // Bouton son de l'accueil : coupe, ou remet le volume d'avant
         touchController.setOnToggleMute(() -> {
             float current = sounds.getSystemVolume();
@@ -151,6 +153,30 @@ public class GameView extends View {
             }
         });
         model.setSoundVolume(sounds.getSystemVolume()); // le curseur part du volume actuel du téléphone
+    }
+
+    // Saisie d'un code (options de l'accueil) : le modèle vérifie, un message donne le résultat
+    private void showCodeDialog(Context context) {
+        android.widget.EditText input = new android.widget.EditText(context);
+        input.setSingleLine(true);
+        input.setHint("Code");
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        android.widget.FrameLayout box = new android.widget.FrameLayout(context);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(input);
+        new android.app.AlertDialog.Builder(context)
+                .setTitle("Entrer un code")
+                .setView(box)
+                .setPositiveButton("Valider", (dialog, which) -> {
+                    int result = model.redeemCode(input.getText().toString());
+                    String message = result == com.example.magicdefense.model.Progression.CODE_OK
+                            ? "Code accepté : +" + com.example.magicdefense.model.Progression.GIFT_CODE_GEMS + " gemmes !"
+                            : result == com.example.magicdefense.model.Progression.CODE_ALREADY_USED
+                            ? "Ce code a déjà été utilisé" : "Code invalide";
+                    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Annuler", null)
+                .show();
     }
 
     // Appelée dès que la taille de la vue est connue (et à chaque changement : rotation, pliable...)

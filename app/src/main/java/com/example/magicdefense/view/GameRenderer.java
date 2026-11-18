@@ -1390,6 +1390,12 @@ public class GameRenderer {
         float shownVolume = touch.isDraggingVolume() ? touch.getDragVolume() : model.getSoundVolume();
         drawVolumeSlider(canvas, shownVolume, touch.isDraggingVolume());
 
+        // CODE (seulement depuis l'accueil)
+        if (model.getOptionsReturnState() == GameState.START) {
+            drawPillButton(canvas, hud.optionsButtons[Hud.OPTIONS_CODE], "CODE", Palette.MARKET,
+                    pressed == Hud.OPTIONS_CODE);
+        }
+
         // RETOUR
         drawPillButton(canvas, hud.optionsButtons[Hud.OPTIONS_BACK], "RETOUR", Palette.MENU_BUTTON,
                 pressed == Hud.OPTIONS_BACK);

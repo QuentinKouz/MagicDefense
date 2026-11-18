@@ -33,6 +33,7 @@ public class TouchController {
     private Runnable onButtonClick; // appelé quand un bouton est validé (pour le son)
     private float dragVolume = 0; // position du curseur pendant le glissement
     private Runnable onToggleMute; // couper / remettre le son (géré par GameView)
+    private Runnable onEnterCode;  // fenêtre de saisie du code (gérée par GameView)
     private boolean draggingVolume = false; // doigt en train de régler le volume
 
     // Accueil : glissement entre les pages et défilement des listes
@@ -78,6 +79,10 @@ public class TouchController {
 
     public void setOnButtonClick(Runnable onButtonClick) {
         this.onButtonClick = onButtonClick;
+    }
+
+    public void setOnEnterCode(Runnable onEnterCode) {
+        this.onEnterCode = onEnterCode;
     }
 
     public void setOnToggleMute(Runnable onToggleMute) {
@@ -387,6 +392,10 @@ public class TouchController {
                         model.toggleMusic();
                     } else if (pressedMenuButton == Hud.OPTIONS_LEFT_HANDED) {
                         model.toggleLeftHanded(); // l'interface passe en miroir (GameView refait la mise en page)
+                    } else if (pressedMenuButton == Hud.OPTIONS_CODE) {
+                        if (onEnterCode != null) {
+                            onEnterCode.run();
+                        }
                     } else if (pressedMenuButton == Hud.OPTIONS_BACK) {
                         model.closeOptions();
                     }
@@ -534,7 +543,9 @@ public class TouchController {
             case PAUSED:
                 return hud.pauseMenuButtonAt(x, y);
             case OPTIONS:
-                return hud.optionsButtonAt(x, y);
+                int o = hud.optionsButtonAt(x, y);
+                // Le code ne se saisit que depuis les options de l'accueil
+                return o == Hud.OPTIONS_CODE && model.getOptionsReturnState() != GameState.START ? -1 : o;
             case VICTORY:
                 return hud.victoryButtonAt(x, y);
             case START: {
