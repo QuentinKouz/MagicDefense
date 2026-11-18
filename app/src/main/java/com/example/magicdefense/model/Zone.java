@@ -7,6 +7,10 @@ public class Zone {
     public static final int MUD = 2;      // ralentit fortement
     public static final int BOG = 3;      // empoisonne
     public static final int FIRE = 4;     // anneau de flammes : brûle
+    public static final int CONCRETE = 5; // béton frais : ralentit presque à l'arrêt
+    public static final int TAR = 6;      // goudron : ralentit et empoisonne
+    public static final int ABYSS = 7;    // abysse : ralentit et ronge (dégâts par seconde)
+    public static final int BLACK_FIRE = 8; // flammes noires : brûle très fort
 
     public final float x;
     public final float y;

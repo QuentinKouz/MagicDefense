@@ -1,8 +1,9 @@
 package com.example.magicdefense.model;
 
 // Réactions élémentaires : un ennemi marqué par un élément, touché par un second élément
-// différent, déclenche une réaction. Chacune des 21 paires des 7 éléments a sa réaction
-// (l'Invocateur laisse une marque « arcanique »). Un objet Reaction est aussi l'effet visuel affiché.
+// différent, déclenche une réaction. Chaque paire des 10 éléments a sa réaction (44 au total),
+// sauf Lumière + Ténèbres qui s'annulent (l'Invocateur laisse une marque « arcanique »,
+// l'Ouvrier une marque « chantier »). Un objet Reaction est aussi l'effet visuel affiché.
 public class Reaction {
     public static final int NONE = -1;
     // Réactions d'origine
@@ -28,13 +29,43 @@ public class Reaction {
     public static final int SPECTRAL_CHAIN = 18; // Foudre + Invocateur : arc qui rebondit 5 fois
     public static final int CURSE = 19;         // Poison + Invocateur : ennemis proches vulnérables
     public static final int VORTEX = 20;        // Air + Invocateur : aspire les ennemis, étourdit
-    public static final int COUNT = 21;
+    // Ouvrier (marque « chantier »)
+    public static final int CONCRETE = 21;      // Ouvrier + Eau : béton frais qui englue presque sur place
+    public static final int FORGE = 22;         // Ouvrier + Feu : coup de forge, cible vulnérable
+    public static final int FOUNDATIONS = 23;   // Ouvrier + Terre : onde sismique qui étourdit, murs réparés
+    public static final int PILEDRIVER = 24;    // Ouvrier + Foudre : 3 frappes sur la cible, étourdissement
+    public static final int TAR = 25;           // Ouvrier + Poison : goudron qui ralentit et empoisonne
+    public static final int CATAPULT = 26;      // Ouvrier + Air : la cible est catapultée et retombe en zone
+    public static final int BARRICADE = 27;     // Ouvrier + Invocateur : barricade temporaire devant elle
+    public static final int SANCTUARY = 28;     // Ouvrier + Lumière : murs et chevaliers soignés
+    public static final int DEMOLITION = 29;    // Ouvrier + Ténèbres : grosse explosion qui repousse
+    // Lumière
+    public static final int RAINBOW = 30;       // Lumière + Eau : ralentit et rend vulnérable
+    public static final int SUPERNOVA = 31;     // Lumière + Feu : explosion de lumière brûlante
+    public static final int PRISM = 32;         // Lumière + Terre : rayons réfractés vers 4 ennemis
+    public static final int JUDGMENT = 33;      // Lumière + Foudre : colonne de lumière, étourdissement
+    public static final int PURIFICATION = 34;  // Lumière + Poison : le poison restant explose d'un coup
+    public static final int AURORA = 35;        // Lumière + Air : aveugle (étourdit) et repousse
+    public static final int CRUSADE = 36;       // Lumière + Invocateur : un paladin rejoint la garde
+    // Ténèbres (pas de réaction Lumière + Ténèbres)
+    public static final int ABYSS = 37;         // Ténèbres + Eau : abysse qui ralentit et ronge
+    public static final int BLACK_FLAMES = 38;  // Ténèbres + Feu : flammes noires (gros dégâts sur la durée)
+    public static final int TOMB = 39;          // Ténèbres + Terre : tombeau, long étourdissement, vulnérable
+    public static final int DARK_BOLT = 40;     // Ténèbres + Foudre : chaîne qui exécute les blessés
+    public static final int NECROSIS = 41;      // Ténèbres + Poison : poison violent et vulnérabilité de zone
+    public static final int BLACK_HOLE = 42;    // Ténèbres + Air : aspire fort et broie
+    public static final int REAPING = 43;       // Ténèbres + Invocateur : moisson des âmes (exécution de zone)
+    public static final int COUNT = 44;
 
     public static final String[] NAMES = {"ÉLECTROCUTION", "LAVE", "VAPEUR",
             "EXPLOSION TOXIQUE", "NUAGE TOXIQUE", "TEMPÊTE DE SABLE",
             "BOUE", "MARÉCAGE", "GEL", "GEYSER", "SURCHARGE", "EMBRASEMENT", "FEUX FOLLETS",
             "CRISTALLISATION", "ACIDE", "ÉBOULEMENT", "PARALYSIE", "ORAGE", "CHAÎNE SPECTRALE",
-            "MALÉDICTION", "VORTEX"};
+            "MALÉDICTION", "VORTEX",
+            "BÉTON", "FORGE", "FONDATIONS", "MARTEAU-PILON", "GOUDRON", "CATAPULTE", "BARRICADE",
+            "SANCTUAIRE", "DÉMOLITION",
+            "ARC-EN-CIEL", "SUPERNOVA", "PRISME", "JUGEMENT", "PURIFICATION", "AURORE", "CROISADE",
+            "ABYSSES", "FLAMMES NOIRES", "TOMBEAU", "ÉCLAIR NOIR", "NÉCROSE", "TROU NOIR", "MOISSON"};
 
     // Les deux éléments de chaque réaction (l'ordre n'a pas d'importance)
     private static final int[][] PAIRS = {
@@ -59,6 +90,29 @@ public class Reaction {
             {Mage.LIGHTNING, Mage.SUMMONER},
             {Mage.POISON, Mage.SUMMONER},
             {Mage.AIR, Mage.SUMMONER},
+            {Mage.WORKER, Mage.WATER},
+            {Mage.WORKER, Mage.FIRE},
+            {Mage.WORKER, Mage.EARTH},
+            {Mage.WORKER, Mage.LIGHTNING},
+            {Mage.WORKER, Mage.POISON},
+            {Mage.WORKER, Mage.AIR},
+            {Mage.WORKER, Mage.SUMMONER},
+            {Mage.WORKER, Mage.LIGHT},
+            {Mage.WORKER, Mage.DARK},
+            {Mage.LIGHT, Mage.WATER},
+            {Mage.LIGHT, Mage.FIRE},
+            {Mage.LIGHT, Mage.EARTH},
+            {Mage.LIGHT, Mage.LIGHTNING},
+            {Mage.LIGHT, Mage.POISON},
+            {Mage.LIGHT, Mage.AIR},
+            {Mage.LIGHT, Mage.SUMMONER},
+            {Mage.DARK, Mage.WATER},
+            {Mage.DARK, Mage.FIRE},
+            {Mage.DARK, Mage.EARTH},
+            {Mage.DARK, Mage.LIGHTNING},
+            {Mage.DARK, Mage.POISON},
+            {Mage.DARK, Mage.AIR},
+            {Mage.DARK, Mage.SUMMONER},
     };
 
     // ---------- Réglages (rayons en dp, durées en images) ----------
@@ -120,6 +174,67 @@ public class Reaction {
     public static final float VORTEX_RADIUS = 130;
     public static final float VORTEX_PULL = 0.6f;        // rapproche de 60 % vers le centre
     public static final int VORTEX_STUN = 25;
+
+    // Ouvrier
+    public static final float CONCRETE_RADIUS = 80;
+    public static final int CONCRETE_DURATION = 240;
+    public static final float CONCRETE_SLOW = 0.15f;     // vitesse × 0,15 dans le béton
+    public static final float FORGE_DAMAGE = 2.5f;
+    public static final float FOUNDATIONS_RADIUS = 100;
+    public static final int FOUNDATIONS_STUN = 50;
+    public static final float FOUNDATIONS_REPAIR = 0.3f;  // murs réparés de 30 % de leurs PV max
+    public static final int PILEDRIVER_HITS = 3;
+    public static final float PILEDRIVER_DAMAGE = 1.0f;  // par frappe
+    public static final int PILEDRIVER_STUN = 40;
+    public static final float TAR_RADIUS = 80;
+    public static final int TAR_DURATION = 270;
+    public static final float TAR_SLOW = 0.4f;
+    public static final float TAR_DPS_FACTOR = 0.8f;     // poison appliqué dans le goudron
+    public static final float CATAPULT_KNOCKBACK = 120;
+    public static final float CATAPULT_RADIUS = 70;
+    public static final float CATAPULT_DAMAGE = 1.5f;
+    public static final float BARRICADE_HP_FACTOR = 15f;  // PV = 15 × le coup
+    public static final int BARRICADE_LIFE = 480;        // ≈ 8 s
+    public static final float SANCTUARY_HEAL = 0.5f;     // +50 % des PV max des murs et chevaliers
+    public static final float DEMOLITION_RADIUS = 110;
+    public static final float DEMOLITION_DAMAGE = 2.5f;
+    public static final float DEMOLITION_KNOCKBACK = 30;
+    // Lumière
+    public static final float RAINBOW_RADIUS = 110;
+    public static final float RAINBOW_SLOW = 0.5f;
+    public static final int RAINBOW_DURATION = 150;
+    public static final float SUPERNOVA_RADIUS = 120;
+    public static final float SUPERNOVA_DAMAGE = 2.2f;
+    public static final int PRISM_BEAMS = 4;
+    public static final float PRISM_RANGE = 220;
+    public static final float PRISM_DAMAGE = 1.3f;
+    public static final float JUDGMENT_DAMAGE = 3f;
+    public static final int JUDGMENT_STUN = 50;
+    public static final float PURIFICATION_RADIUS = 100;
+    public static final float PURIFICATION_FACTOR = 1.5f; // poison restant × 1,5, tout de suite
+    public static final float AURORA_RADIUS = 120;
+    public static final int AURORA_STUN = 40;
+    public static final float AURORA_KNOCKBACK = 20;
+    public static final float CRUSADE_HP_FACTOR = 6f;    // PV du paladin = 6 × le coup
+    public static final float CRUSADE_HIT_FACTOR = 1f;
+    // Ténèbres
+    public static final float ABYSS_RADIUS = 85;
+    public static final int ABYSS_DURATION = 240;
+    public static final float ABYSS_SLOW = 0.35f;
+    public static final float ABYSS_DPS_FACTOR = 0.8f;
+    public static final float BLACK_FLAMES_RADIUS = 85;
+    public static final int BLACK_FLAMES_DURATION = 180;
+    public static final float BLACK_FLAMES_DPS_FACTOR = 2.2f;
+    public static final int TOMB_STUN = 100;
+    public static final int CHAIN_EXECUTE_JUMPS = 4;
+    public static final float CHAIN_EXECUTE_RATIO = 0.15f; // l'éclair noir exécute sous 15 % de PV
+    public static final float NECROSIS_RADIUS = 100;
+    public static final float NECROSIS_DPS_FACTOR = 1.5f;
+    public static final float BLACK_HOLE_RADIUS = 150;
+    public static final float BLACK_HOLE_PULL = 0.8f;
+    public static final float BLACK_HOLE_DAMAGE = 1.5f;
+    public static final float REAPING_RADIUS = 120;
+    public static final float REAPING_RATIO = 0.20f;     // exécute sous 20 % de PV (jamais le boss)
 
     // Réaction déclenchée par la marque `mark` puis l'élément `element`, ou NONE
     public static int between(int mark, int element) {

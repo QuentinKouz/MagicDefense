@@ -485,6 +485,9 @@ public class GameRenderer {
             drawShieldDome(canvas, model.getShield());
         }
 
+        for (com.example.magicdefense.model.Wall w : model.getWalls()) {
+            attacks.drawWall(canvas, w); // murs des Ouvriers, devant les chevaliers
+        }
         for (Knight k : model.getKnights()) {
             drawKnight(canvas, k);
         }

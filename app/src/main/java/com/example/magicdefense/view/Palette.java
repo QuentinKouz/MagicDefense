@@ -4,7 +4,8 @@ import android.graphics.Color;
 
 // Couleurs et noms affichés pour chaque élément (indice = Mage.type)
 public class Palette {
-    public static final String[] ELEMENT_NAMES = {"Eau", "Feu", "Terre", "Foudre", "Poison", "Air", "Invocateur"};
+    public static final String[] ELEMENT_NAMES = {"Eau", "Feu", "Terre", "Foudre", "Poison", "Air", "Invocateur",
+            "Ouvrier", "Lumière", "Ténèbres"};
     public static final int[] ELEMENT_COLORS = {
             Color.rgb(70, 150, 255),   // Eau
             Color.rgb(255, 110, 50),   // Feu
@@ -13,11 +14,16 @@ public class Palette {
             Color.rgb(120, 200, 60),   // Poison
             Color.rgb(185, 225, 240),  // Air
             Color.rgb(230, 100, 180),  // Invocateur
+            Color.rgb(230, 160, 50),   // Ouvrier
+            Color.rgb(255, 235, 140),  // Lumière
+            Color.rgb(120, 70, 170),   // Ténèbres
     };
     // Description courte (Marché)
     public static final String[] ELEMENT_DESCRIPTIONS = {
             "Dégâts de zone", "Dégâts qui explosent", "Salve de cristaux", "Tir éclair",
             "Empoisonne : dégâts sur la durée", "Repousse les ennemis", "Invoque des chevaliers gardiens",
+            "Construit un mur, lance des marteaux", "Renforce tous les mages, rayons sur tous",
+            "Exécute les blessés, grande zone qui ralentit",
     };
 
     // Réactions élémentaires (indice = Reaction.xxx)
@@ -43,7 +49,35 @@ public class Palette {
             Color.rgb(240, 130, 255),  // Chaîne spectrale
             Color.rgb(170, 80, 200),   // Malédiction
             Color.rgb(210, 220, 240),  // Vortex
+            Color.rgb(175, 175, 180),  // Béton
+            Color.rgb(255, 140, 50),   // Forge
+            Color.rgb(200, 150, 90),   // Fondations
+            Color.rgb(250, 210, 90),   // Marteau-pilon
+            Color.rgb(70, 60, 50),     // Goudron
+            Color.rgb(220, 190, 140),  // Catapulte
+            Color.rgb(190, 140, 80),   // Barricade
+            Color.rgb(255, 245, 190),  // Sanctuaire
+            Color.rgb(255, 110, 70),   // Démolition
+            Color.rgb(160, 220, 255),  // Arc-en-ciel
+            Color.rgb(255, 230, 150),  // Supernova
+            Color.rgb(200, 255, 240),  // Prisme
+            Color.rgb(255, 250, 200),  // Jugement
+            Color.rgb(220, 255, 180),  // Purification
+            Color.rgb(170, 255, 210),  // Aurore
+            Color.rgb(255, 225, 120),  // Croisade
+            Color.rgb(60, 80, 170),    // Abysses
+            Color.rgb(150, 80, 220),   // Flammes noires
+            Color.rgb(140, 120, 150),  // Tombeau
+            Color.rgb(180, 110, 255),  // Éclair noir
+            Color.rgb(130, 170, 90),   // Nécrose
+            Color.rgb(110, 60, 160),   // Trou noir
+            Color.rgb(200, 160, 230),  // Moisson
     };
+    // Murs de l'Ouvrier
+    public static final int WALL_STONE = Color.rgb(150, 140, 130);
+    public static final int WALL_STONE_DARK = Color.rgb(95, 88, 82);
+    public static final int WALL_MORTAR = Color.rgb(70, 64, 60);
+    public static final int WALL_BAR = Color.rgb(230, 160, 50);
     public static final int VULNERABLE = Color.rgb(255, 150, 40); // ennemi vulnérable (Acide, Malédiction)
 
     // Ennemis

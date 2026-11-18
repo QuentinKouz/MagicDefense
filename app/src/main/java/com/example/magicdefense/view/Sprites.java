@@ -66,6 +66,9 @@ public final class Sprites {
             {".g.g", "g.G.", ".gGg", "gGGg", ".gg.", "..T."},   // Poison : bulles toxiques
             {"gGg.", "...g", ".gG.", "g...", ".gGg", "..T."},   // Air : spirale de vent
             {".gg.", "gGGg", "gKGg", "gGGg", ".gg.", "..T."},   // Invocateur : orbe avec un œil
+            {"gggg", "gGGg", "gggg", "..T.", "..T.", "..T."},   // Ouvrier : tête de marteau
+            {"g.g.", ".GG.", "gGGg", ".GG.", "g.g.", "..T."},   // Lumière : soleil rayonnant
+            {".gg.", "gKKg", "gKGg", "gKKg", ".gg.", "..T."},   // Ténèbres : orbe d'ombre
     };
     private static final String[] SMALL_TIP = {"....", "....", "..g.", ".gGg", "..g.", "..T."};
 
@@ -78,6 +81,9 @@ public final class Sprites {
             "rGrrgYYrgrrGr",   // Poison : gouttes
             "rGrGrYYrGrGrr",   // Air : rafales
             "rgrrGYYGrrgrr",   // Invocateur : runes
+            "rGGrrYYrrGGrr",   // Ouvrier : briques
+            "GrGrGYYGrGrGr",   // Lumière : rayons
+            "rKrrKYYKrrKrr",   // Ténèbres : ombres
     };
 
     // Couleurs propres à chaque élément : robe, robe ombrée, embout clair, embout foncé
@@ -89,6 +95,19 @@ public final class Sprites {
             {Color.rgb(90, 170, 60), Color.rgb(55, 115, 35), Color.rgb(200, 255, 120), Color.rgb(110, 190, 40)},
             {Color.rgb(185, 215, 232), Color.rgb(120, 160, 185), Color.rgb(255, 255, 255), Color.rgb(160, 210, 240)},
             {Color.rgb(200, 80, 160), Color.rgb(130, 45, 105), Color.rgb(255, 190, 240), Color.rgb(230, 110, 200)},
+            {Color.rgb(215, 140, 40), Color.rgb(150, 90, 25), Color.rgb(200, 200, 210), Color.rgb(120, 120, 135)},
+            {Color.rgb(245, 240, 225), Color.rgb(205, 190, 150), Color.rgb(255, 250, 200), Color.rgb(255, 210, 70)},
+            {Color.rgb(75, 45, 110), Color.rgb(45, 25, 70), Color.rgb(200, 140, 255), Color.rgb(130, 70, 200)},
+    };
+
+    private static final int WORKER_TYPE = 7; // Mage.WORKER
+    private static final String[] WORKER_HELMET = {
+            "",
+            "",
+            "....KKKK",
+            "...KYYYYK",
+            "..KYYYYYYK",
+            "..KYYYYYYYK",
     };
 
     public static final int MAGE_WIDTH = 19;
@@ -97,6 +116,12 @@ public final class Sprites {
     // Grille du mage d'un élément et d'un niveau : le design évolue à chaque fusion
     static String[] mageRows(int type, int level) {
         char[][] g = toGrid(level == 1 ? BODY_APPRENTICE : BODY_MAGE, MAGE_WIDTH);
+        if (type == WORKER_TYPE) {
+            // Ouvrier : casque de chantier jaune à la place du chapeau pointu
+            for (int i = 0; i < WORKER_HELMET.length; i++) {
+                g[i] = pad(WORKER_HELMET[i], MAGE_WIDTH);
+            }
+        }
 
         String[] tip = (level == 1) ? SMALL_TIP : TIPS[type];
         for (int i = 0; i < tip.length; i++) {
@@ -122,7 +147,10 @@ public final class Sprites {
             g[0][18] = 'Y';
             g[2][14] = 'Y';
         }
-        if (level >= 5) {                       // grand mage : pointe et bande du chapeau dorées
+        if (level >= 5 && type == WORKER_TYPE) { // chef de chantier : lampe frontale sur le casque
+            g[3][5] = 'W';
+            g[3][6] = 'W';
+        } else if (level >= 5) {                 // grand mage : pointe et bande du chapeau dorées
             g[0][6] = 'Y';
             g[0][7] = 'Y';
             g[1][6] = 'Y';

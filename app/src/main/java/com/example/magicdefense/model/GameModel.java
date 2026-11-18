@@ -103,6 +103,8 @@ public class GameModel {
     private final ArrayList<Enemy> enemies = new ArrayList<>();
     private final ArrayList<Projectile> projectiles = new ArrayList<>();
     private final ArrayList<Knight> knights = new ArrayList<>();
+    private final ArrayList<Wall> walls = new ArrayList<>();          // murs des Ouvriers
+    private final float[][] auras = new float[Board.ROWS][Board.COLS]; // bonus de Lumière reçu par case
     private Mage[][] grid = new Mage[Board.ROWS][Board.COLS]; // null = case vide
     private boolean[][] locked = new boolean[Board.ROWS][Board.COLS];
     private int cellsUnlocked = 0;
@@ -198,6 +200,7 @@ public class GameModel {
     public List<Enemy> getEnemies() { return enemies; }
     public List<Projectile> getProjectiles() { return projectiles; }
     public List<Knight> getKnights() { return knights; }
+    public List<Wall> getWalls() { return walls; }
     public Mage getMage(int row, int col) { return grid[row][col]; }
     public int getGold() { return gold; }
     public int getWave() { return wave; }
@@ -682,6 +685,7 @@ public class GameModel {
         enemies.clear();
         projectiles.clear();
         knights.clear();
+        walls.clear();
         splashes.clear();
         bolts.clear();
         hits.clear();
@@ -785,6 +789,7 @@ public class GameModel {
         enemies.clear();
         projectiles.clear();
         knights.clear();
+        walls.clear();
         if (listener != null) {
             listener.onProgressChanged(); // la partie en cours n'est plus à reprendre
         }
@@ -1163,6 +1168,20 @@ public class GameModel {
                         case Zone.BOG:
                             e.poison(z.dps, 60);
                             break;
+                        case Zone.CONCRETE:
+                            e.slow(Reaction.CONCRETE_SLOW, 5);
+                            break;
+                        case Zone.TAR:
+                            e.slow(Reaction.TAR_SLOW, 5);
+                            e.poison(z.dps, 60);
+                            break;
+                        case Zone.ABYSS:
+                            e.slow(Reaction.ABYSS_SLOW, 5);
+                            hurt(e, z.dps / 60f);
+                            break;
+                        case Zone.BLACK_FIRE:
+                            hurt(e, z.dps / 60f);
+                            break;
                     }
                 }
             }
@@ -1205,9 +1224,18 @@ public class GameModel {
             for (int i = enemies.size() - 1; i >= 0; i--) {
                 Enemy enemy = enemies.get(i);
 
-                // Un chevalier lui barre la route : il s'arrête et se bat
-                Knight blocker = blockingKnight(enemy);
-                if (blocker != null && !enemy.isDead()) {
+                // Un mur d'Ouvrier ou un chevalier lui barre la route : il s'arrête et frappe
+                Wall wall = blockingWall(enemy);
+                Knight blocker = wall == null ? blockingKnight(enemy) : null;
+                if (wall != null && !enemy.isDead()) {
+                    enemy.hold();
+                    wall.fighting = true;
+                    if (enemy.stunTimer == 0) {
+                        float ratio = enemy.isBoss() ? Wall.BOSS_DPS_RATIO : Wall.GOBLIN_DPS_RATIO;
+                        wall.hp -= enemy.maxHp * ratio / 60f;
+                        wall.hitTimer = 6;
+                    }
+                } else if (blocker != null && !enemy.isDead()) {
                     enemy.hold();
                     blocker.fighting = true;
                     if (enemy.stunTimer == 0) {
@@ -1262,11 +1290,13 @@ public class GameModel {
             }
         }
 
-        // 3. Les chevaliers se placent et frappent
+        // 3. Les chevaliers se placent et frappent ; les Ouvriers (re)construisent leurs murs
         updateKnights();
+        updateWalls();
 
-        // 4. Les mages attaquent, chacun à sa façon
-        float mult = damageMult();
+        // 4. Les mages attaquent, chacun à sa façon (renforcés par l'aura des mages de Lumière)
+        computeAuras();
+        float baseMult = damageMult();
         List<Enemy> targets = findTargets();
         for (int row = 0; row < Board.ROWS; row++) {
             for (int col = 0; col < Board.COLS; col++) {
@@ -1274,6 +1304,8 @@ public class GameModel {
                 if (mage == null) {
                     continue;
                 }
+                float aura = auras[row][col];
+                float mult = baseMult * (1f + aura);
                 if (mage.skillTimer > 0) {
                     mage.skillTimer--;
                 }
@@ -1288,7 +1320,7 @@ public class GameModel {
                     // Invocateur : un chevalier de plus devant le château (jusqu'à sa limite)
                     if (knightsOf(mage) < mage.getMaxKnights()) {
                         spawnKnight(mage, board.cellCenterX(col), 1f);
-                        mage.cooldown = mage.getFireDelay();
+                        mage.cooldown = fireDelay(mage, aura);
                     }
                     continue;
                 }
@@ -1299,6 +1331,18 @@ public class GameModel {
                 }
 
                 switch (mage.type) {
+                    case Mage.LIGHT:
+                        // Lumière : un rayon du ciel sur CHAQUE ennemi visible, au même instant
+                        for (Enemy e : targets) {
+                            if (e.isDead()) {
+                                continue;
+                            }
+                            applyHit(e, mage.getDamage() * mult, Mage.LIGHT, 0, 0, 0);
+                            bolts.add(new Bolt(e.x, 0, e.x, e.y, mage.level).as(Mage.LIGHT));
+                            hits.add(new HitEffect(e.x, e.y, Mage.LIGHT, mage.level));
+                        }
+                        break;
+
                     case Mage.LIGHTNING:
                         // Foudre : l'éclair relie instantanément le bâton à la cible
                         applyHit(target, mage.getDamage() * mult, Mage.LIGHTNING, 0, 0, 0);
@@ -1327,7 +1371,7 @@ public class GameModel {
                         }
                         break;
                 }
-                mage.cooldown = mage.getFireDelay();
+                mage.cooldown = fireDelay(mage, aura);
             }
         }
 
@@ -1346,8 +1390,10 @@ public class GameModel {
 
             if (p.update()) {
                 if (p.aoeRadius > 0) {
-                    splashes.add(new Splash(p.target.x, p.target.y, p.aoeRadius, p.level)); // effet visuel
-                    // Eau : touche tous les ennemis dans la zone autour de l'impact
+                    Splash splash = new Splash(p.target.x, p.target.y, p.aoeRadius, p.level); // effet visuel
+                    splash.type = p.type;
+                    splashes.add(splash);
+                    // Eau, Ténèbres : touche tous les ennemis dans la zone autour de l'impact
                     float cx = p.target.x;
                     float cy = p.target.y;
                     for (Enemy e : enemies) {
@@ -1355,6 +1401,12 @@ public class GameModel {
                         float dy = e.y - cy;
                         if (dx * dx + dy * dy <= p.aoeRadius * p.aoeRadius) {
                             applyHit(e, p.damage, p.type, 0, 0, 0);
+                            if (p.slow < 1f) {
+                                e.slow(p.slow, Mage.DARK_SLOW_FRAMES); // Ténèbres : ralenti
+                            }
+                            if (p.executeRatio > 0) {
+                                tryExecute(e, p.executeRatio);   // Ténèbres : exécution des blessés
+                            }
                         }
                     }
                 } else if (p.fromReaction) {
@@ -1513,6 +1565,146 @@ public class GameModel {
             float dy = knightGuardY() - k.y;
             k.y += Math.max(-step, Math.min(step, dy));
         }
+    }
+
+    // ---------- Murs (Ouvrier) ----------
+    // Ligne des murs : devant la garde des chevaliers, juste avant le damier
+    private float wallY() {
+        return board.gridTop - 64 * board.density;
+    }
+
+    private float wallHalfWidth() {
+        return board.cellWidth * 0.45f;
+    }
+
+    private float wallHalfHeight() {
+        return 9 * board.density;
+    }
+
+    private Wall wallOf(Mage mage) {
+        for (Wall w : walls) {
+            if (w.owner == mage) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    private boolean isOnBoard(Mage mage) {
+        for (int row = 0; row < Board.ROWS; row++) {
+            for (int col = 0; col < Board.COLS; col++) {
+                if (grid[row][col] == mage) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Murs : usure, destruction (l'ouvrier attend avant de reconstruire), puis construction
+    // du mur de chaque Ouvrier devant SA colonne (le mur suit l'ouvrier s'il change de colonne)
+    private void updateWalls() {
+        for (int i = walls.size() - 1; i >= 0; i--) {
+            Wall w = walls.get(i);
+            w.age++;
+            if (w.hitTimer > 0) {
+                w.hitTimer--;
+            }
+            if (w.life > 0) {
+                w.life--;
+            }
+            boolean ownerGone = w.owner != null && !isOnBoard(w.owner); // fusionné ou parti
+            if (w.isDead() || ownerGone) {
+                if (w.owner != null && !ownerGone) {
+                    w.owner.wallTimer = Mage.WALL_REBUILD;
+                }
+                hits.add(new HitEffect(w.x, w.y, Mage.WORKER, 4));
+                walls.remove(i);
+            }
+            w.fighting = false;
+        }
+        for (int row = 0; row < Board.ROWS; row++) {
+            for (int col = 0; col < Board.COLS; col++) {
+                Mage m = grid[row][col];
+                if (m == null || m.type != Mage.WORKER) {
+                    continue;
+                }
+                Wall w = wallOf(m);
+                if (w != null) {
+                    w.x = board.cellCenterX(col);
+                } else if (m.wallTimer > 0) {
+                    m.wallTimer--;
+                } else {
+                    walls.add(new Wall(board.cellCenterX(col), wallY(), wallHalfWidth(), wallHalfHeight(),
+                            m.getWallHp(), m, -1));
+                    hits.add(new HitEffect(board.cellCenterX(col), wallY(), Mage.WORKER, 3));
+                }
+            }
+        }
+    }
+
+    private Wall blockingWall(Enemy e) {
+        for (Wall w : walls) {
+            if (!w.isDead() && w.touches(e)) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    // ---------- Aura de Lumière ----------
+    // Chaque mage reçoit le bonus des (au plus 2) plus fortes auras de Lumière du damier, hors la sienne
+    private void computeAuras() {
+        int n = 0;
+        float[] all = new float[Board.ROWS * Board.COLS];
+        for (int row = 0; row < Board.ROWS; row++) {
+            for (int col = 0; col < Board.COLS; col++) {
+                Mage m = grid[row][col];
+                if (m != null && m.getAuraBonus() > 0) {
+                    all[n++] = m.getAuraBonus();
+                }
+            }
+        }
+        Arrays.sort(all, 0, n); // croissant
+        for (int row = 0; row < Board.ROWS; row++) {
+            for (int col = 0; col < Board.COLS; col++) {
+                Mage m = grid[row][col];
+                float own = m == null ? 0 : m.getAuraBonus();
+                float sum = 0;
+                int taken = 0;
+                boolean skippedOwn = own <= 0;
+                for (int k = n - 1; k >= 0 && taken < Mage.MAX_LIGHT_AURAS; k--) {
+                    if (!skippedOwn && all[k] == own) {
+                        skippedOwn = true; // sa propre aura ne compte pas
+                        continue;
+                    }
+                    sum += all[k];
+                    taken++;
+                }
+                auras[row][col] = Math.min(Mage.MAX_AURA_BONUS, sum);
+            }
+        }
+    }
+
+    // Bonus de Lumière reçu par le mage de cette case (+x % de dégâts, −x % de délais)
+    public float getAuraBonus(int row, int col) {
+        computeAuras();
+        return auras[row][col];
+    }
+
+    private static int fireDelay(Mage mage, float aura) {
+        return Math.max(1, Math.round(mage.getFireDelay() * (1f - aura)));
+    }
+
+    // ---------- Ténèbres ----------
+    // Tue net un gobelin blessé sous `ratio` de ses PV max (le boss n'est jamais exécuté)
+    private boolean tryExecute(Enemy e, float ratio) {
+        if (e.isBoss() || e.isDead() || e.hp > e.maxHp * ratio) {
+            return false;
+        }
+        e.hp = 0;
+        hits.add(new HitEffect(e.x, e.y, Mage.DARK, 5));
+        return true;
     }
 
     // ---------- Coups et réactions élémentaires ----------
@@ -1751,11 +1943,216 @@ public class GameModel {
                 ringRadius = rad;
                 break;
             }
+            default:
+                ringRadius = triggerNewReaction(r, e, dmg, ringRadius);
+                break;
         }
         reactions.add(new Reaction(e.x, e.y, r, ringRadius));
         progression.addReaction();
         if (listener != null) {
             listener.onReaction();
+        }
+    }
+
+    // Réactions de l'Ouvrier, de la Lumière et des Ténèbres. Retourne le rayon de l'anneau affiché.
+    private float triggerNewReaction(int r, Enemy e, float dmg, float ringRadius) {
+        float d = board.density;
+        switch (r) {
+            // ---------- Ouvrier ----------
+            case Reaction.CONCRETE: {     // Eau : béton frais, les gobelins s'y engluent
+                float rad = Reaction.CONCRETE_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.CONCRETE, 0, Reaction.CONCRETE_DURATION));
+                return rad;
+            }
+            case Reaction.FORGE:          // Feu : coup de forge, l'armure est fendue
+                hurt(e, dmg * Reaction.FORGE_DAMAGE);
+                e.makeVulnerable(Reaction.VULNERABLE_DURATION);
+                hits.add(new HitEffect(e.x, e.y, Mage.FIRE, 5));
+                return ringRadius;
+            case Reaction.FOUNDATIONS: {  // Terre : onde sismique, les murs sont consolidés
+                float rad = Reaction.FOUNDATIONS_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    hurt(o, dmg);
+                    o.stun(Reaction.FOUNDATIONS_STUN);
+                }
+                for (Wall w : walls) {
+                    w.repair(w.maxHp * Reaction.FOUNDATIONS_REPAIR);
+                }
+                return rad;
+            }
+            case Reaction.PILEDRIVER:     // Foudre : trois coups de marteau électrique
+                for (int k = 0; k < Reaction.PILEDRIVER_HITS; k++) {
+                    hurt(e, dmg * Reaction.PILEDRIVER_DAMAGE);
+                    bolts.add(new Bolt(e.x + (k - 1) * 10 * d, 0, e.x, e.y, 3));
+                }
+                e.stun(Reaction.PILEDRIVER_STUN);
+                hits.add(new HitEffect(e.x, e.y, Mage.WORKER, 5));
+                return ringRadius;
+            case Reaction.TAR: {          // Poison : goudron collant et toxique
+                float rad = Reaction.TAR_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.TAR, Math.max(1f, dmg * Reaction.TAR_DPS_FACTOR),
+                        Reaction.TAR_DURATION));
+                return rad;
+            }
+            case Reaction.CATAPULT: {     // Air : la cible est catapultée et retombe sur les autres
+                e.knockBack(Reaction.CATAPULT_KNOCKBACK * d);
+                float rad = Reaction.CATAPULT_RADIUS * d;
+                damageAround(e.x, e.y, rad, dmg * Reaction.CATAPULT_DAMAGE);
+                hits.add(new HitEffect(e.x, e.y, Mage.EARTH, 4));
+                return rad;
+            }
+            case Reaction.BARRICADE: {    // Invocateur : barricade temporaire sur la ligne des murs
+                float hw = wallHalfWidth();
+                float x = Math.max(board.playLeft + hw, Math.min(board.playRight() - hw, e.x));
+                walls.add(new Wall(x, wallY(), hw, wallHalfHeight(), Math.max(1f, dmg * Reaction.BARRICADE_HP_FACTOR),
+                        null, Reaction.BARRICADE_LIFE));
+                hits.add(new HitEffect(x, wallY(), Mage.WORKER, 3));
+                return ringRadius;
+            }
+            case Reaction.SANCTUARY:      // Lumière : murs et chevaliers soignés
+                for (Wall w : walls) {
+                    w.repair(w.maxHp * Reaction.SANCTUARY_HEAL);
+                }
+                for (Knight k : knights) {
+                    k.hp = Math.min(k.maxHp, k.hp + k.maxHp * Reaction.SANCTUARY_HEAL);
+                    hits.add(new HitEffect(k.x, k.y, Mage.LIGHT, 2));
+                }
+                return ringRadius;
+            case Reaction.DEMOLITION: {   // Ténèbres : charge de démolition
+                float rad = Reaction.DEMOLITION_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    hurt(o, dmg * Reaction.DEMOLITION_DAMAGE);
+                    o.knockBack(Reaction.DEMOLITION_KNOCKBACK * d);
+                }
+                hits.add(new HitEffect(e.x, e.y, Mage.FIRE, 5));
+                return rad;
+            }
+
+            // ---------- Lumière ----------
+            case Reaction.RAINBOW: {      // Eau : arc-en-ciel, ralentit et rend vulnérable
+                float rad = Reaction.RAINBOW_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.slow(Reaction.RAINBOW_SLOW, Reaction.RAINBOW_DURATION);
+                    o.makeVulnerable(Reaction.RAINBOW_DURATION);
+                }
+                return rad;
+            }
+            case Reaction.SUPERNOVA: {    // Feu : explosion de lumière
+                float rad = Reaction.SUPERNOVA_RADIUS * d;
+                damageAround(e.x, e.y, rad, dmg * Reaction.SUPERNOVA_DAMAGE);
+                hits.add(new HitEffect(e.x, e.y, Mage.LIGHT, 5));
+                return rad;
+            }
+            case Reaction.PRISM: {        // Terre : le cristal réfracte la lumière vers 4 ennemis
+                ArrayList<Enemy> near = enemiesNear(e.x, e.y, Reaction.PRISM_RANGE * d, e);
+                for (int k = 0; k < Math.min(Reaction.PRISM_BEAMS, near.size()); k++) {
+                    Enemy o = near.get(k);
+                    hurt(o, dmg * Reaction.PRISM_DAMAGE);
+                    bolts.add(new Bolt(e.x, e.y, o.x, o.y, 3).as(Mage.LIGHT));
+                }
+                return ringRadius;
+            }
+            case Reaction.JUDGMENT:       // Foudre : colonne de lumière foudroyante
+                hurt(e, dmg * Reaction.JUDGMENT_DAMAGE);
+                e.stun(Reaction.JUDGMENT_STUN);
+                bolts.add(new Bolt(e.x, 0, e.x, e.y, 5).as(Mage.LIGHT));
+                return ringRadius;
+            case Reaction.PURIFICATION: { // Poison : tout le poison restant éclate d'un coup
+                float rad = Reaction.PURIFICATION_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    float rest = o.poisonDps * o.poisonTimer / 60f;
+                    hurt(o, dmg + rest * Reaction.PURIFICATION_FACTOR);
+                    o.poisonDps = 0;
+                    o.poisonTimer = 0;
+                }
+                return rad;
+            }
+            case Reaction.AURORA: {       // Air : lumière aveuglante, les gobelins reculent
+                float rad = Reaction.AURORA_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.stun(Reaction.AURORA_STUN);
+                    o.knockBack(Reaction.AURORA_KNOCKBACK * d);
+                }
+                return rad;
+            }
+            case Reaction.CRUSADE: {      // Invocateur : un paladin rejoint la garde
+                float radius = 14 * d;
+                float x = Math.max(board.playLeft + radius, Math.min(board.playRight() - radius, e.x));
+                knights.add(new Knight(x, knightGuardY(), radius, Math.max(1f, dmg * Reaction.CRUSADE_HP_FACTOR),
+                        dmg * Reaction.CRUSADE_HIT_FACTOR, null));
+                progression.addKnight();
+                hits.add(new HitEffect(x, knightGuardY(), Mage.LIGHT, 3));
+                return ringRadius;
+            }
+
+            // ---------- Ténèbres ----------
+            case Reaction.ABYSS: {        // Eau : abysse qui ralentit et ronge
+                float rad = Reaction.ABYSS_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.ABYSS, dmg * Reaction.ABYSS_DPS_FACTOR,
+                        Reaction.ABYSS_DURATION));
+                return rad;
+            }
+            case Reaction.BLACK_FLAMES: { // Feu : flammes noires
+                float rad = Reaction.BLACK_FLAMES_RADIUS * d;
+                zones.add(new Zone(e.x, e.y, rad, Zone.BLACK_FIRE, dmg * Reaction.BLACK_FLAMES_DPS_FACTOR,
+                        Reaction.BLACK_FLAMES_DURATION));
+                return rad;
+            }
+            case Reaction.TOMB:           // Terre : la cible est enfermée dans un tombeau
+                e.stun(Reaction.TOMB_STUN);
+                e.makeVulnerable(Reaction.VULNERABLE_DURATION);
+                hits.add(new HitEffect(e.x, e.y, Mage.EARTH, 5));
+                return ringRadius;
+            case Reaction.DARK_BOLT: {    // Foudre : éclair noir qui rebondit et achève les blessés
+                Enemy from = e;
+                ArrayList<Enemy> done = new ArrayList<>();
+                done.add(e);
+                tryExecute(e, Reaction.CHAIN_EXECUTE_RATIO);
+                for (int k = 0; k < Reaction.CHAIN_EXECUTE_JUMPS; k++) {
+                    Enemy next = null;
+                    for (Enemy o : enemiesNear(from.x, from.y, Reaction.CHAIN_RANGE * d, from)) {
+                        if (!done.contains(o)) {
+                            next = o;
+                            break;
+                        }
+                    }
+                    if (next == null) {
+                        break;
+                    }
+                    hurt(next, dmg);
+                    tryExecute(next, Reaction.CHAIN_EXECUTE_RATIO);
+                    bolts.add(new Bolt(from.x, from.y, next.x, next.y, 3).as(Mage.DARK));
+                    done.add(next);
+                    from = next;
+                }
+                return ringRadius;
+            }
+            case Reaction.NECROSIS: {     // Poison : nécrose, poison violent et chairs vulnérables
+                float rad = Reaction.NECROSIS_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.poison(Math.max(1f, dmg * Reaction.NECROSIS_DPS_FACTOR), Mage.POISON_DURATION);
+                    o.makeVulnerable(Reaction.CURSE_DURATION);
+                }
+                return rad;
+            }
+            case Reaction.BLACK_HOLE: {   // Air : trou noir qui aspire et broie
+                float rad = Reaction.BLACK_HOLE_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, e)) {
+                    o.pullTowards(e.x, e.y, Reaction.BLACK_HOLE_PULL);
+                    hurt(o, dmg * Reaction.BLACK_HOLE_DAMAGE);
+                }
+                hurt(e, dmg * Reaction.BLACK_HOLE_DAMAGE);
+                return rad;
+            }
+            case Reaction.REAPING: {      // Invocateur : moisson des âmes blessées
+                float rad = Reaction.REAPING_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    tryExecute(o, Reaction.REAPING_RATIO);
+                }
+                return rad;
+            }
+            default:
+                return ringRadius;
         }
     }
 
@@ -2060,7 +2457,7 @@ public class GameModel {
         float d = board.density;
         float dmg = m.getDamage() * damageMult();
         ArrayList<Enemy> field = visibleEnemies();
-        if (field.isEmpty() && m.type != Mage.SUMMONER) {
+        if (field.isEmpty() && m.type != Mage.SUMMONER && m.type != Mage.WORKER) {
             return false; // pas de cible : on garde la compétence
         }
         switch (m.type) {
@@ -2112,8 +2509,40 @@ public class GameModel {
                     spawnKnight(m, board.playLeft + board.playWidth * (k + 1) / 4f, 2f);
                 }
                 break;
+            case Mage.WORKER:    // Grand rempart : un mur renforcé (temporaire) devant chaque colonne
+                for (int c = 0; c < Board.COLS; c++) {
+                    walls.add(new Wall(board.cellCenterX(c), wallY(), wallHalfWidth(), wallHalfHeight(),
+                            m.getWallHp() * 2, null, 900));
+                    hits.add(new HitEffect(board.cellCenterX(c), wallY(), Mage.WORKER, 5));
+                }
+                break;
+            case Mage.LIGHT:     // Aube sacrée : brûle et aveugle tout le terrain, recharge les autres compétences
+                for (Enemy e : field) {
+                    hurt(e, dmg * 4);
+                    e.stun(60);
+                    bolts.add(new Bolt(e.x, 0, e.x, e.y, 5).as(Mage.LIGHT));
+                }
+                for (int r = 0; r < Board.ROWS; r++) {
+                    for (int c = 0; c < Board.COLS; c++) {
+                        Mage o = grid[r][c];
+                        if (o != null && o != m) {
+                            o.skillTimer /= 2;
+                        }
+                    }
+                }
+                break;
+            case Mage.DARK:      // Éclipse : exécute les blessés (< 25 %), ralentit et blesse les autres
+                for (Enemy e : field) {
+                    if (!tryExecute(e, 0.25f)) {
+                        hurt(e, dmg * 2);
+                        e.slow(0.4f, 240);
+                    }
+                    hits.add(new HitEffect(e.x, e.y, Mage.DARK, 4));
+                }
+                break;
         }
-        m.skillTimer = m.getSkillCooldown();
+        // Recharge raccourcie par l'aura des mages de Lumière
+        m.skillTimer = Math.max(1, Math.round(m.getSkillCooldown() * (1f - getAuraBonus(row, col))));
         progression.addSkill();
         skillText = Mage.SKILL_NAMES[m.type].toUpperCase();
         skillTextType = m.type;

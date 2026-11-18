@@ -8,6 +8,7 @@ public class Splash {
     public final float y;
     public final float radius;             // rayon réel de la zone de dégâts
     public final int level;                // niveau du mage : tourbillon (4), déferlante (5)
+    public int type = Mage.WATER;          // Eau, ou Ténèbres (zone d'ombre)
     private int timer = DURATION;
 
     public Splash(float x, float y, float radius, int level) {

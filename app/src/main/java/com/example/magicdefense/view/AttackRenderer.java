@@ -132,7 +132,121 @@ public class AttackRenderer {
             case Mage.SUMMONER:
                 drawSpirit(canvas, p, size);
                 break;
+            case Mage.WORKER:
+                drawHammer(canvas, p, size);
+                break;
+            case Mage.DARK:
+                drawShadowOrb(canvas, p, size);
+                break;
+            case Mage.LIGHT:
+                // (la Lumière frappe par rayons ; une petite étoile si un projectile en hérite)
+                paint.setColor(Color.rgb(255, 245, 190));
+                canvas.drawCircle(p.x, p.y, size * 0.6f, paint);
+                break;
         }
+    }
+
+    // ---------- Ouvrier ----------
+
+    // Marteau qui tournoie : manche en bois et tête d'acier (dorée à partir du niveau 4)
+    private void drawHammer(Canvas canvas, Projectile p, float size) {
+        float s = size * 1.3f;
+        canvas.save();
+        canvas.rotate(p.age * 18f, p.x, p.y);
+        paint.setColor(Color.rgb(26, 22, 38));
+        canvas.drawRect(p.x - s * 0.18f - density, p.y - s * 0.2f - density, p.x + s * 0.18f + density,
+                p.y + s + density, paint);
+        paint.setColor(Color.rgb(139, 90, 43));
+        canvas.drawRect(p.x - s * 0.18f, p.y - s * 0.2f, p.x + s * 0.18f, p.y + s, paint);
+        int head = p.level >= 4 ? Color.rgb(240, 192, 64) : Color.rgb(170, 170, 185);
+        tmpRect.set(p.x - s * 0.7f, p.y - s * 0.75f, p.x + s * 0.7f, p.y - s * 0.1f);
+        paint.setColor(Color.rgb(26, 22, 38));
+        canvas.drawRoundRect(tmpRect.left - density, tmpRect.top - density, tmpRect.right + density,
+                tmpRect.bottom + density, 2 * density, 2 * density, paint);
+        paint.setColor(head);
+        canvas.drawRoundRect(tmpRect, 2 * density, 2 * density, paint);
+        paint.setColor(Color.argb(150, 255, 255, 255));
+        canvas.drawRect(tmpRect.left + density, tmpRect.top + density, tmpRect.right - density,
+                tmpRect.top + 2.5f * density, paint);
+        canvas.restore();
+    }
+
+    // ---------- Ténèbres ----------
+
+    // Orbe d'ombre : halo violet, cœur noir, et volutes qui traînent derrière
+    private void drawShadowOrb(Canvas canvas, Projectile p, float size) {
+        for (int i = 1; i <= 4; i++) {
+            float k = i * size * 0.6f;
+            paint.setColor(Color.argb(110 - i * 22, 120, 60, 190));
+            canvas.drawCircle(p.x - p.dirX * k, p.y - p.dirY * k, size * (0.9f - i * 0.15f), paint);
+        }
+        paint.setColor(Color.argb(120, 170, 100, 255));
+        canvas.drawCircle(p.x, p.y, size * 1.3f, paint);
+        paint.setColor(Color.rgb(30, 15, 45));
+        canvas.drawCircle(p.x, p.y, size * 0.85f, paint);
+        paint.setColor(Color.rgb(200, 140, 255));
+        canvas.drawCircle(p.x - size * 0.25f, p.y - size * 0.25f, size * 0.22f, paint);
+    }
+
+    // Mur de l'Ouvrier : rangées de pierres, fissures quand il s'abîme, barre de PV
+    public void drawWall(Canvas canvas, com.example.magicdefense.model.Wall w) {
+        float grow = Math.min(1f, w.age / 15f); // il sort de terre
+        float left = w.x - w.halfWidth;
+        float right = w.x + w.halfWidth;
+        float bottom = w.y + w.halfHeight;
+        float top = bottom - 2 * w.halfHeight * grow;
+        float shake = w.hitTimer > 0 ? (float) Math.sin(frame * 2.0) * 1.2f * density : 0;
+        boolean temporary = w.owner == null;
+        // Ombre
+        paint.setColor(Color.argb(90, 0, 0, 0));
+        canvas.drawRect(left + 3 * density, top + 3 * density, right + 3 * density, bottom + 3 * density, paint);
+        paint.setColor(Palette.WALL_MORTAR);
+        canvas.drawRect(left + shake, top, right + shake, bottom, paint);
+        // Pierres en quinconce (2 rangées)
+        int cols = 4;
+        float bw = (right - left) / cols;
+        float bh = (bottom - top) / 2f;
+        for (int row = 0; row < 2; row++) {
+            float off = row % 2 == 0 ? 0 : bw / 2;
+            for (int c = -1; c < cols; c++) {
+                float x0 = Math.max(left, left + off + c * bw) + density + shake;
+                float x1 = Math.min(right, left + off + (c + 1) * bw) - density + shake;
+                if (x1 <= x0) {
+                    continue;
+                }
+                float y0 = top + row * bh + density;
+                float y1 = top + (row + 1) * bh - density;
+                paint.setColor(temporary ? Color.rgb(170, 135, 90) : Palette.WALL_STONE);
+                canvas.drawRect(x0, y0, x1, y1, paint);
+                paint.setColor(temporary ? Color.rgb(120, 90, 55) : Palette.WALL_STONE_DARK);
+                canvas.drawRect(x0, y1 - 1.5f * density, x1, y1, paint);
+            }
+        }
+        // Fissures sous la moitié des PV
+        float ratio = Math.max(0f, w.hp / w.maxHp);
+        if (ratio < 0.5f) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(1.5f * density);
+            paint.setColor(Color.rgb(40, 35, 32));
+            path.reset();
+            path.moveTo(w.x - bw * 0.6f, top);
+            path.lineTo(w.x - bw * 0.2f, top + bh);
+            path.lineTo(w.x - bw * 0.5f, bottom);
+            canvas.drawPath(path, paint);
+            if (ratio < 0.25f) {
+                path.reset();
+                path.moveTo(w.x + bw * 0.7f, top);
+                path.lineTo(w.x + bw * 0.4f, top + bh * 1.2f);
+                canvas.drawPath(path, paint);
+            }
+            paint.setStyle(Paint.Style.FILL);
+        }
+        // Barre de PV
+        float barTop = top - 6 * density;
+        paint.setColor(Color.DKGRAY);
+        canvas.drawRect(left, barTop, right, barTop + 3 * density, paint);
+        paint.setColor(Palette.WALL_BAR);
+        canvas.drawRect(left, barTop, left + (right - left) * ratio, barTop + 3 * density, paint);
     }
 
     // ---------- Poison ----------
@@ -606,6 +720,36 @@ public class AttackRenderer {
         if (dx * dx + dy * dy < 1) {
             return;
         }
+        if (b.type == Mage.LIGHT) {
+            drawLightBeam(canvas, b, alpha);
+            return;
+        }
+        if (b.type == Mage.DARK) {
+            // Éclair noir : zigzag violet sombre, cœur noir
+            boltRandom.setSeed((frame / 2) * 104729L + (long) (b.toX * 17 + b.fromY));
+            path.reset();
+            path.moveTo(b.fromX, b.fromY);
+            float len = (float) Math.sqrt(dx * dx + dy * dy);
+            float px = -dy / len;
+            float py = dx / len;
+            for (int i = 1; i < 8; i++) {
+                float f = i / 8f;
+                float j = (boltRandom.nextFloat() - 0.5f) * 20 * density;
+                path.lineTo(b.fromX + dx * f + px * j, b.fromY + dy * f + py * j);
+            }
+            path.lineTo(b.toX, b.toY);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setColor(Color.argb(alpha / 2, 170, 90, 255));
+            paint.setStrokeWidth(9 * density);
+            canvas.drawPath(path, paint);
+            paint.setColor(Color.argb(alpha, 25, 10, 40));
+            paint.setStrokeWidth(3 * density);
+            canvas.drawPath(path, paint);
+            paint.setStrokeJoin(Paint.Join.MITER);
+            paint.setStyle(Paint.Style.FILL);
+            return;
+        }
         // Le zigzag change toutes les 2 images : l'éclair crépite
         boltRandom.setSeed((frame / 2) * 7919L + (long) (b.toX * 31 + b.fromY));
 
@@ -620,6 +764,27 @@ public class AttackRenderer {
             // Niveau 5 : un second éclair, plus fin et plus agité
             drawZigzag(canvas, b.fromX, b.fromY, b.toX, b.toY, 28 * density, b.level, alpha * 160 / 255, false);
         }
+    }
+
+    // Rayon de lumière droit : large halo doré, cœur blanc, plus épais avec le niveau
+    private void drawLightBeam(Canvas canvas, Bolt b, int alpha) {
+        float w = (3 + 1.5f * b.level) * density;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(Color.argb(alpha / 3, 255, 220, 90));
+        paint.setStrokeWidth(w * 3);
+        canvas.drawLine(b.fromX, b.fromY, b.toX, b.toY, paint);
+        paint.setColor(Color.argb(alpha * 2 / 3, 255, 240, 160));
+        paint.setStrokeWidth(w * 1.6f);
+        canvas.drawLine(b.fromX, b.fromY, b.toX, b.toY, paint);
+        paint.setColor(Color.argb(alpha, 255, 255, 245));
+        paint.setStrokeWidth(w * 0.6f);
+        canvas.drawLine(b.fromX, b.fromY, b.toX, b.toY, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStyle(Paint.Style.FILL);
+        // Éclat à l'arrivée
+        paint.setColor(Color.argb(alpha / 2, 255, 250, 200));
+        canvas.drawCircle(b.toX, b.toY, w * 2, paint);
     }
 
     // Zigzag de (x1, y1) à (x2, y2), avec des ramifications à partir du niveau 3
@@ -778,6 +943,46 @@ public class AttackRenderer {
                             hit.y + (float) Math.sin(a) * r2, paint);
                 }
                 break;
+
+            case Mage.WORKER:
+                // Poussière et éclats de pierre
+                paint.setColor(Color.argb(alpha / 2, 200, 180, 150));
+                canvas.drawCircle(hit.x, hit.y, u * (1.5f + 3 * t), paint);
+                paint.setColor(Color.argb(alpha, 150, 140, 130));
+                for (int j = 0; j < count; j++) {
+                    double a = j * 2 * Math.PI / count + hit.x * 0.2;
+                    float r = u * (1 + 4.5f * t);
+                    float s = u * 0.45f * (1 - t) + density;
+                    float cx = hit.x + (float) Math.cos(a) * r;
+                    float cy = hit.y + (float) Math.sin(a) * r;
+                    canvas.drawRect(cx - s, cy - s, cx + s, cy + s, paint);
+                }
+                break;
+
+            case Mage.LIGHT:
+                // Étoile de lumière
+                paint.setColor(Color.argb(alpha / 2, 255, 235, 140));
+                canvas.drawCircle(hit.x, hit.y, u * (1.5f + 2.5f * t), paint);
+                paint.setColor(Color.argb(alpha, 255, 255, 235));
+                paint.setStrokeWidth(2 * density);
+                for (int j = 0; j < 8; j++) {
+                    double a = j * Math.PI / 4;
+                    float r2 = u * (j % 2 == 0 ? 3 + 3 * t : 1.8f + 2 * t);
+                    canvas.drawLine(hit.x, hit.y, hit.x + (float) Math.cos(a) * r2,
+                            hit.y + (float) Math.sin(a) * r2, paint);
+                }
+                break;
+
+            case Mage.DARK:
+                // Implosion : l'ombre se referme sur la cible
+                paint.setColor(Color.argb(alpha * 2 / 3, 40, 15, 60));
+                canvas.drawCircle(hit.x, hit.y, u * (4 - 3 * t), paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(2 * density);
+                paint.setColor(Color.argb(alpha, 190, 120, 255));
+                canvas.drawCircle(hit.x, hit.y, u * (5 - 4 * t), paint);
+                paint.setStyle(Paint.Style.FILL);
+                break;
         }
     }
 
@@ -844,6 +1049,43 @@ public class AttackRenderer {
                     canvas.drawCircle(r.x + (float) Math.cos(sa) * sd, r.y + (float) Math.sin(sa) * sd, k, paint);
                     break;
                 }
+                case Reaction.FOUNDATIONS:
+                case Reaction.BARRICADE:
+                case Reaction.DEMOLITION:
+                case Reaction.CATAPULT:
+                case Reaction.PILEDRIVER:
+                    // briques et gravats
+                    canvas.drawRect(px - k * 1.4f, py - k * 0.8f, px + k * 1.4f, py + k * 0.8f, paint);
+                    break;
+                case Reaction.SUPERNOVA:
+                case Reaction.JUDGMENT:
+                case Reaction.PRISM:
+                case Reaction.AURORA:
+                case Reaction.SANCTUARY:
+                case Reaction.CRUSADE:
+                case Reaction.PURIFICATION:
+                    // rayons de lumière qui partent du centre
+                    paint.setStrokeWidth(2 * density);
+                    canvas.drawLine(r.x + (px - r.x) * 0.5f, r.y + (py - r.y) * 0.5f, px, py, paint);
+                    break;
+                case Reaction.RAINBOW: {
+                    // gouttes aux couleurs de l'arc-en-ciel
+                    float hue = (j * 45 + frame * 4) % 360;
+                    paint.setColor(withAlpha(Color.HSVToColor(new float[]{hue, 0.6f, 1f}), alpha));
+                    canvas.drawCircle(px, py, k * 1.2f, paint);
+                    break;
+                }
+                case Reaction.BLACK_HOLE:
+                case Reaction.ABYSS: {
+                    // l'ombre est aspirée en spirale vers le centre
+                    double sa = a - t * 7;
+                    float sd = r.radius * (1 - t);
+                    canvas.drawCircle(r.x + (float) Math.cos(sa) * sd, r.y + (float) Math.sin(sa) * sd, k, paint);
+                    break;
+                }
+                case Reaction.REAPING:
+                case Reaction.TOMB:
+                case Reaction.NECROSIS:
                 case Reaction.CURSE:
                     // petits crânes : un rond et deux yeux
                     canvas.drawCircle(px, py, k * 1.3f, paint);
@@ -876,6 +1118,59 @@ public class AttackRenderer {
         float t = z.getProgress();
         float fade = t > 0.8f ? (1 - t) / 0.2f : 1f; // s'estompe sur la fin
         int age = z.getAge();
+        if (z.type == Zone.CONCRETE || z.type == Zone.TAR || z.type == Zone.ABYSS) {
+            // Béton gris, goudron noir brillant, abysse bleu nuit qui tourbillonne
+            int outer = z.type == Zone.CONCRETE ? Color.rgb(120, 120, 125)
+                    : z.type == Zone.TAR ? Color.rgb(25, 22, 20) : Color.rgb(15, 20, 60);
+            int inner = z.type == Zone.CONCRETE ? Color.rgb(175, 175, 180)
+                    : z.type == Zone.TAR ? Color.rgb(55, 50, 45) : Color.rgb(40, 50, 130);
+            tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
+            paint.setColor(withAlpha(outer, (int) (200 * fade)));
+            canvas.drawOval(tmpRect, paint);
+            tmpRect.inset(z.radius * 0.18f, z.radius * 0.12f);
+            paint.setColor(withAlpha(inner, (int) (200 * fade)));
+            canvas.drawOval(tmpRect, paint);
+            if (z.type == Zone.ABYSS) {
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(2 * density);
+                paint.setColor(Color.argb((int) (160 * fade), 120, 140, 255));
+                for (int k = 0; k < 3; k++) {
+                    float rr = z.radius * (0.3f + 0.22f * k);
+                    tmpRect.set(z.x - rr, z.y - rr * 0.6f, z.x + rr, z.y + rr * 0.6f);
+                    canvas.drawArc(tmpRect, -age * 6f + k * 120, 200, false, paint);
+                }
+                paint.setStyle(Paint.Style.FILL);
+            } else {
+                // Reflets (goudron) ou gravillons (béton)
+                for (int j = 0; j < 6; j++) {
+                    float bx = z.x + (float) Math.cos(j * 1.9) * z.radius * 0.55f;
+                    float by = z.y + (float) Math.sin(j * 1.3) * z.radius * 0.3f;
+                    paint.setColor(z.type == Zone.TAR ? Color.argb((int) (120 * fade), 200, 200, 210)
+                            : Color.argb((int) (200 * fade), 110, 110, 115));
+                    canvas.drawCircle(bx, by, z.radius * 0.05f + density, paint);
+                }
+            }
+            return;
+        }
+        if (z.type == Zone.BLACK_FIRE) {
+            // Flammes noires et violettes
+            int flames = 14;
+            for (int j = 0; j < flames; j++) {
+                double a = j * 2 * Math.PI / flames - age * 0.03;
+                float fx = z.x + (float) Math.cos(a) * z.radius * 0.75f;
+                float fy = z.y + (float) Math.sin(a) * z.radius * 0.45f;
+                float flick = 0.7f + 0.3f * (float) Math.sin(age * 0.5 + j * 1.7);
+                float fh = z.radius * 0.3f * flick;
+                paint.setColor(Color.argb((int) (210 * fade), 30, 10, 45));
+                canvas.drawCircle(fx, fy - fh * 0.3f, fh * 0.55f, paint);
+                paint.setColor(Color.argb((int) (220 * fade), 170, 90, 255));
+                canvas.drawCircle(fx, fy - fh * 0.5f, fh * 0.28f, paint);
+            }
+            tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
+            paint.setColor(Color.argb((int) (70 * fade), 60, 20, 90));
+            canvas.drawOval(tmpRect, paint);
+            return;
+        }
         if (z.type == Zone.MUD || z.type == Zone.BOG) {
             // Boue brune ou marécage vert, avec des bulles qui remontent
             boolean bog = z.type == Zone.BOG;
@@ -950,6 +1245,25 @@ public class AttackRenderer {
         float t = s.getProgress();                 // 0 → 1
         float r = s.radius * (0.3f + 0.7f * t);    // de 30 % à 100 % du rayon
         int alpha = (int) (255 * (1 - t));         // de opaque à invisible
+
+        if (s.type == Mage.DARK) {
+            // Ténèbres : vague d'ombre, anneau violet et volutes qui retombent
+            paint.setColor(Color.argb(alpha / 3, 40, 15, 60));
+            canvas.drawCircle(s.x, s.y, r, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3 * density);
+            paint.setColor(Color.argb(alpha, 160, 90, 240));
+            canvas.drawCircle(s.x, s.y, r, paint);
+            paint.setStyle(Paint.Style.FILL);
+            for (int j = 0; j < 8; j++) {
+                double a = j * Math.PI / 4 + t * 2;
+                float dist = r * 0.75f;
+                paint.setColor(Color.argb(alpha, 90, 40, 140));
+                canvas.drawCircle(s.x + (float) Math.cos(a) * dist, s.y + (float) Math.sin(a) * dist,
+                        (2 + s.level) * density * (1 - t) + 1, paint);
+            }
+            return;
+        }
 
         // Intérieur de la zone, très transparent, puis contour
         paint.setColor(Color.argb(alpha / 4, 70, 150, 255));
