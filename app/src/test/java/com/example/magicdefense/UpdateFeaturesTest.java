@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import com.example.magicdefense.model.Achievement;
 import com.example.magicdefense.model.Artifact;
 import com.example.magicdefense.model.Board;
+import com.example.magicdefense.model.Chest;
 import com.example.magicdefense.model.GameModel;
 import com.example.magicdefense.model.GameState;
 import com.example.magicdefense.model.LevelSpec;
@@ -31,12 +32,10 @@ public class UpdateFeaturesTest {
 
     @Test
     public void prices_areMuchHigher() {
-        assertEquals(60, Progression.price(Mage.POISON));
-        assertEquals(100, Progression.price(Mage.AIR));
-        assertEquals(160, Progression.price(Mage.SUMMONER));
         assertEquals(0, Ultimate.price(Ultimate.STUN));
         assertTrue(Ultimate.price(Ultimate.METEOR) > Ultimate.price(Ultimate.FURY));
-        assertEquals(10, Progression.CHEST_PRICE);
+        assertEquals(35, Chest.price(Chest.SMALL));
+        assertEquals(160, Chest.price(Chest.MYSTERY));
         assertEquals(250, Progression.SPEED2_PRICE);
         assertEquals(600, Progression.SPEED3_PRICE);
     }
@@ -76,23 +75,6 @@ public class UpdateFeaturesTest {
         assertEquals(3, m.getGameSpeed());
         m.cycleGameSpeed();
         assertEquals(1, m.getGameSpeed());
-    }
-
-    @Test
-    public void chests_buyAndOpenSeveral() {
-        Progression p = new Progression();
-        p.addGems(25);
-        assertTrue(p.buyChest());
-        assertTrue(p.buyChest());
-        assertFalse(p.buyChest());
-        assertEquals(5, p.getGems());
-        p.addChests(8);
-        assertEquals(5, p.openChests(5, new Random(3)));
-        assertEquals(5, p.getChests());
-        assertEquals(5, p.getLastChestCount());
-        assertEquals(5, p.openChests(10, new Random(3))); // ×10 : ouvre ce qu'il reste
-        assertEquals(0, p.getChests());
-        assertEquals(10, p.getChestsOpened());
     }
 
     @Test
@@ -144,8 +126,8 @@ public class UpdateFeaturesTest {
         LevelSpec infernal = LevelSpec.endless(LevelSpec.INFERNAL);
         assertTrue(infernal.difficulty(10) > LevelSpec.endless().difficulty(10));
         assertTrue(easy.difficulty(10) < LevelSpec.endless().difficulty(10));
-        assertEquals(1, Progression.chestsForEndless(5, LevelSpec.EASY));
-        assertEquals(3, Progression.chestsForEndless(6, LevelSpec.INFERNAL));
+        assertEquals(1, Progression.chestsForEndless(5, LevelSpec.EASY)[Chest.SMALL]);
+        assertEquals(2, Progression.chestsForEndless(6, LevelSpec.INFERNAL)[Chest.BIG]);
         Progression p = new Progression();
         assertTrue(p.recordEndlessWave(12, LevelSpec.HARD));
         assertEquals(12, p.getBestEndlessWave(LevelSpec.HARD));

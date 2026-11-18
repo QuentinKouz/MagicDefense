@@ -12,6 +12,8 @@ import com.example.magicdefense.controller.TouchController;
 import com.example.magicdefense.model.Achievement;
 import com.example.magicdefense.model.Artifact;
 import com.example.magicdefense.model.Board;
+import com.example.magicdefense.model.Chest;
+import com.example.magicdefense.model.Rarity;
 import com.example.magicdefense.model.Knight;
 import com.example.magicdefense.model.Ultimate;
 import com.example.magicdefense.model.Bolt;
@@ -63,6 +65,8 @@ public class GameRenderer {
     private final MenuList menu;                                       // lignes des listes (Marché, Mages, Château)
     private final RectF rowRect = new RectF();
     private final RectF btnRect = new RectF();
+    private final RectF cellRect = new RectF();
+    private final Paint[] chestPaints = new Paint[Chest.COUNT];
 
     private final AttackRenderer attacks;
     private final UiKit ui;                                            // boutons, fenêtres, rubans...
@@ -90,6 +94,13 @@ public class GameRenderer {
         impPaint.setColorFilter(new LightingColorFilter(0xFF6060, 0x400000));
         lockedPaint.setFilterBitmap(false);
         lockedPaint.setColorFilter(new LightingColorFilter(0x505060, 0x000000));
+        // Coffres : bois naturel, doré, violet
+        for (int c = 0; c < Chest.COUNT; c++) {
+            chestPaints[c] = new Paint();
+            chestPaints[c].setFilterBitmap(false);
+        }
+        chestPaints[Chest.BIG].setColorFilter(new LightingColorFilter(0xFFF0B0, 0x302000));
+        chestPaints[Chest.MYSTERY].setColorFilter(new LightingColorFilter(0xC090FF, 0x200030));
         hitPaint.setFilterBitmap(false);
         hitPaint.setColorFilter(new LightingColorFilter(0xFF8080, 0x400000));
         attacks = new AttackRenderer(density);
@@ -154,6 +165,10 @@ public class GameRenderer {
             drawHomePage(canvas, model, touch, page + 1, offset + w, -1);
         }
         drawTabBar(canvas, model, pressed);
+        // Fiche d'un mage par-dessus tout l'accueil
+        if (page == GameModel.PAGE_MAGES && model.getSelectedMage() >= 0 && model.getState() == GameState.START) {
+            drawMageSheet(canvas, model, model.getSelectedMage(), pressed);
+        }
     }
 
     private void drawHomePage(Canvas canvas, GameModel model, TouchController touch, int page, float dx, int pressed) {
@@ -437,7 +452,7 @@ public class GameRenderer {
                 drawCenteredText(canvas, "Record : vague " + model.getProgression().getBestEndlessWave(),
                         p.top + 116 * density, 15);
             }
-            drawChestsEarned(canvas, model.getLastChestsEarned(), p.top + 168 * density);
+            drawChestsEarned(canvas, model, p.top + 168 * density);
             int diff = model.getSpec().endlessDifficulty;
             String line = "Difficulté : " + LevelSpec.DIFFICULTY_NAMES[diff];
             if (model.getLastBonusGems() > 0) {
@@ -1437,7 +1452,7 @@ public class GameRenderer {
                 Palette.GOLD, Paint.Align.CENTER);
         // Coffres gagnés, sous les étoiles (juste au-dessus des boutons)
         if (stateFrames >= 60) { // après l'apparition des étoiles
-            drawChestsEarned(canvas, model.getLastChestsEarned(), p.top + 186 * density);
+            drawChestsEarned(canvas, model, p.top + 186 * density);
             // Niveau de boss en 3 étoiles : 10 % de chances d'artefact
             int art = model.getLastArtifact();
             if (art != Artifact.NONE) {
@@ -1614,30 +1629,46 @@ public class GameRenderer {
                 Color.argb(230, 255, 240, 200), Paint.Align.CENTER, f.width() - 12 * density);
     }
 
-    // "+N coffres" avec un petit coffre devant, centré dans la colonne
-    private void drawChestsEarned(Canvas canvas, int chests, float y) {
-        if (chests <= 0) {
+    // Coffres gagnés : « +2 petits · +1 grand » avec un coffre devant, centré dans la colonne
+    private static final String[][] CHEST_WORDS = {{"petit", "petits"}, {"grand", "grands"},
+            {"mystérieux", "mystérieux"}};
+
+    private void drawChestsEarned(Canvas canvas, GameModel model, float y) {
+        if (model.getLastChestsEarned() <= 0) {
             paint.setColor(Palette.TEXT_INACTIVE);
-            drawCenteredText(canvas, "Aucun coffre (1 toutes les "
-                    + Progression.WAVES_PER_ENDLESS_CHEST + " vagues)", y, 13);
+            drawCenteredText(canvas, "Aucun coffre cette fois", y, 13);
             return;
         }
-        String text = "+" + chests + (chests > 1 ? " coffres" : " coffre");
-        paint.setTextSize(17 * density);
-        float textW = paint.measureText(text);
+        StringBuilder sb = new StringBuilder();
+        int best = Chest.SMALL;
+        for (int c = 0; c < Chest.COUNT; c++) {
+            int k = model.getLastChestsEarned(c);
+            if (k > 0) {
+                if (sb.length() > 0) {
+                    sb.append(" · ");
+                }
+                sb.append('+').append(k).append(' ').append(CHEST_WORDS[c][k > 1 ? 1 : 0]);
+                best = c;
+            }
+        }
+        String text = sb.toString();
+        paint.setTextSize(16 * density);
+        float textW = Math.min(paint.measureText(text), board.playWidth * 0.7f);
         float icon = 10 * density;
         float total = icon * 2 + 8 * density + textW;
         float x = board.centerX() - total / 2;
-        drawChest(canvas, x + icon, y - 6 * density, icon, 0);
-        paint.setColor(Palette.GOLD);
-        paint.setTextSize(17 * density);
-        paint.setTextAlign(Paint.Align.LEFT);
-        canvas.drawText(text, x + icon * 2 + 8 * density, y, paint);
+        drawChestOfType(canvas, x + icon, y - 6 * density, icon, 0, best, false);
+        ui.textPx(canvas, text, x + icon * 2 + 8 * density, y, 16 * density, Palette.GOLD, Paint.Align.LEFT,
+                board.playWidth * 0.7f);
     }
 
     // Coffre : caisse en bois, couvercle (qui se soulève de `open` entre 0 et 1), bande et serrure dorées
     // (cx, cy) : centre du haut de la caisse ; s : demi-largeur ; open : 0 fermé → 1 ouvert
     private void drawChest(Canvas canvas, float cx, float cy, float s, float open) {
+        drawChest(canvas, cx, cy, s, open, spritePaint);
+    }
+
+    private void drawChest(Canvas canvas, float cx, float cy, float s, float open, Paint chestPaint) {
         float px = s * 2 / Sprites.CHEST_WIDTH;          // taille d'un pixel du sprite
         float bodyTop = cy - s * 0.2f;
         float bodyH = Sprites.CHEST_BODY_HEIGHT * px;
@@ -1653,7 +1684,7 @@ public class GameRenderer {
         }
         // Caisse
         tmpRect.set(cx - s, bodyTop, cx + s, bodyTop + bodyH);
-        canvas.drawBitmap(chestSprites[1], null, tmpRect, spritePaint);
+        canvas.drawBitmap(chestSprites[1], null, tmpRect, chestPaint);
         // Couvercle : se soulève et bascule vers l'arrière (charnière à gauche)
         canvas.save();
         if (open > 0) {
@@ -1661,7 +1692,7 @@ public class GameRenderer {
             canvas.rotate(-28 * open, cx - s, bodyTop);
         }
         tmpRect.set(cx - s, bodyTop - lidH + px, cx + s, bodyTop + px);
-        canvas.drawBitmap(chestSprites[0], null, tmpRect, spritePaint);
+        canvas.drawBitmap(chestSprites[0], null, tmpRect, chestPaint);
         canvas.restore();
     }
 
@@ -1702,11 +1733,13 @@ public class GameRenderer {
             ui.textPx(canvas, TAB_NAMES[i], cx, labelY, (sel ? 11 : 10) * density,
                     sel ? Color.WHITE : Palette.TEXT_INACTIVE, Paint.Align.CENTER, b.width() - 4 * density);
         }
-        // Pastille : des coffres attendent sur la page Mages
+        // Pastille du Marché : coffres à ouvrir (ou « ! » : coffres gratuits du jour)
         int chests = model.getProgression().getChests();
-        if (chests > 0) {
-            RectF u = hud.tabButtons[GameModel.PAGE_MAGES];
-            drawBadge(canvas, u.right - 10 * density, u.top + 6 * density, chests > 999 ? "999+" : String.valueOf(chests));
+        boolean daily = model.getProgression().canClaimDaily(todayLocal());
+        if (chests > 0 || daily) {
+            RectF u = hud.tabButtons[GameModel.PAGE_MARKET];
+            drawBadge(canvas, u.right - 10 * density, u.top + 6 * density,
+                    chests == 0 ? "!" : chests > 999 ? "999+" : String.valueOf(chests));
         }
     }
 
@@ -1778,33 +1811,9 @@ public class GameRenderer {
         ui.text(canvas, chests, cx + 40 * density, y, 16, Palette.GOLD, Paint.Align.LEFT);
     }
 
-    // Page Mages : coffres (×1, ×5, ×10) puis la liste des mages
+    // Page Mages : équipe en 2 × 2, collection, cartes à débloquer (la fiche s'ouvre au toucher)
     private void drawMagesPage(Canvas canvas, GameModel model, float scroll, int pressed) {
-        Progression prog = model.getProgression();
         drawPageHeader(canvas, model, "MAGES", UiKit.RIBBON);
-
-        RectF c = hud.chestRow;
-        ui.inset(canvas, c);
-        int chests = prog.getChests();
-        // Des coffres à ouvrir : le coffre se dandine pour attirer l'œil
-        float wiggle = chests > 0 && (frame % 120) < 24 ? (float) Math.sin(frame * 0.8) * 6 : 0;
-        canvas.save();
-        canvas.rotate(wiggle, c.left + 36 * density, c.centerY() + 10 * density);
-        drawChest(canvas, c.left + 36 * density, c.centerY() + 2 * density, 20 * density, 0);
-        canvas.restore();
-        float tx = c.left + 66 * density;
-        float textRight = hud.chestButtons[0].left - 6 * density;
-        ui.textPx(canvas, "Coffres", tx, c.centerY() - 4 * density, 15 * density, Color.WHITE,
-                Paint.Align.LEFT, textRight - tx);
-        ui.textPx(canvas, chests + " à ouvrir", tx, c.centerY() + 14 * density, 12 * density, Palette.GOLD,
-                Paint.Align.LEFT, textRight - tx);
-        for (int i = 0; i < Hud.CHEST_BATCHES.length; i++) {
-            // ×5 et ×10 ouvrent ce qu'il reste s'il y a moins de coffres
-            int batch = Hud.CHEST_BATCHES[i];
-            drawSmallButton(canvas, hud.chestButtons[i], "×" + batch,
-                    chests > 0 ? Palette.RESUME : Palette.DISABLED, pressed == Hud.HOME_CHEST_0 + i, 15);
-        }
-
         drawList(canvas, model, GameModel.PAGE_MAGES, hud.magesViewport, scroll, pressed);
     }
 
@@ -1858,8 +1867,13 @@ public class GameRenderer {
                 ui.textPx(canvas, menu.text[i], r.centerX(), r.centerY() + 4 * density, 11 * density,
                         Palette.TEXT_INACTIVE, Paint.Align.CENTER, r.width());
                 return;
-            case MenuList.MAGE:
-                drawMageRow(canvas, prog, i, a, r, pressedButton);
+            case MenuList.TEAM_ROW:
+            case MenuList.CARD_ROW:
+            case MenuList.LOCKED_ROW:
+                drawCardRow(canvas, model, i, r, pressedButton);
+                return;
+            case MenuList.SHOP_CHEST:
+                drawChestShopRow(canvas, prog, i, a, r, pressedButton);
                 return;
             case MenuList.ACHIEVEMENT:
                 drawAchievementRow(canvas, model, a, r);
@@ -1879,32 +1893,17 @@ public class GameRenderer {
         int statusColor = Palette.TEXT_INACTIVE;
 
         switch (menu.kind[i]) {
-            case MenuList.SHOP_CHEST:
-                drawChest(canvas, iconCx, iconCy - 4 * density, 22 * density, 0);
-                title = "Coffre magique";
+            case MenuList.FREE_CHEST: {
+                long day = todayLocal();
+                boolean can = prog.canClaimDaily(day);
+                drawChestOfType(canvas, iconCx, iconCy - 4 * density, 20 * density, 0, Chest.SMALL, can);
+                title = "Coffres gratuits";
                 titleColor = Palette.GOLD;
-                desc = "3 lots de fragments et 1 à 3 gemmes";
-                status = "Vous en avez " + prog.getChests();
-                drawPriceButton(canvas, btnRect, Progression.CHEST_PRICE, prog.canBuyChest(), mainPressed);
-                break;
-            case MenuList.SHOP_UNIT: {
-                boolean owned = prog.isOwned(a);
-                float box = 56 * density;
-                float sh = box * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
-                spriteRect.set(iconCx - box / 2, iconCy - sh / 2, iconCx + box / 2, iconCy + sh / 2);
-                canvas.drawBitmap(mageSprites[a][2], null, spriteRect, owned ? spritePaint : lockedPaint);
-                title = Palette.ELEMENT_NAMES[a];
-                titleColor = Palette.ELEMENT_COLORS[a];
-                desc = Palette.ELEMENT_DESCRIPTIONS[a];
-                if (owned) {
-                    statusColor = Palette.TEAM;
-                    status = prog.isInTeam(a) ? "Dans l'équipe" : "À ajouter à l'équipe (Mages)";
-                    drawSmallButton(canvas, btnRect, "ACQUIS", Palette.TEAM, false, 13);
-                } else {
-                    status = prog.canBuy(a) ? "Unité exclusive" : "Il manque " + (Progression.price(a) - prog.getGems()) + " gemmes";
-                    statusColor = prog.canBuy(a) ? Palette.GOLD : Palette.TEXT_INACTIVE;
-                    drawPriceButton(canvas, btnRect, Progression.price(a), prog.canBuy(a), mainPressed);
-                }
+                desc = Progression.DAILY_FREE_CHESTS + " petits coffres chaque jour";
+                status = can ? "Disponibles !" : "Revenez demain";
+                statusColor = can ? Palette.TEAM : Palette.TEXT_INACTIVE;
+                drawSmallButton(canvas, btnRect, can ? "PRENDRE" : "DEMAIN", can ? Palette.RESUME : Palette.DISABLED,
+                        can && mainPressed, 13);
                 break;
             }
             case MenuList.SHOP_ULTIMATE: {
@@ -2024,96 +2023,227 @@ public class GameRenderer {
         ui.textPx(canvas, status, tx, y0 + 2 * step, 11 * density, statusColor, Paint.Align.LEFT, maxW);
     }
 
-    // Ligne d'un mage : portrait (équipe), rang, bonus, fragments, +1 RANG, compétence, bandeau d'artefact
-    private void drawMageRow(Canvas canvas, Progression prog, int i, int type, RectF r, int pressedButton) {
+    // =====================================================================
+    //  Cartes de mage, fiche d'un mage, coffres du Marché
+    // =====================================================================
+
+    private static long todayLocal() {
+        long now = System.currentTimeMillis();
+        return (now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L;
+    }
+
+    // Coffre teinté selon sa sorte (petit : bois, grand : doré, mystérieux : violet), avec une lueur
+    private void drawChestOfType(Canvas canvas, float cx, float cy, float s, float open, int chest, boolean glow) {
+        if (glow) {
+            int c = Palette.CHEST_COLORS[chest];
+            float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.1 + chest);
+            paint.setColor(Color.argb((int) (40 + 40 * pulse), Color.red(c), Color.green(c), Color.blue(c)));
+            canvas.drawCircle(cx, cy + s * 0.2f, s * 1.35f, paint);
+        }
+        drawChest(canvas, cx, cy, s, open, chestPaints[chest]);
+    }
+
+    // Une rangée de cartes (équipe, collection, à débloquer)
+    private void drawCardRow(Canvas canvas, GameModel model, int i, RectF r, int pressedButton) {
+        Progression prog = model.getProgression();
+        int k = menu.kind[i];
+        int n = k == MenuList.TEAM_ROW ? 2 : MenuList.CARDS_PER_ROW;
+        boolean swapping = model.getSwappingMage() >= 0;
+        for (int b = 0; b < n; b++) {
+            menu.buttonRect(i, b, r, cellRect);
+            int type = menu.cardType(i, b, model);
+            if (k == MenuList.TEAM_ROW) {
+                ui.inset(canvas, cellRect);
+                if (swapping) {
+                    // Choix de l'emplacement : les cartes de l'équipe se dandinent, cadre doré
+                    float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.2);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(3 * density);
+                    paint.setColor(Color.argb((int) (150 + 100 * pulse), 255, 215, 90));
+                    canvas.drawRoundRect(cellRect, 10 * density, 10 * density, paint);
+                    paint.setStyle(Paint.Style.FILL);
+                }
+            }
+            if (type < 0) {
+                if (k == MenuList.TEAM_ROW) {
+                    ui.text(canvas, "Vide", cellRect.centerX(), cellRect.centerY(), 14, Palette.TEXT_INACTIVE,
+                            Paint.Align.CENTER);
+                }
+                continue;
+            }
+            float wiggle = k == MenuList.TEAM_ROW && swapping ? (float) Math.sin(frame * 0.35 + b) * 2.5f : 0;
+            canvas.save();
+            canvas.rotate(wiggle, cellRect.centerX(), cellRect.centerY());
+            drawMiniCard(canvas, prog, type, cellRect, k == MenuList.LOCKED_ROW, k == MenuList.TEAM_ROW);
+            canvas.restore();
+            if (pressedButton == b) {
+                drawPressedOverlay(canvas, cellRect, 10 * density);
+            }
+        }
+    }
+
+    // Carte d'un mage dans une case : la carte (rang), puis la barre de cartes vers le rang suivant
+    private void drawMiniCard(Canvas canvas, Progression prog, int type, RectF cell, boolean locked, boolean team) {
+        float pad = team ? 10 * density : 2 * density;
+        float barH = 16 * density;
+        float maxH = cell.height() - barH - 14 * density - pad * 2;
+        float w = Math.min(cell.width() - pad * 2, maxH / 1.32f);
+        float h = w * 1.32f;
+        float cx = cell.centerX();
+        float cy = cell.top + pad + h / 2;
+        int rarity = Rarity.of(type);
+        // Liseré de la couleur de la rareté
+        paint.setColor(Palette.RARITY_COLORS[rarity]);
+        tmpRect.set(cx - w / 2 - 3 * density, cy - h / 2 - 3 * density, cx + w / 2 + 3 * density, cy + h / 2 + 3 * density);
+        canvas.drawRoundRect(tmpRect, w * 0.11f, w * 0.11f, paint);
+        drawCardFace(canvas, cx, cy, w, h, type, locked ? "?" : "Rang " + prog.getRank(type), 1);
+        float barTop = cy + h / 2 + 8 * density;
+        tmpRect.set(cx - w / 2, barTop, cx + w / 2, barTop + barH);
+        if (locked) {
+            // Pas encore débloqué : carte assombrie
+            paint.setColor(Color.argb(150, 10, 8, 20));
+            canvas.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, w * 0.09f, w * 0.09f, paint);
+            drawLock(canvas, cx, cy - h * 0.12f, w * 0.12f);
+            ui.textPx(canvas, "À débloquer", cx, barTop + barH - 3 * density, 11 * density, Palette.TEXT_INACTIVE,
+                    Paint.Align.CENTER, cell.width());
+            return;
+        }
+        int cards = prog.getFragments(type);
+        int need = prog.upgradeCost(type);
+        boolean ready = prog.hasCardsToUpgrade(type);
+        ui.bar(canvas, tmpRect, Math.min(1f, cards / (float) need), ready ? Palette.TEAM : Palette.RARITY_COLORS[rarity]);
+        ui.textPx(canvas, ready ? "↑ " + cards + "/" + need : cards + "/" + need, cx, barTop + barH - 3.5f * density,
+                10 * density, Color.WHITE, Paint.Align.CENTER, w);
+    }
+
+    // Fiche d'un mage : carte, rareté, bonus du rang, cartes, compétence, artefact, AMÉLIORER / UTILISER
+    private void drawMageSheet(Canvas canvas, GameModel model, int type, int pressed) {
+        Progression prog = model.getProgression();
+        paint.setColor(Color.argb(170, 0, 0, 0));
+        canvas.drawRect(0, 0, board.width, board.height, paint);
+        RectF p = hud.mageSheet;
+        int rarity = Rarity.of(type);
+        boolean owned = prog.isOwned(type);
         int rank = prog.getRank(type);
-        ui.inset(canvas, r);
-
-        // Portrait : petit vitrail de la couleur de l'élément, cadre vert si dans l'équipe
-        menu.buttonRect(i, MenuList.BTN_PORTRAIT, r, btnRect);
-        RectF portrait = new RectF(btnRect);
-        boolean inTeam = prog.isInTeam(type);
-        tmpRect.set(portrait);
-        tmpRect.inset(2 * density, 2 * density);
-        paint.setColor(inTeam ? Palette.TEAM : UiKit.GOLD_DARK);
-        canvas.drawRoundRect(tmpRect, 9 * density, 9 * density, paint);
-        tmpRect.inset(2.5f * density, 2.5f * density);
         int ec = Palette.ELEMENT_COLORS[type];
-        paint.setColor(UiKit.shade(ec, 0.35f));
-        canvas.drawRoundRect(tmpRect, 7 * density, 7 * density, paint);
-        paint.setColor(Color.argb(70, Color.red(ec), Color.green(ec), Color.blue(ec)));
-        canvas.drawCircle(tmpRect.centerX(), tmpRect.centerY() - 2 * density, tmpRect.width() * 0.42f, paint);
-        // Sprite : son apparence évolue tous les 10 rangs (comme les fusions)
-        int tier = Math.min(GameModel.MAX_LEVEL, 1 + (rank - 1) / 10);
-        float sw = tmpRect.width() * 0.9f;
-        float sh = sw * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
-        spriteRect.set(tmpRect.centerX() - sw / 2, tmpRect.centerY() - sh / 2 - 3 * density,
-                tmpRect.centerX() + sw / 2, tmpRect.centerY() + sh / 2 - 3 * density);
-        canvas.drawBitmap(mageSprites[type][tier - 1], null, spriteRect, spritePaint);
-        if (inTeam) {
-            paint.setTextSize(9 * density);
-            float tw = paint.measureText("ÉQUIPE") + 8 * density;
-            tmpRect.set(portrait.centerX() - tw / 2, portrait.bottom - 14 * density,
-                    portrait.centerX() + tw / 2, portrait.bottom - 2 * density);
-            paint.setColor(Palette.TEAM);
-            canvas.drawRoundRect(tmpRect, 5 * density, 5 * density, paint);
-            paint.setColor(Color.WHITE);
-            paint.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText("ÉQUIPE", tmpRect.centerX(), tmpRect.bottom - 3 * density, paint);
-        }
-        if (pressedButton == MenuList.BTN_PORTRAIT) {
-            drawPressedOverlay(canvas, portrait, 10 * density);
+        ui.panel(canvas, p, Palette.ELEMENT_NAMES[type].toUpperCase(), UiKit.shade(Palette.RARITY_COLORS[rarity], 0.7f));
+
+        RectF c = hud.sheetCard;
+        drawCardFace(canvas, c.centerX(), c.centerY(), c.width(), c.height(), type, owned ? "Rang " + rank : "?", 1);
+        if (!owned) {
+            paint.setColor(Color.argb(150, 10, 8, 20));
+            canvas.drawRoundRect(c, c.width() * 0.09f, c.width() * 0.09f, paint);
+            drawLock(canvas, c.centerX(), c.centerY(), c.width() * 0.14f);
         }
 
-        menu.buttonRect(i, MenuList.BTN_MAIN, r, btnRect);
-        float tx = portrait.right + 8 * density;
-        float maxW = btnRect.left - 8 * density - tx;
-
-        // Ligne 1 : élément (dans sa couleur) et rang
-        String name = Palette.ELEMENT_NAMES[type];
-        ui.textPx(canvas, name + " · Rang " + rank, tx, r.top + 22 * density, 15 * density, ec, Paint.Align.LEFT, maxW);
-        // Ligne 2 : bonus permanents
+        float tx = c.right + 14 * density;
+        float maxW = p.right - 16 * density - tx;
+        float y = c.top + 14 * density;
+        ui.textPx(canvas, Rarity.NAMES[rarity], tx, y, 15 * density, Palette.RARITY_COLORS[rarity], Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, Palette.ELEMENT_DESCRIPTIONS[type], tx, y + 20 * density, 11 * density, Color.WHITE,
+                Paint.Align.LEFT, maxW);
         String bonus = String.format(java.util.Locale.FRANCE, "Dégâts ×%.1f · Cadence +%d %%",
                 Progression.damageMultiplier(rank), Math.round(Progression.speedBonus(rank) * 100));
-        ui.textPx(canvas, bonus, tx, r.top + 38 * density, 11 * density, Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
-        // Ligne 3 : barre de fragments vers le rang suivant
-        boolean maxed = rank >= Progression.MAX_RANK;
-        int frags = prog.getFragments(type);
-        int cost = prog.upgradeCost(type);
-        float barTop = r.top + 45 * density;
-        float barH = 14 * density;
-        tmpRect.set(tx, barTop, tx + maxW, barTop + barH);
-        float ratio = maxed ? 1f : Math.min(1f, frags / (float) cost);
-        ui.bar(canvas, tmpRect, ratio, ec);
-        ui.text(canvas, maxed ? "MAX" : frags + " / " + cost, tx + maxW / 2, barTop + barH - 3.5f * density, 10,
-                Color.WHITE, Paint.Align.CENTER);
+        ui.textPx(canvas, bonus, tx, y + 40 * density, 11 * density, Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
+        // Cartes vers le rang suivant
+        int cards = prog.getFragments(type);
+        int need = prog.upgradeCost(type);
+        tmpRect.set(tx, y + 52 * density, tx + maxW, y + 70 * density);
+        ui.bar(canvas, tmpRect, owned ? Math.min(1f, cards / (float) need) : 0,
+                prog.hasCardsToUpgrade(type) ? Palette.TEAM : Palette.RARITY_COLORS[rarity]);
+        ui.textPx(canvas, owned ? "Cartes " + cards + " / " + need : "Aucune carte", tx + maxW / 2, y + 65 * density,
+                10.5f * density, Color.WHITE, Paint.Align.CENTER, maxW);
         // Compétence de niveau 5
-        ui.textPx(canvas, "Niv. 5 : " + Mage.SKILL_NAMES[type] + " (toucher le mage)", tx, r.top + 74 * density,
-                10 * density, UiKit.tint(ec, 0.4f), Paint.Align.LEFT, r.right - 10 * density - tx);
+        ui.textPx(canvas, "Niv. 5 : " + Mage.SKILL_NAMES[type], tx, y + 92 * density, 12 * density,
+                UiKit.tint(ec, 0.35f), Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, Mage.SKILL_DESCRIPTIONS[type], tx, y + 108 * density, 10 * density, Palette.TEXT_INACTIVE,
+                Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, "(toucher le mage en partie)", tx, y + 122 * density, 10 * density, Palette.TEXT_INACTIVE,
+                Paint.Align.LEFT, maxW);
 
-        // Bouton +1 RANG
-        boolean can = prog.canUpgrade(type);
-        drawSmallButton(canvas, btnRect, maxed ? "MAX" : "+1 RANG",
-                can ? Palette.RESUME : Palette.DISABLED, can && pressedButton == MenuList.BTN_MAIN, 14);
-
-        // Bandeau d'artefact : toucher pour changer
-        menu.buttonRect(i, MenuList.BTN_ARTIFACT, r, btnRect);
-        int owned = prog.artifactCount(type);
+        // Artefact : toucher pour changer
+        RectF a = hud.sheetArtifact;
+        int ownedArt = prog.artifactCount(type);
         int art = prog.getEquippedArtifact(type);
-        if (owned > 0) {
-            RectF f = ui.button(canvas, btnRect, UiKit.shade(Palette.ARTIFACT, 0.6f),
-                    pressedButton == MenuList.BTN_ARTIFACT, true);
-            String label = art == Artifact.NONE ? "Aucun artefact équipé (" + owned + "/3) · toucher pour changer"
+        if (owned && ownedArt > 0) {
+            RectF f = ui.button(canvas, a, UiKit.shade(Palette.ARTIFACT, 0.6f), pressed == Hud.HOME_SHEET_ARTIFACT, true);
+            String label = art == Artifact.NONE ? "Aucun artefact (" + ownedArt + "/3) · toucher pour changer"
                     : Artifact.NAMES[art] + " · " + Artifact.DESCRIPTIONS[art];
             ui.textPx(canvas, label, f.centerX(), f.centerY() + 4 * density, 11.5f * density,
-                    art == Artifact.NONE ? Palette.TEXT_INACTIVE : Color.WHITE, Paint.Align.CENTER,
-                    f.width() - 10 * density);
+                    art == Artifact.NONE ? Palette.TEXT_INACTIVE : Color.WHITE, Paint.Align.CENTER, f.width() - 10 * density);
         } else {
             paint.setColor(Color.argb(90, 0, 0, 0));
-            canvas.drawRoundRect(btnRect, 8 * density, 8 * density, paint);
-            ui.textPx(canvas, "Artefact : aucun (0/3) · battez un boss", btnRect.centerX(),
-                    btnRect.centerY() + 4 * density, 11 * density, Palette.TEXT_INACTIVE, Paint.Align.CENTER,
-                    btnRect.width() - 10 * density);
+            canvas.drawRoundRect(a, 8 * density, 8 * density, paint);
+            ui.textPx(canvas, "Artefact : 0/3 · niveaux de boss en 3 étoiles (10 %)", a.centerX(), a.centerY() + 4 * density,
+                    11 * density, Palette.TEXT_INACTIVE, Paint.Align.CENTER, a.width() - 10 * density);
+        }
+
+        if (owned) {
+            boolean maxed = rank >= Progression.MAX_RANK;
+            boolean can = prog.canUpgrade(type);
+            String cost = maxed ? "Rang maximal" : need + " cartes · " + prog.upgradeGemCost(type) + " gemmes";
+            if (!maxed && prog.hasCardsToUpgrade(type) && !can) {
+                cost = "Il manque " + (prog.upgradeGemCost(type) - prog.getGems()) + " gemmes";
+            }
+            drawTwoLineButton(canvas, hud.sheetUpgrade, "AMÉLIORER", cost, can ? Palette.RESUME : Palette.DISABLED,
+                    can && pressed == Hud.HOME_SHEET_UPGRADE);
+            boolean inTeam = prog.isInTeam(type);
+            drawTwoLineButton(canvas, hud.sheetUse, inTeam ? "DANS L'ÉQUIPE" : "UTILISER",
+                    inTeam ? "Déjà emmené en partie" : prog.isTeamFull() ? "Remplace un mage" : "Rejoint l'équipe",
+                    inTeam ? Palette.DISABLED : Palette.TEAM, !inTeam && pressed == Hud.HOME_SHEET_USE);
+        } else {
+            RectF u = hud.sheetUpgrade;
+            ui.textPx(canvas, "À débloquer : trouvez une carte dans un coffre", p.centerX(), u.centerY() - 4 * density,
+                    13 * density, Palette.GOLD, Paint.Align.CENTER, p.width() - 24 * density);
+            ui.textPx(canvas, rarity >= Rarity.EPIC ? "Grand coffre ou coffre mystérieux (Marché)"
+                            : "Tous les coffres (Marché)", p.centerX(), u.centerY() + 16 * density,
+                    11 * density, Palette.TEXT_INACTIVE, Paint.Align.CENTER, p.width() - 24 * density);
+        }
+        drawPillButton(canvas, hud.sheetClose, "FERMER", Palette.MENU_BUTTON, pressed == Hud.HOME_SHEET_CLOSE);
+    }
+
+    // Marché : une sorte de coffre (contenu, probabilités, réserve, achat ×1 / ×5 / ×10 ou ouverture)
+    private void drawChestShopRow(Canvas canvas, Progression prog, int i, int chest, RectF r, int pressedButton) {
+        ui.inset(canvas, r);
+        int stock = prog.getChests(chest);
+        float iconCx = r.left + 42 * density;
+        float iconCy = r.top + 46 * density;
+        float wiggle = stock > 0 && (frame % 120) < 24 ? (float) Math.sin(frame * 0.8) * 6 : 0;
+        canvas.save();
+        canvas.rotate(wiggle, iconCx, iconCy + 16 * density);
+        drawChestOfType(canvas, iconCx, iconCy - 6 * density, (20 + 3 * chest) * density, 0, chest, true);
+        canvas.restore();
+        float tx = r.left + 84 * density;
+        float maxW = r.right - 10 * density - tx;
+        ui.textPx(canvas, Chest.NAMES[chest], tx, r.top + 24 * density, 16 * density, Palette.CHEST_COLORS[chest],
+                Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, Chest.cards(chest) + " cartes (± " + Chest.spread(chest) + ") · " + Chest.slots(chest)
+                        + " types · " + Chest.gemsMin(chest) + " à " + Chest.gemsMax(chest) + " gemmes",
+                tx, r.top + 42 * density, 11 * density, Color.WHITE, Paint.Align.LEFT, maxW);
+        String status = stock > 0 ? "En réserve : " + stock + " (achat possible une fois vide)"
+                : "Prix : " + Chest.price(chest) + " gemmes l'unité";
+        ui.textPx(canvas, status, tx, r.top + 60 * density, 11 * density, stock > 0 ? Palette.GOLD : Palette.TEXT_INACTIVE,
+                Paint.Align.LEFT, maxW);
+        // Probabilités de chaque type de carte
+        for (int s = 0; s < Chest.slots(chest); s++) {
+            ui.textPx(canvas, "Carte " + (s + 1) + " : " + Chest.oddsText(chest, s), r.left + 14 * density,
+                    r.top + (84 + 17 * s) * density, 10.5f * density, UiKit.tint(Palette.CHEST_COLORS[chest], 0.5f),
+                    Paint.Align.LEFT, r.width() - 28 * density);
+        }
+        // Boutons
+        int n = menu.buttons[i];
+        for (int b = 0; b < n; b++) {
+            menu.buttonRect(i, b, r, btnRect);
+            boolean pressed = pressedButton == b;
+            if (stock > 0) {
+                drawTwoLineButton(canvas, btnRect, b == 0 ? "OUVRIR" : "TOUT OUVRIR",
+                        b == 0 ? "1 coffre" : stock + (stock > 1 ? " coffres" : " coffre"), Palette.RESUME, pressed);
+            } else {
+                int count = b == 0 ? 1 : b == 1 ? 5 : 10;
+                boolean can = prog.canBuyChests(chest, count);
+                drawTwoLineButton(canvas, btnRect, "×" + count, (Chest.price(chest) * count) + " gemmes",
+                        can ? Palette.MARKET : Palette.DISABLED, can && pressed);
+            }
         }
     }
 
@@ -2180,6 +2310,14 @@ public class GameRenderer {
         canvas.drawPath(path, paint);
     }
 
+    // Récompenses du mode infini selon la difficulté (voir Progression.chestForEndlessWave)
+    private static final String[] ENDLESS_REWARDS = {
+            "Petit coffre aux vagues 5, 15, 25… · grand aux vagues 10, 20…",
+            "1 coffre / 3 vagues · grands (4e, 8e, 12e) et mystérieux (15e)",
+            "1 coffre / 2 vagues · grand (4e) et mystérieux (8e)",
+            "1 grand coffre / 3 vagues · le 6e est mystérieux",
+    };
+
     // Page Infini : difficultés (avec leur record), récompenses, JOUER
     private void drawEndlessPage(Canvas canvas, GameModel model, int pressed) {
         Progression prog = model.getProgression();
@@ -2216,7 +2354,7 @@ public class GameRenderer {
         int pct = Math.round(LevelSpec.difficultyMultiplier(sel) * 100);
         ui.text(canvas, LevelSpec.DIFFICULTY_NAMES[sel] + " : gobelins à " + pct + " %", cx, y, 14,
                 Palette.DIFFICULTY_COLORS[sel], Paint.Align.CENTER);
-        String reward = "1 coffre toutes les " + LevelSpec.wavesPerChest(sel) + " vagues";
+        String reward = ENDLESS_REWARDS[sel];
         if (LevelSpec.bonusGemsPerChest(sel) > 0) {
             reward += " · +" + LevelSpec.bonusGemsPerChest(sel) + " gemmes par coffre";
         }
@@ -2327,7 +2465,9 @@ public class GameRenderer {
         // Titre et consigne
         ui.ribbon(canvas, cx, board.topShift + 58 * density, Math.min(board.playWidth * 0.7f, 240 * density),
                 model.getProgression().getLastChestCount() > 1
-                        ? model.getProgression().getLastChestCount() + " COFFRES" : "COFFRE MAGIQUE", UiKit.RIBBON);
+                        ? model.getProgression().getLastChestCount() + " COFFRES"
+                        : Chest.NAMES[model.getProgression().getLastChestType()].toUpperCase(),
+                UiKit.shade(Palette.CHEST_COLORS[model.getProgression().getLastChestType()], 0.7f));
         if (revealed > 0) {
             ui.text(canvas, "Carte " + revealed + " / " + n, cx, board.topShift + 96 * density, 13,
                     Palette.TEXT_INACTIVE, Paint.Align.CENTER);
@@ -2388,38 +2528,67 @@ public class GameRenderer {
             drawCardFace(canvas, 0, 0, w, h, type, "x" + shown, pop);
         }
         canvas.restore();
+        // Rareté sous la carte, et « NOUVEAU ! » quand la carte débloque un mage
+        if (!back && type >= 0 && cf >= 14) {
+            int rarity = Rarity.of(type);
+            ui.text(canvas, Rarity.NAMES[rarity].toUpperCase(), cx, cy + h / 2 + 30 * density, 18,
+                    Palette.RARITY_COLORS[rarity], Paint.Align.CENTER);
+            if (model.isChestCardNew(i)) {
+                float p = 1 + 0.08f * (float) Math.sin(frame * 0.2);
+                ui.text(canvas, "NOUVEAU MAGE !", cx, cy - h / 2 - 16 * density, 20 * p, Palette.GOLD,
+                        Paint.Align.CENTER);
+            }
+        }
     }
 
-    // Récapitulatif : toutes les cartes du coffre, qui apparaissent l'une après l'autre
+    // Récapitulatif : toutes les cartes du coffre (par rangées de 4), qui apparaissent l'une après l'autre
     private void drawChestSummary(Canvas canvas, GameModel model, int pressed, int cf) {
         float cx = board.centerX();
         int n = model.getChestCardCount();
         ui.ribbon(canvas, cx, board.topShift + 58 * density, Math.min(board.playWidth * 0.6f, 200 * density),
                 "BUTIN", Palette.RESUME);
 
-        float gap = 8 * density;
-        float w = n > 0 ? Math.min(80 * density, (board.playWidth - 32 * density - (n - 1) * gap) / n) : 0;
+        int perRow = 4;
+        int rows = (n + perRow - 1) / perRow;
+        float gap = 10 * density;
+        float w = Math.min(80 * density, (board.playWidth - 32 * density - (perRow - 1) * gap) / perRow);
         float h = w * 1.32f;
-        float cy = board.height * 0.4f;
-        float rowLeft = cx - (n * w + (n - 1) * gap) / 2;
+        float rowGap = 34 * density; // place pour « NOUVEAU » sous la carte
+        float top = board.height * 0.42f - (rows * h + (rows - 1) * rowGap) / 2;
         for (int i = 0; i < n; i++) {
             int age = cf - i * 5;
             if (age < 0) {
                 continue;
             }
+            int row = i / perRow;
+            int inRow = Math.min(perRow, n - row * perRow);
+            float rowLeft = cx - (inRow * w + (inRow - 1) * gap) / 2;
+            float x = rowLeft + (i % perRow) * (w + gap) + w / 2;
+            float y = top + row * (h + rowGap) + h / 2;
             float t = Math.min(1f, age / 8f);
-            float scale = t < 1 ? 0.6f + 0.5f * t : 1 + 0.08f * (float) Math.max(0, Math.sin((age - 8) / 6f * Math.PI)) * (age < 14 ? 1 : 0);
+            float scale = t < 1 ? 0.6f + 0.5f * t : 1;
+            int type = model.getChestCardType(i);
+            if (type >= 0) {
+                paint.setColor(Palette.RARITY_COLORS[Rarity.of(type)]);
+                tmpRect.set(x - w / 2 * scale - 3 * density, y - h / 2 * scale - 3 * density,
+                        x + w / 2 * scale + 3 * density, y + h / 2 * scale + 3 * density);
+                canvas.drawRoundRect(tmpRect, w * 0.11f, w * 0.11f, paint);
+            }
             canvas.save();
-            canvas.translate(rowLeft + i * (w + gap) + w / 2, cy);
+            canvas.translate(x, y);
             canvas.scale(scale, scale);
-            drawCardFace(canvas, 0, 0, w, h, model.getChestCardType(i), "x" + model.getChestCardAmount(i), 1);
+            drawCardFace(canvas, 0, 0, w, h, type, "x" + model.getChestCardAmount(i), 1);
             canvas.restore();
+            if (model.isChestCardNew(i)) {
+                ui.text(canvas, "NOUVEAU !", x, y + h / 2 + 18 * density, 12, Palette.GOLD, Paint.Align.CENTER);
+            }
         }
 
+        float bottom = top + rows * h + (rows - 1) * rowGap;
         float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12);
-        ui.text(canvas, "Touchez pour continuer", cx, cy + h / 2 + 40 * density, 15,
+        ui.text(canvas, "Touchez pour continuer", cx, bottom + 44 * density, 15,
                 Color.argb((int) (160 + 95 * pulse), 255, 240, 200), Paint.Align.CENTER);
-        int chests = model.getProgression().getChests();
+        int chests = model.getProgression().getChests(model.getProgression().getLastChestType());
         if (chests > 0) {
             drawPillButton(canvas, hud.chestAgainButton, "OUVRIR ENCORE (" + chests + ")",
                     Palette.RESUME, pressed == Hud.CHEST_AGAIN);

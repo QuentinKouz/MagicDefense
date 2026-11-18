@@ -181,4 +181,10 @@ public class Palette {
             Color.rgb(80, 170, 100), Color.rgb(80, 120, 200), Color.rgb(200, 120, 40), Color.rgb(190, 40, 50)};
     public static final int[] ULTIMATE_COLORS = {STUNNED, FURY, METEOR, SHIELD};
 
+    // Cartes et coffres : couleur de chaque rareté (commune, rare, épique, légendaire) et de chaque coffre
+    public static final int[] RARITY_COLORS = {
+            Color.rgb(140, 170, 200), Color.rgb(255, 150, 50), Color.rgb(190, 90, 255), Color.rgb(90, 240, 210)};
+    public static final int[] CHEST_COLORS = {
+            Color.rgb(200, 140, 70), Color.rgb(240, 190, 60), Color.rgb(170, 90, 240)};
+
 }

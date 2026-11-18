@@ -82,7 +82,10 @@ public class Hud {
     public static final int HOME_PREV_PAGE = 102;
     public static final int HOME_NEXT_PAGE = 103;
     public static final int HOME_TAB_0 = 110;    // onglets : 110 à 114
-    public static final int HOME_CHEST_0 = 120;  // page Mages : ouvrir ×1, ×5, ×10
+    public static final int HOME_SHEET_UPGRADE = 150; // fiche d'un mage (page Mages)
+    public static final int HOME_SHEET_USE = 151;
+    public static final int HOME_SHEET_ARTIFACT = 152;
+    public static final int HOME_SHEET_CLOSE = 153;
     public static final int HOME_DIFF_0 = 130;   // page Infini : difficultés 130 à 133
     public static final int HOME_ENDLESS_PLAY = 140;
     public static final int HOME_LIST_0 = 1000;  // listes : 1000 + ligne × 4 + bouton
@@ -91,12 +94,16 @@ public class Hud {
     public final RectF prevPageButton = new RectF();
     public final RectF nextPageButton = new RectF();
 
-    // Pages à liste (Marché, Château) : zone qui défile ; page Mages : sous la ligne des coffres
+    // Pages à liste (Marché, Mages, Château) : zone qui défile
     public final RectF listViewport = new RectF();
     public final RectF magesViewport = new RectF();
-    public final RectF chestRow = new RectF();
-    public static final int[] CHEST_BATCHES = {1, 5, 10};
-    public final RectF[] chestButtons = new RectF[CHEST_BATCHES.length];
+    // Fiche d'un mage : carte, statistiques, artefact, AMÉLIORER, UTILISER, FERMER
+    public final RectF mageSheet = new RectF();
+    public final RectF sheetCard = new RectF();
+    public final RectF sheetArtifact = new RectF();
+    public final RectF sheetUpgrade = new RectF();
+    public final RectF sheetUse = new RectF();
+    public final RectF sheetClose = new RectF();
 
     // Page Infini : panneau, difficultés, JOUER
     public final RectF endlessPanel = new RectF();
@@ -127,7 +134,6 @@ public class Hud {
         init(victoryButtons);
         init(levelNodes);
         init(tabButtons);
-        init(chestButtons);
         init(difficultyButtons);
     }
 
@@ -296,14 +302,24 @@ public class Hud {
         float lLeft = cx - lw / 2;
         float listTop = shift + 112 * d;
         listViewport.set(lLeft, listTop, lLeft + lw, tabBar.top - 8 * d);
-        // Page Mages : ligne des coffres (ouvrir ×1, ×5, ×10), puis la liste
-        chestRow.set(lLeft, listTop, lLeft + lw, listTop + 76 * d);
-        float cbW = 58 * d;
-        for (int i = 0; i < chestButtons.length; i++) {
-            float r = chestRow.right - 8 * d - (chestButtons.length - 1 - i) * (cbW + 6 * d);
-            chestButtons[i].set(r - cbW, chestRow.centerY() - 24 * d, r, chestRow.centerY() + 24 * d);
-        }
-        magesViewport.set(lLeft, chestRow.bottom + 8 * d, lLeft + lw, tabBar.top - 8 * d);
+        magesViewport.set(listViewport);
+
+        // Fiche d'un mage : grande carte à gauche, infos à droite, artefact, puis les boutons
+        float sw = cw * 0.92f;
+        float sH = 470 * d;
+        float sTop = popupTop(h, sH);
+        float sLeft = cx - sw / 2;
+        mageSheet.set(sLeft, sTop, sLeft + sw, sTop + sH);
+        float cardW = Math.min(124 * d, sw * 0.38f);
+        sheetCard.set(sLeft + 16 * d, sTop + 62 * d, sLeft + 16 * d + cardW, sTop + 62 * d + cardW * 1.32f);
+        float aTop = sheetCard.bottom + 14 * d;
+        sheetArtifact.set(sLeft + 16 * d, aTop, sLeft + sw - 16 * d, aTop + 46 * d);
+        float bTop = sTop + sH - 136 * d;
+        float bw = (sw - 16 * d * 2 - 10 * d) / 2;
+        sheetUpgrade.set(sLeft + 16 * d, bTop, sLeft + 16 * d + bw, bTop + 58 * d);
+        sheetUse.set(sheetUpgrade.right + 10 * d, bTop, sLeft + sw - 16 * d, bTop + 58 * d);
+        float closeW = sw * 0.5f;
+        sheetClose.set(cx - closeW / 2, sTop + sH - 64 * d, cx + closeW / 2, sTop + sH - 16 * d);
 
         // Page Infini : panneau des records, difficultés en 2 × 2, JOUER
         endlessPlayButton.set(cx - playW / 2, tabBar.top - 74 * d, cx + playW / 2, tabBar.top - 12 * d);
@@ -452,10 +468,6 @@ public class Hud {
                     }
                 }
                 return -1;
-            case GameModel.PAGE_MAGES: {
-                int c = indexAt(chestButtons, x, y);
-                return c >= 0 ? HOME_CHEST_0 + c : -1;
-            }
             case GameModel.PAGE_ENDLESS: {
                 if (endlessPlayButton.contains(x, y)) {
                     return HOME_ENDLESS_PLAY;
@@ -466,6 +478,20 @@ public class Hud {
             default:
                 return -1;
         }
+    }
+
+    // Fiche d'un mage ouverte : ses boutons, sinon FERMER (toucher à côté ferme aussi)
+    public int sheetButtonAt(float x, float y) {
+        if (sheetUpgrade.contains(x, y)) {
+            return HOME_SHEET_UPGRADE;
+        }
+        if (sheetUse.contains(x, y)) {
+            return HOME_SHEET_USE;
+        }
+        if (sheetArtifact.contains(x, y)) {
+            return HOME_SHEET_ARTIFACT;
+        }
+        return HOME_SHEET_CLOSE;
     }
 
     // Zone de liste qui défile sur cette page (null : pas de liste)

@@ -14,23 +14,20 @@ public class Progression {
     public static final float DAMAGE_BONUS_PER_RANK = 0.10f;  // +10 % de dégâts par rang
     public static final float SPEED_BONUS_PER_RANK = 0.01f;   // +1 % de cadence par rang...
     public static final float MAX_SPEED_BONUS = 0.30f;        // ...plafonné à +30 %
-    public static final int LOTS_PER_CHEST = 3;           // un coffre = 3 lots de fragments
-    public static final int LOT_MIN = 4;                  // chaque lot : 4 à 8 fragments
-    public static final int LOT_MAX = 8;
-    public static final int GEMS_MIN = 1;                 // et 1 à 3 gemmes
-    public static final int GEMS_MAX = 3;
-    public static final int WAVES_PER_ENDLESS_CHEST = 3;  // mode infini (Normal) : 1 coffre toutes les 3 vagues
+    public static final int DAILY_FREE_CHESTS = 2;        // petits coffres gratuits chaque jour
+    public static final String GIFT_CODE = "thomasleboss"; // code des options : une seule fois par sauvegarde
+    public static final int GIFT_CODE_GEMS = 9999;
+    public static final int CODE_OK = 1;
+    public static final int CODE_WRONG = 0;
+    public static final int CODE_ALREADY_USED = -1;
     public static final int LEVELS_PER_BONUS_CHEST = 4;   // un coffre de plus tous les 4 niveaux
     public static final int TEAM_SIZE = 4;                // mages emmenés en partie
     public static final int NO_UNIT = -1;
 
     // Marché (gemmes)
-    public static final int CHEST_PRICE = 10;             // un coffre
     public static final int SPEED2_PRICE = 250;           // vitesse ×2, achat définitif
     public static final int AUTO_PRICE = 400;             // mode automatique, achat définitif
     public static final int SPEED3_PRICE = 600;           // vitesse ×3, achat définitif (après ×2)
-    // Prix des unités exclusives (indice = type ; 0 = possédé dès le départ)
-    private static final int[] PRICES = {0, 0, 0, 0, 60, 100, 160, 0, 0, 0}; // 3 derniers : cartes (lot 3)
 
     // Château (gemmes) : PV max et résistance
     public static final int CASTLE_HP_MAX_LEVEL = 20;
@@ -39,7 +36,7 @@ public class Progression {
     public static final float CASTLE_RES_PER_LEVEL = 0.03f;   // −3 % de dégâts subis par niveau
 
     // ---------- État ----------
-    private int chests = 0;
+    private final int[] chests = new int[Chest.COUNT]; // coffres en réserve, par sorte
     private int gems = 0;
     private final int[] fragments = new int[Mage.TYPE_COUNT];
     private final int[] ranks = new int[Mage.TYPE_COUNT];
@@ -48,7 +45,11 @@ public class Progression {
     private final int[] bestEndless = new int[LevelSpec.DIFFICULTY_COUNT]; // record par difficulté
     private final int[] lastChestReward = new int[Mage.TYPE_COUNT]; // contenu du dernier coffre ouvert
     private int lastChestGems = 0;
-    private int lastChestCount = 0;  // coffres ouverts d'un coup (×1, ×5, ×10)
+    private int lastChestCount = 0;  // coffres ouverts d'un coup (« tout ouvrir »)
+    private int lastChestType = Chest.SMALL;
+    private final boolean[] lastChestNew = new boolean[Mage.TYPE_COUNT]; // mage débloqué par ce coffre
+    private long lastDailyDay = -1;  // jour (depuis 1970) des derniers coffres gratuits
+    private boolean codeUsed = false;
 
     private final boolean[] ultimates = new boolean[Ultimate.COUNT];
     private int equippedUltimate = Ultimate.STUN;
@@ -84,7 +85,12 @@ public class Progression {
     }
 
     // ---------- Lecture ----------
-    public int getChests() { return chests; }
+    public int getChests() { return chests[Chest.SMALL] + chests[Chest.BIG] + chests[Chest.MYSTERY]; }
+    public int getChests(int chest) { return chests[chest]; }
+    public int getLastChestType() { return lastChestType; }
+    public boolean isLastChestNew(int type) { return lastChestNew[type]; }
+    public boolean isCodeUsed() { return codeUsed; }
+    public long getLastDailyDay() { return lastDailyDay; }
     public int getGems() { return gems; }
     public int getFragments(int type) { return fragments[type]; }
     public int getRank(int type) { return ranks[type]; }
@@ -93,7 +99,6 @@ public class Progression {
     public int getLastChestGems() { return lastChestGems; }
     public int getLastChestCount() { return lastChestCount; }
     public int getChestsOpened() { return chestsOpened; }
-    public static int price(int type) { return PRICES[type]; }
 
     // Meilleure vague, toutes difficultés confondues
     public int getBestEndlessWave() {
@@ -140,17 +145,22 @@ public class Progression {
         return n;
     }
 
-    // Fragments nécessaires pour passer au rang suivant : proportionnel au rang actuel
+    // Cartes nécessaires pour passer au rang suivant : proportionnel au rang, moins pour les cartes rares
     public int upgradeCost(int type) {
-        return COST_PER_RANK * ranks[type];
+        return Rarity.upgradeCards(Rarity.of(type)) * ranks[type];
     }
 
-    public boolean canUpgrade(int type) {
+    // Gemmes à payer en plus des cartes
+    public int upgradeGemCost(int type) {
+        return Rarity.upgradeGems(Rarity.of(type)) * ranks[type];
+    }
+
+    public boolean hasCardsToUpgrade(int type) {
         return owned[type] && ranks[type] < MAX_RANK && fragments[type] >= upgradeCost(type);
     }
 
-    public boolean canBuy(int type) {
-        return !owned[type] && gems >= PRICES[type];
+    public boolean canUpgrade(int type) {
+        return hasCardsToUpgrade(type) && gems >= upgradeGemCost(type);
     }
 
     // Multiplicateur de dégâts d'un rang (rang 1 = ×1, rang 11 = ×2...)
@@ -168,13 +178,54 @@ public class Progression {
         return 1 + (level - 1) / LEVELS_PER_BONUS_CHEST;
     }
 
-    // Coffres gagnés en mode infini (Normal) selon les vagues entièrement repoussées
-    public static int chestsForEndless(int wavesCleared) {
-        return chestsForEndless(wavesCleared, LevelSpec.NORMAL);
+    // Coffre gagné en repoussant la vague `wave` du mode infini (-1 : aucun)
+    //  - Facile    : petit coffre aux vagues 5, 15, 25... ; grand coffre aux vagues 10, 20, 30...
+    //  - Normal    : un coffre toutes les 3 vagues, par cycles de 15 coffres :
+    //                petits, sauf les 4e, 8e et 12e (grands) et le 15e (mystérieux)
+    //  - Difficile : un coffre toutes les 2 vagues, par cycles de 8 coffres :
+    //                petits, sauf le 4e (grand) et le 8e (mystérieux)
+    //  - Infernal  : un grand coffre toutes les 3 vagues, par cycles de 6 : le 6e est mystérieux
+    public static int chestForEndlessWave(int wave, int difficulty) {
+        if (wave <= 0) {
+            return -1;
+        }
+        switch (LevelSpec.clampDifficulty(difficulty)) {
+            case LevelSpec.EASY:
+                return wave % 10 == 0 ? Chest.BIG : wave % 10 == 5 ? Chest.SMALL : -1;
+            case LevelSpec.HARD: {
+                if (wave % 2 != 0) {
+                    return -1;
+                }
+                int pos = (wave / 2 - 1) % 8 + 1;
+                return pos == 8 ? Chest.MYSTERY : pos == 4 ? Chest.BIG : Chest.SMALL;
+            }
+            case LevelSpec.INFERNAL: {
+                if (wave % 3 != 0) {
+                    return -1;
+                }
+                int pos = (wave / 3 - 1) % 6 + 1;
+                return pos == 6 ? Chest.MYSTERY : Chest.BIG;
+            }
+            default: { // Normal
+                if (wave % 3 != 0) {
+                    return -1;
+                }
+                int pos = (wave / 3 - 1) % 15 + 1;
+                return pos == 15 ? Chest.MYSTERY : pos % 4 == 0 ? Chest.BIG : Chest.SMALL;
+            }
+        }
     }
 
-    public static int chestsForEndless(int wavesCleared, int difficulty) {
-        return Math.max(0, wavesCleared) / LevelSpec.wavesPerChest(difficulty);
+    // Coffres gagnés (par sorte) en repoussant les vagues 1 à wavesCleared
+    public static int[] chestsForEndless(int wavesCleared, int difficulty) {
+        int[] out = new int[Chest.COUNT];
+        for (int w = 1; w <= wavesCleared; w++) {
+            int c = chestForEndlessWave(w, difficulty);
+            if (c >= 0) {
+                out[c]++;
+            }
+        }
+        return out;
     }
 
     // ---------- Ultimes ----------
@@ -262,22 +313,66 @@ public class Progression {
         return true;
     }
 
+    // Coffres par sorte (absents des anciennes sauvegardes : on garde alors les anciens coffres en petits),
+    // coffres gratuits du jour, code des options
+    public void loadChests(int small, int big, int mystery, long dailyDay, boolean codeUsed) {
+        if (small >= 0) {
+            chests[Chest.SMALL] = small;
+        }
+        chests[Chest.BIG] = Math.max(0, big);
+        chests[Chest.MYSTERY] = Math.max(0, mystery);
+        lastDailyDay = dailyDay;
+        this.codeUsed = codeUsed;
+    }
+
     public void loadAuto(boolean owned) {
         auto = owned;
     }
 
-    // ---------- Coffres achetés ----------
-    public boolean canBuyChest() {
-        return gems >= CHEST_PRICE;
+    // ---------- Coffres du Marché ----------
+    // On ne peut acheter une sorte de coffre que si l'on n'en a plus aucun en réserve (×1, ×5 ou ×10)
+    public boolean canBuyChests(int chest, int count) {
+        return count > 0 && chests[chest] == 0 && gems >= Chest.price(chest) * count;
     }
 
-    public boolean buyChest() {
-        if (!canBuyChest()) {
+    public boolean buyChests(int chest, int count) {
+        if (!canBuyChests(chest, count)) {
             return false;
         }
-        gems -= CHEST_PRICE;
-        chests++;
+        gems -= Chest.price(chest) * count;
+        chests[chest] += count;
         return true;
+    }
+
+    public void addChests(int chest, int count) {
+        chests[chest] += Math.max(0, count);
+    }
+
+    // ---------- Coffres gratuits du jour ----------
+    public boolean canClaimDaily(long day) {
+        return day != lastDailyDay;
+    }
+
+    public boolean claimDaily(long day) {
+        if (!canClaimDaily(day)) {
+            return false;
+        }
+        lastDailyDay = day;
+        chests[Chest.SMALL] += DAILY_FREE_CHESTS;
+        return true;
+    }
+
+    // ---------- Code des options ----------
+    public int redeemCode(String code) {
+        if (code == null || !code.trim().equalsIgnoreCase(GIFT_CODE)) {
+            return CODE_WRONG;
+        }
+        if (codeUsed) {
+            return CODE_ALREADY_USED;
+        }
+        codeUsed = true;
+        gems += GIFT_CODE_GEMS;
+        return CODE_OK;
     }
 
     // ---------- Château ----------
@@ -447,77 +542,87 @@ public class Progression {
     }
 
     // ---------- Actions ----------
-    public void addChests(int count) {
-        chests += Math.max(0, count);
-    }
-
     public void addGems(int count) {
         gems += Math.max(0, count);
     }
 
-    // Ouvre un coffre : des fragments d'éléments possédés tirés au hasard, et des gemmes.
-    // Retourne false s'il n'y a pas de coffre.
-    public boolean openChest(Random random) {
-        return openChests(1, random) > 0;
+    // Ouvre un coffre de cette sorte. Retourne false s'il n'y en a pas.
+    public boolean openChest(int chest, Random random) {
+        return openChests(chest, 1, random) > 0;
     }
 
-    // Ouvre jusqu'à `count` coffres d'un coup : le butin est additionné (une carte par élément).
+    // Ouvre jusqu'à `count` coffres de cette sorte d'un coup (« tout ouvrir ») : le butin est additionné.
+    // Une carte d'un mage pas encore possédé le débloque (il rejoint l'équipe s'il reste une place).
     // Retourne le nombre de coffres ouverts.
-    public int openChests(int count, Random random) {
-        int n = Math.min(count, chests);
+    public int openChests(int chest, int count, Random random) {
+        int n = Math.min(count, chests[chest]);
         if (n <= 0) {
             return 0;
         }
         for (int t = 0; t < Mage.TYPE_COUNT; t++) {
             lastChestReward[t] = 0;
+            lastChestNew[t] = false;
         }
         lastChestGems = 0;
-        int[] pool = new int[Mage.TYPE_COUNT];
-        int poolSize = 0;
-        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
-            if (owned[t]) {
-                pool[poolSize++] = t;
-            }
-        }
         for (int c = 0; c < n; c++) {
-            for (int i = 0; i < LOTS_PER_CHEST; i++) {
-                int type = pool[random.nextInt(poolSize)];
-                int amount = LOT_MIN + random.nextInt(LOT_MAX - LOT_MIN + 1);
-                fragments[type] += amount;
-                lastChestReward[type] += amount;
+            Chest.Loot loot = Chest.roll(chest, random);
+            for (int s = 0; s < loot.types.length; s++) {
+                int type = loot.types[s];
+                if (type < 0) {
+                    continue;
+                }
+                fragments[type] += loot.amounts[s];
+                lastChestReward[type] += loot.amounts[s];
+                if (!owned[type]) {
+                    owned[type] = true;
+                    lastChestNew[type] = true;
+                    addToTeamIfRoom(type);
+                }
             }
-            lastChestGems += GEMS_MIN + random.nextInt(GEMS_MAX - GEMS_MIN + 1);
+            lastChestGems += loot.gems;
         }
         gems += lastChestGems;
-        chests -= n;
+        chests[chest] -= n;
         chestsOpened += n;
         lastChestCount = n;
+        lastChestType = chest;
         return n;
     }
 
-    // Dépense les fragments et monte le rang. Retourne false si ce n'est pas possible.
+    private void addToTeamIfRoom(int type) {
+        for (int i = 0; i < TEAM_SIZE; i++) {
+            if (team[i] == NO_UNIT) {
+                team[i] = type;
+                return;
+            }
+        }
+    }
+
+    // Dépense les cartes et les gemmes, et monte le rang. Retourne false si ce n'est pas possible.
     public boolean upgrade(int type) {
         if (!canUpgrade(type)) {
             return false;
         }
         fragments[type] -= upgradeCost(type);
+        gems -= upgradeGemCost(type);
         ranks[type]++;
         return true;
     }
 
-    // Achète une unité exclusive au Marché ; elle rejoint l'équipe s'il reste une place
-    public boolean buy(int type) {
-        if (!canBuy(type)) {
+    // Place le mage dans l'emplacement `slot` de l'équipe. S'il y était déjà ailleurs,
+    // les deux emplacements sont échangés. Retourne false si rien n'a changé.
+    public boolean setTeamSlot(int slot, int type) {
+        if (slot < 0 || slot >= TEAM_SIZE || type < 0 || type >= Mage.TYPE_COUNT || !owned[type]
+                || team[slot] == type) {
             return false;
         }
-        gems -= PRICES[type];
-        owned[type] = true;
         for (int i = 0; i < TEAM_SIZE; i++) {
-            if (team[i] == NO_UNIT) {
-                team[i] = type;
+            if (team[i] == type) {
+                team[i] = team[slot];
                 break;
             }
         }
+        team[slot] = type;
         return true;
     }
 
@@ -579,7 +684,7 @@ public class Progression {
 
     public void load(int chests, int gems, int[] fragments, int[] ranks, boolean[] owned, int[] team,
                      int bestEndlessWave) {
-        this.chests = Math.max(0, chests);
+        this.chests[Chest.SMALL] = Math.max(0, chests); // anciens coffres : des petits coffres
         this.gems = Math.max(0, gems);
         for (int t = 0; t < Mage.TYPE_COUNT; t++) {
             if (t < fragments.length) {

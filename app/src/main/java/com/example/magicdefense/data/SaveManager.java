@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 import com.example.magicdefense.model.Achievement;
 import com.example.magicdefense.model.Artifact;
+import com.example.magicdefense.model.Chest;
 import com.example.magicdefense.model.GameModel;
 import com.example.magicdefense.model.LevelSpec;
 import com.example.magicdefense.model.Mage;
@@ -57,6 +58,10 @@ public class SaveManager {
     private static final String KEY_AUTO = "auto_mode";
     private static final String KEY_AUTO_OWNED = "auto_owned";
     private static final String KEY_VIBRATION = "vibration";
+    private static final String KEY_CHESTS_BIG = "chests_big";        // (KEY_CHESTS = petits coffres)
+    private static final String KEY_CHESTS_MYSTERY = "chests_mystery";
+    private static final String KEY_DAILY_DAY = "daily_day";
+    private static final String KEY_CODE_USED = "code_used";
     private static final String KEY_DIFFICULTY = "endless_difficulty";
     private static final String KEY_RUN = "run_in_progress";      // partie à reprendre (vide = aucune)
 
@@ -129,6 +134,8 @@ public class SaveManager {
 
         model.setGameSpeed(prefs.getInt(KEY_SPEED, 1));
         p.loadAuto(prefs.getBoolean(KEY_AUTO_OWNED, false));
+        p.loadChests(-1, prefs.getInt(KEY_CHESTS_BIG, 0), prefs.getInt(KEY_CHESTS_MYSTERY, 0),
+                prefs.getLong(KEY_DAILY_DAY, -1), prefs.getBoolean(KEY_CODE_USED, false));
         model.setAutoMode(prefs.getBoolean(KEY_AUTO, false));
         model.setEndlessDifficulty(prefs.getInt(KEY_DIFFICULTY, LevelSpec.NORMAL));
 
@@ -148,7 +155,11 @@ public class SaveManager {
         editor.putBoolean(KEY_MUSIC, model.isMusicEnabled());
 
         Progression p = model.getProgression();
-        editor.putInt(KEY_CHESTS, p.getChests());
+        editor.putInt(KEY_CHESTS, p.getChests(Chest.SMALL));
+        editor.putInt(KEY_CHESTS_BIG, p.getChests(Chest.BIG));
+        editor.putInt(KEY_CHESTS_MYSTERY, p.getChests(Chest.MYSTERY));
+        editor.putLong(KEY_DAILY_DAY, p.getLastDailyDay());
+        editor.putBoolean(KEY_CODE_USED, p.isCodeUsed());
         for (int t = 0; t < Mage.TYPE_COUNT; t++) {
             editor.putInt(KEY_FRAGMENTS + t, p.getFragments(t));
             editor.putInt(KEY_RANK + t, p.getRank(t));

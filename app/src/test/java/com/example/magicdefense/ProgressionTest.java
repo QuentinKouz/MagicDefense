@@ -22,6 +22,7 @@ public class ProgressionTest {
         assertEquals(10, p.upgradeCost(Mage.FIRE));                // rang 1 → 2
         p.load(0, new int[]{0, 1000, 0, 0}, new int[]{1, 5, 1, 1}, 0);
         assertEquals(50, p.upgradeCost(Mage.FIRE));                // rang 5 → 6
+        p.addGems(p.upgradeGemCost(Mage.FIRE));                     // + des gemmes
         assertTrue(p.upgrade(Mage.FIRE));
         assertEquals(6, p.getRank(Mage.FIRE));
         assertEquals(950, p.getFragments(Mage.FIRE));
@@ -65,30 +66,10 @@ public class ProgressionTest {
     }
 
     @Test
-    public void openChest_givesThreeLots() {
-        Progression p = new Progression();
-        assertFalse(p.openChest(new Random(1)));  // aucun coffre
-        p.addChests(2);
-        assertTrue(p.openChest(new Random(1)));
-        assertEquals(1, p.getChests());
-        int total = 0;
-        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
-            total += p.getFragments(t);
-            assertEquals(p.getFragments(t), p.getLastChestReward(t));
-        }
-        int lots = Progression.LOTS_PER_CHEST;
-        assertTrue(total >= lots * Progression.LOT_MIN && total <= lots * Progression.LOT_MAX);
-    }
-
-    @Test
     public void chestsEarned() {
         assertEquals(1, Progression.chestsForLevel(1));
         assertEquals(1, Progression.chestsForLevel(4));
         assertEquals(2, Progression.chestsForLevel(5));
-        assertEquals(0, Progression.chestsForEndless(2));
-        assertEquals(1, Progression.chestsForEndless(3));
-        assertEquals(3, Progression.chestsForEndless(10));
-        assertEquals(0, Progression.chestsForEndless(-1));
     }
 
     @Test

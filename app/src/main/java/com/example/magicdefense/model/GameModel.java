@@ -152,7 +152,7 @@ public class GameModel {
 
     // Progression permanente et fin de partie
     private final Progression progression = new Progression();
-    private int lastChestsEarned = 0;       // coffres gagnés à la dernière fin de partie
+    private int[] lastChests = new int[Chest.COUNT]; // coffres gagnés (par sorte) à la dernière fin de partie
     private int lastBonusGems = 0;          // gemmes en plus (difficulté du mode infini)
     private int lastArtifact = Artifact.NONE; // artefact gagné contre le boss
     private int lastArtifactGems = 0;
@@ -210,7 +210,8 @@ public class GameModel {
     public Progression getProgression() { return progression; }
     public boolean isEndless() { return spec.endless; }
     public LevelSpec getSpec() { return spec; }
-    public int getLastChestsEarned() { return lastChestsEarned; }
+    public int getLastChestsEarned() { return lastChests[0] + lastChests[1] + lastChests[2]; }
+    public int getLastChestsEarned(int chest) { return lastChests[chest]; }
     public int getLastBonusGems() { return lastBonusGems; }
     public int getLastArtifact() { return lastArtifact; }
     public int getLastArtifactGems() { return lastArtifactGems; }
@@ -224,7 +225,12 @@ public class GameModel {
     public int getHomePage() { return homePage; }
 
     public void setHomePage(int page) {
-        homePage = Math.max(0, Math.min(PAGE_COUNT - 1, page));
+        int p = Math.max(0, Math.min(PAGE_COUNT - 1, page));
+        if (p != homePage) {
+            selectedMage = -1;   // on quitte la page : la fiche et le choix d'emplacement se ferment
+            swappingMage = -1;
+        }
+        homePage = p;
     }
 
     public int getEndlessDifficulty() { return endlessDifficulty; }
@@ -602,8 +608,13 @@ public class GameModel {
         selectedLevel = level + 1;
         showPageOf(selectedLevel);
 
-        lastChestsEarned = Progression.chestsForLevel(level);
-        progression.addChests(lastChestsEarned);
+        // Petits coffres (1, puis un de plus tous les 4 niveaux) et un grand coffre sur les niveaux de boss
+        lastChests = new int[Chest.COUNT];
+        lastChests[Chest.SMALL] = Progression.chestsForLevel(level);
+        if (spec.hasBossLevel()) {
+            lastChests[Chest.BIG] = 1;
+        }
+        addLastChests();
         lastArtifact = Artifact.NONE;
         lastArtifactGems = 0;
         // Niveau de boss gagné en 3 étoiles : 10 % de chances d'obtenir un artefact (à chaque fois)
@@ -628,9 +639,9 @@ public class GameModel {
         }
         endlessRewarded = true;
         int wavesCleared = wave - 1; // la vague en cours n'a pas été repoussée
-        lastChestsEarned = Progression.chestsForEndless(wavesCleared, spec.endlessDifficulty);
-        progression.addChests(lastChestsEarned);
-        lastBonusGems = lastChestsEarned * LevelSpec.bonusGemsPerChest(spec.endlessDifficulty);
+        lastChests = Progression.chestsForEndless(wavesCleared, spec.endlessDifficulty);
+        addLastChests();
+        lastBonusGems = getLastChestsEarned() * LevelSpec.bonusGemsPerChest(spec.endlessDifficulty);
         progression.addGems(lastBonusGems);
         lastEndlessRecord = progression.recordEndlessWave(wave, spec.endlessDifficulty);
         checkAchievements();
@@ -711,7 +722,7 @@ public class GameModel {
         modeBannerTimer = 0;
         announceTimer = 0;
         skillTextTimer = 0;
-        lastChestsEarned = 0;
+        lastChests = new int[Chest.COUNT];
         lastBonusGems = 0;
         lastArtifact = Artifact.NONE;
         lastArtifactGems = 0;
@@ -795,42 +806,111 @@ public class GameModel {
         }
     }
 
-    // ---------- Page Mages : coffres, rangs, équipe, artefacts ----------
+    // ---------- Page Mages : équipe (2 × 2), collection, cartes à débloquer ----------
 
-    // Élément de la ligne `row` de la liste des mages (seulement les mages possédés), ou -1
-    public int ownedTypeAt(int row) {
+    // Mages possédés qui ne sont pas dans l'équipe (la collection), puis mages à débloquer,
+    // chacun trié par rareté puis par élément
+    public int[] collectionTypes() {
+        return typesWhere(true);
+    }
+
+    public int[] lockedTypes() {
+        return typesWhere(false);
+    }
+
+    private int[] typesWhere(boolean ownedList) {
+        int[] out = new int[Mage.TYPE_COUNT];
         int n = 0;
-        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
-            if (progression.isOwned(t)) {
-                if (n == row) {
-                    return t;
+        for (int r = 0; r < Rarity.COUNT; r++) {
+            for (int t = 0; t < Mage.TYPE_COUNT; t++) {
+                if (Rarity.of(t) != r) {
+                    continue;
                 }
-                n++;
+                boolean mine = progression.isOwned(t);
+                if (ownedList ? mine && !progression.isInTeam(t) : !mine) {
+                    out[n++] = t;
+                }
             }
         }
-        return -1;
+        return Arrays.copyOf(out, n);
+    }
+
+    // Fiche d'un mage (toucher une carte) et choix de l'emplacement d'équipe (bouton UTILISER)
+    private int selectedMage = -1;
+    private int swappingMage = -1;
+
+    public int getSelectedMage() { return selectedMage; }
+    public int getSwappingMage() { return swappingMage; }
+
+    public void selectMage(int type) {
+        if (inMenu() && type >= 0 && type < Mage.TYPE_COUNT) {
+            selectedMage = type;
+            swappingMage = -1;
+        }
+    }
+
+    public void closeMageSheet() {
+        selectedMage = -1;
+    }
+
+    public void cancelSwap() {
+        swappingMage = -1;
+    }
+
+    // UTILISER : le mage rejoint l'équipe (place libre), sinon on choisit le mage qu'il remplace
+    public boolean useMage(int type) {
+        if (!inMenu() || !progression.isOwned(type) || progression.isInTeam(type)) {
+            return false;
+        }
+        selectedMage = -1;
+        for (int slot = 0; slot < Progression.TEAM_SIZE; slot++) {
+            if (progression.getTeamSlot(slot) == Progression.NO_UNIT) {
+                return chooseTeamSlot(slot, type);
+            }
+        }
+        swappingMage = type; // l'équipe est pleine : toucher le mage à remplacer
+        return true;
+    }
+
+    // Toucher un emplacement d'équipe pendant le choix : le mage y prend place
+    public boolean chooseTeamSlot(int slot) {
+        return swappingMage >= 0 && chooseTeamSlot(slot, swappingMage);
+    }
+
+    private boolean chooseTeamSlot(int slot, int type) {
+        swappingMage = -1;
+        if (!progression.setTeamSlot(slot, type)) {
+            return false;
+        }
+        if (listener != null) {
+            listener.onProgressChanged();
+        }
+        return true;
     }
 
     private boolean inMenu() {
         return state == GameState.START;
     }
 
-    // Ouvre un coffre et lance l'animation (page Mages, ou « encore » à la fin de l'animation)
-    public boolean openChest() {
-        return openChests(1);
+    private void addLastChests() {
+        for (int c = 0; c < Chest.COUNT; c++) {
+            progression.addChests(c, lastChests[c]);
+        }
     }
 
-    // Ouvre jusqu'à `count` coffres d'un coup (×1, ×5, ×10) : le butin est additionné
-    public boolean openChests(int count) {
+    // ---------- Coffres (page Marché) ----------
+
+    // Ouvre un coffre de cette sorte (ou tous : « tout ouvrir ») et lance l'animation
+    public boolean openChests(int chest, int count) {
         boolean fromAnim = state == GameState.CHEST_OPENING && isChestRevealComplete();
         if (!inMenu() && !fromAnim) {
             return false;
         }
-        if (progression.openChests(count, random) == 0) {
+        if (progression.openChests(chest, count, random) == 0) {
             return false;
         }
         state = GameState.CHEST_OPENING;
-        homePage = PAGE_MAGES;
+        homePage = PAGE_MARKET;
         chestAnimFrame = 0;
         chestCardFrame = 0;
         chestRevealed = 0;
@@ -843,12 +923,44 @@ public class GameModel {
         return true;
     }
 
-    // Cartes du coffre : une par élément obtenu (de la plus petite à la plus grosse), les gemmes en dernier
+    // « Ouvrir encore » à la fin de l'animation : un coffre de la même sorte
+    public boolean openChest() {
+        return openChests(progression.getLastChestType(), 1);
+    }
+
+    // Achat au Marché (seulement s'il n'en reste aucun de cette sorte)
+    public boolean buyChests(int chest, int count) {
+        return afterPurchase(inMenu() && progression.buyChests(chest, count));
+    }
+
+    // Petits coffres gratuits, une fois par jour (day = jour depuis 1970, donné par la vue)
+    public boolean claimDailyChests(long day) {
+        return afterPurchase(inMenu() && progression.claimDaily(day));
+    }
+
+    // Code des options (CODE_OK, CODE_WRONG, CODE_ALREADY_USED)
+    public int redeemCode(String code) {
+        int result = progression.redeemCode(code);
+        if (result == Progression.CODE_OK && listener != null) {
+            listener.onUnitBought();
+            listener.onProgressChanged();
+        }
+        return result;
+    }
+
+    // Cartes du coffre : les gemmes d'abord, puis les mages de la rareté la plus basse à la plus haute
+    // (le suspense monte jusqu'à la dernière carte)
     private void buildChestCards() {
         int n = getChestCardCount();
         chestCardTypes = new int[n];
         chestCardAmounts = new int[n];
         int k = 0;
+        if (progression.getLastChestGems() > 0) {
+            chestCardTypes[k] = CARD_GEMS;
+            chestCardAmounts[k] = progression.getLastChestGems();
+            k++;
+        }
+        int first = k;
         for (int t = 0; t < Mage.TYPE_COUNT; t++) {
             if (progression.getLastChestReward(t) > 0) {
                 chestCardTypes[k] = t;
@@ -856,9 +968,9 @@ public class GameModel {
                 k++;
             }
         }
-        // Tri par quantité croissante : le suspense monte jusqu'à la dernière carte
-        for (int i = 1; i < k; i++) {
-            for (int j = i; j > 0 && chestCardAmounts[j] < chestCardAmounts[j - 1]; j--) {
+        // Tri : rareté croissante, puis quantité décroissante
+        for (int i = first + 1; i < k; i++) {
+            for (int j = i; j > first && before(j, j - 1); j--) {
                 int ta = chestCardTypes[j];
                 chestCardTypes[j] = chestCardTypes[j - 1];
                 chestCardTypes[j - 1] = ta;
@@ -867,10 +979,18 @@ public class GameModel {
                 chestCardAmounts[j - 1] = aa;
             }
         }
-        if (progression.getLastChestGems() > 0) {
-            chestCardTypes[k] = CARD_GEMS;
-            chestCardAmounts[k] = progression.getLastChestGems();
-        }
+    }
+
+    private boolean before(int a, int b) {
+        int ra = Rarity.of(chestCardTypes[a]);
+        int rb = Rarity.of(chestCardTypes[b]);
+        return ra < rb || (ra == rb && chestCardAmounts[a] > chestCardAmounts[b]);
+    }
+
+    // La carte i débloque un nouveau mage
+    public boolean isChestCardNew(int i) {
+        int t = chestCardTypes[i];
+        return t >= 0 && progression.isLastChestNew(t);
     }
 
     public int getChestAnimFrame() { return chestAnimFrame; }
@@ -920,7 +1040,7 @@ public class GameModel {
             chestCardFrame = 0;
         } else {
             state = GameState.START;
-            homePage = PAGE_MAGES;
+            homePage = PAGE_MARKET;
         }
     }
 
@@ -968,14 +1088,6 @@ public class GameModel {
             }
         }
         return ok;
-    }
-
-    public boolean buyUnit(int type) {
-        return afterPurchase(inMenu() && progression.buy(type));
-    }
-
-    public boolean buyChest() {
-        return afterPurchase(inMenu() && progression.buyChest());
     }
 
     public boolean buyUltimate(int id) {

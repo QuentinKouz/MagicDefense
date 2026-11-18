@@ -223,7 +223,7 @@ public class TouchController {
     private void handleHomeMove(float dx, float dy, float ty, long time) {
         int page = model.getHomePage();
         RectF vp = hud.viewportFor(page);
-        if (gesture == GESTURE_NONE && moved) {
+        if (gesture == GESTURE_NONE && moved && !(page == GameModel.PAGE_MAGES && model.getSelectedMage() >= 0)) {
             if (Math.abs(dx) > Math.abs(dy)) {
                 gesture = GESTURE_SWIPE;
             } else if (vp != null && vp.contains(downX, downY)) {
@@ -409,14 +409,17 @@ public class TouchController {
 
     // Accueil : bouton validé
     private void handleHomeButton(int b) {
-        if (b >= Hud.HOME_LIST_0) {
+        if (b != Hud.HOME_SHEET_USE && !(b >= Hud.HOME_LIST_0 && model.getHomePage() == GameModel.PAGE_MAGES)) {
+            model.cancelSwap(); // un autre bouton annule le choix de l'emplacement
+        }
+        if (b >= Hud.HOME_SHEET_UPGRADE && b <= Hud.HOME_SHEET_CLOSE) {
+            handleSheetButton(b);
+        } else if (b >= Hud.HOME_LIST_0) {
             handleListButton((b - Hud.HOME_LIST_0) / 4, (b - Hud.HOME_LIST_0) % 4);
         } else if (b >= Hud.HOME_ENDLESS_PLAY) {
             model.startEndless();
         } else if (b >= Hud.HOME_DIFF_0) {
             model.setEndlessDifficulty(b - Hud.HOME_DIFF_0);
-        } else if (b >= Hud.HOME_CHEST_0) {
-            model.openChests(Hud.CHEST_BATCHES[b - Hud.HOME_CHEST_0]); // ×1, ×5 ou ×10
         } else if (b >= Hud.HOME_TAB_0) {
             goToPage(b - Hud.HOME_TAB_0);
         } else if (b == Hud.HOME_PLAY) {
@@ -437,6 +440,33 @@ public class TouchController {
         }
     }
 
+    private static final int[] CHEST_BATCHES = {1, 5, 10}; // achats de coffres au Marché
+
+    // Jour local depuis 1970 (coffres gratuits du jour)
+    private static long today() {
+        long now = System.currentTimeMillis();
+        return (now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L;
+    }
+
+    // Fiche d'un mage : AMÉLIORER, UTILISER, changer d'artefact, FERMER
+    private void handleSheetButton(int b) {
+        int type = model.getSelectedMage();
+        switch (b) {
+            case Hud.HOME_SHEET_UPGRADE:
+                model.upgradeMage(type);
+                break;
+            case Hud.HOME_SHEET_USE:
+                model.useMage(type);
+                break;
+            case Hud.HOME_SHEET_ARTIFACT:
+                model.cycleArtifact(type);
+                break;
+            default:
+                model.closeMageSheet();
+                break;
+        }
+    }
+
     // Bouton d'une ligne de liste (Marché, Mages, Château)
     private void handleListButton(int row, int button) {
         menu.build(model.getHomePage(), model);
@@ -445,20 +475,33 @@ public class TouchController {
         }
         int a = menu.arg[row];
         switch (menu.kind[row]) {
-            case MenuList.MAGE:
-                if (button == MenuList.BTN_PORTRAIT) {
-                    model.toggleTeam(a);
-                } else if (button == MenuList.BTN_ARTIFACT) {
-                    model.cycleArtifact(a);
-                } else {
-                    model.upgradeMage(a); // +1 RANG
+            case MenuList.TEAM_ROW: {
+                int type = menu.cardType(row, button, model);
+                if (model.getSwappingMage() >= 0) {
+                    model.chooseTeamSlot(a + button); // le mage choisi prend cette place
+                } else if (type >= 0) {
+                    model.selectMage(type);
                 }
                 break;
-            case MenuList.SHOP_CHEST:
-                model.buyChest();
+            }
+            case MenuList.CARD_ROW:
+            case MenuList.LOCKED_ROW: {
+                int type = menu.cardType(row, button, model);
+                model.cancelSwap();
+                if (type >= 0) {
+                    model.selectMage(type);
+                }
                 break;
-            case MenuList.SHOP_UNIT:
-                model.buyUnit(a);
+            }
+            case MenuList.FREE_CHEST:
+                model.claimDailyChests(today());
+                break;
+            case MenuList.SHOP_CHEST:
+                if (model.getProgression().getChests(a) > 0) {
+                    model.openChests(a, button == 0 ? 1 : Integer.MAX_VALUE); // OUVRIR / TOUT OUVRIR
+                } else {
+                    model.buyChests(a, CHEST_BATCHES[button]);                 // ×1, ×5, ×10
+                }
                 break;
             case MenuList.SHOP_ULTIMATE:
                 model.buyUltimate(a);
@@ -499,6 +542,9 @@ public class TouchController {
                     return -1; // page encore en mouvement
                 }
                 int page = model.getHomePage();
+                if (page == GameModel.PAGE_MAGES && model.getSelectedMage() >= 0) {
+                    return hud.sheetButtonAt(x, y); // fiche ouverte : elle capte tous les touchers
+                }
                 int b = hud.homeButtonAt(page, x, y);
                 // Flèche de page sans page de ce côté : elle est cachée, donc inactive
                 if ((b == Hud.HOME_PREV_PAGE && !model.canChangeMapPage(-1))
@@ -523,7 +569,7 @@ public class TouchController {
                 int c = hud.chestButtonAt(x, y);
                 // OUVRIR ENCORE n'existe qu'à la fin de l'animation, s'il reste des coffres
                 if (c == Hud.CHEST_AGAIN && !(model.isChestRevealComplete()
-                        && model.getProgression().getChests() > 0)) {
+                        && model.getProgression().getChests(model.getProgression().getLastChestType()) > 0)) {
                     return Hud.CHEST_CONTINUE;
                 }
                 return c;
