@@ -78,6 +78,19 @@ public class Enemy {
         y += speed * speedMult * mult;
     }
 
+    // Bloqué par un chevalier : il ne bouge pas, mais ses états s'écoulent
+    public void hold() {
+        if (stunTimer > 0) {
+            stunTimer--;
+        }
+        if (slowTimer > 0) {
+            slowTimer--;
+            if (slowTimer == 0) {
+                slowFactor = 1f;
+            }
+        }
+    }
+
     // Ralentissement : le plus fort l'emporte
     public void slow(float factor, int frames) {
         if (slowTimer == 0 || factor < slowFactor) {

@@ -42,7 +42,7 @@ public class ContentV2Test {
         board.resize(400, 800);
         com.example.magicdefense.model.GameModel model = new com.example.magicdefense.model.GameModel(board);
         model.getProgression().addChests(1);
-        model.openUpgrades();
+        model.setHomePage(com.example.magicdefense.model.GameModel.PAGE_MAGES);
         assertTrue(model.openChest());
         assertEquals(com.example.magicdefense.model.GameState.CHEST_OPENING, model.getState());
 
@@ -62,7 +62,7 @@ public class ContentV2Test {
         model.tapChestOpening();                 // récapitulatif
         assertTrue(model.isChestRevealComplete());
         model.tapChestOpening();                 // fermer
-        assertEquals(com.example.magicdefense.model.GameState.UPGRADES, model.getState());
+        assertEquals(com.example.magicdefense.model.GameState.START, model.getState());
     }
 
     // ---------- Marché ----------
@@ -277,7 +277,7 @@ public class ContentV2Test {
         assertTrue(new Mage(Mage.POISON).getPoisonDps() > 0);
         assertEquals(0f, new Mage(Mage.FIRE).getPoisonDps(), 0f);
         assertTrue(new Mage(Mage.AIR).getKnockback() > 0);
-        assertTrue(new Mage(Mage.SUMMONER).getStunFrames() > 0);
+        assertTrue(new Mage(Mage.SUMMONER).getMaxKnights() > 0);
         assertTrue(Mage.isExclusive(Mage.SUMMONER));
         assertFalse(Mage.isExclusive(Mage.LIGHTNING));
     }

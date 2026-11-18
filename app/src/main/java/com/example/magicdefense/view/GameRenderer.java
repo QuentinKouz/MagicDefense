@@ -9,7 +9,11 @@ import android.graphics.Path;
 import android.graphics.RectF;
 
 import com.example.magicdefense.controller.TouchController;
+import com.example.magicdefense.model.Achievement;
+import com.example.magicdefense.model.Artifact;
 import com.example.magicdefense.model.Board;
+import com.example.magicdefense.model.Knight;
+import com.example.magicdefense.model.Ultimate;
 import com.example.magicdefense.model.Bolt;
 import com.example.magicdefense.model.Enemy;
 import com.example.magicdefense.model.GameModel;
@@ -54,6 +58,11 @@ public class GameRenderer {
     private final Random decorRandom = new Random();                   // décor de l'accueil (graine fixe par biome)
 
     private final Bitmap[] chestSprites = Sprites.buildChest();        // { couvercle, caisse }
+    private final Bitmap[] knightSprites = Sprites.buildKnight();      // { garde, coup d'épée }
+    private final Paint hitPaint = new Paint();                        // chevalier frappé : rougit
+    private final MenuList menu;                                       // lignes des listes (Marché, Mages, Château)
+    private final RectF rowRect = new RectF();
+    private final RectF btnRect = new RectF();
 
     private final AttackRenderer attacks;
     private final UiKit ui;                                            // boutons, fenêtres, rubans...
@@ -81,8 +90,11 @@ public class GameRenderer {
         impPaint.setColorFilter(new LightingColorFilter(0xFF6060, 0x400000));
         lockedPaint.setFilterBitmap(false);
         lockedPaint.setColorFilter(new LightingColorFilter(0x505060, 0x000000));
+        hitPaint.setFilterBitmap(false);
+        hitPaint.setColorFilter(new LightingColorFilter(0xFF8080, 0x400000));
         attacks = new AttackRenderer(density);
         ui = new UiKit(density);
+        menu = new MenuList(density);
     }
 
     // À appeler quand la taille de l'écran change (après board.resize et hud.resize)
@@ -104,7 +116,7 @@ public class GameRenderer {
 
         switch (model.getState()) {
             case START:
-                drawStartScreen(canvas, model, touch.getPressedMenuButton());
+                drawHome(canvas, model, touch, touch.getPressedMenuButton());
                 break;
             case PLAYING:
                 drawGame(canvas, model, touch, shakeProgress);
@@ -121,23 +133,55 @@ public class GameRenderer {
             case VICTORY:
                 drawVictoryScreen(canvas, model, touch);
                 break;
-            case UPGRADES:
-                drawUpgradesScreen(canvas, model, touch.getPressedMenuButton());
-                break;
             case CHEST_OPENING:
-                drawChestOpening(canvas, model, touch.getPressedMenuButton());
-                break;
-            case MARKET:
-                drawMarketScreen(canvas, model, touch.getPressedMenuButton());
+                drawChestOpening(canvas, model, touch, touch.getPressedMenuButton());
                 break;
         }
+        drawToast(canvas, model); // succès débloqué : par-dessus tous les écrans
     }
 
     // ---------- Écrans ----------
-    // Accueil : carte des niveaux reliés par un chemin, bulle, JOUER, options et son
+    // Accueil : décor, page courante (et sa voisine pendant un glissement), barre d'onglets
+    private void drawHome(Canvas canvas, GameModel model, TouchController touch, int pressed) {
+        drawBiomeBackground(canvas, model.getMapBiome()); // le décor change avec la page de la carte
+        int page = model.getHomePage();
+        float offset = touch.getPageOffset();
+        float w = board.width;
+        drawHomePage(canvas, model, touch, page, offset, pressed);
+        if (offset > 0 && page > 0) {
+            drawHomePage(canvas, model, touch, page - 1, offset - w, -1);
+        } else if (offset < 0 && page < GameModel.PAGE_COUNT - 1) {
+            drawHomePage(canvas, model, touch, page + 1, offset + w, -1);
+        }
+        drawTabBar(canvas, model, pressed);
+    }
+
+    private void drawHomePage(Canvas canvas, GameModel model, TouchController touch, int page, float dx, int pressed) {
+        canvas.save();
+        canvas.translate(dx, 0);
+        switch (page) {
+            case GameModel.PAGE_CAMPAIGN:
+                drawStartScreen(canvas, model, pressed);
+                break;
+            case GameModel.PAGE_MAGES:
+                drawMagesPage(canvas, model, touch.getScroll(page), pressed);
+                break;
+            case GameModel.PAGE_MARKET:
+                drawListPage(canvas, model, page, "MARCHÉ", Palette.MARKET, touch.getScroll(page), pressed);
+                break;
+            case GameModel.PAGE_ENDLESS:
+                drawEndlessPage(canvas, model, pressed);
+                break;
+            case GameModel.PAGE_CASTLE:
+                drawListPage(canvas, model, page, "CHÂTEAU", Palette.CASTLE_PAGE, touch.getScroll(page), pressed);
+                break;
+        }
+        canvas.restore();
+    }
+
+    // Campagne : carte des niveaux reliés par un chemin, bulle, JOUER, options et son
     private void drawStartScreen(Canvas canvas, GameModel model, int pressed) {
         int biome = model.getMapBiome();
-        drawBiomeBackground(canvas, biome); // le décor change avec la page de la carte
 
         // Titre en lettres dorées à contour (un peu plus petit sur un écran étroit, pour laisser
         // la place aux boutons du coin)
@@ -187,29 +231,6 @@ public class GameRenderer {
         }
 
         drawPillButton(canvas, hud.playButton, playText, Palette.RESUME, pressed == Hud.HOME_PLAY);
-
-        // Mode INFINI (avec le record) et écran MAGES (avec les coffres à ouvrir)
-        int best = model.getProgression().getBestEndlessWave();
-        drawTwoLineButton(canvas, hud.endlessButton, "INFINI",
-                best > 0 ? "Record : vague " + best : "Vagues sans fin",
-                Palette.ENDLESS, pressed == Hud.HOME_ENDLESS);
-        drawTwoLineButton(canvas, hud.upgradesButton, "MAGES", "Coffres, équipe",
-                Palette.MENU_BUTTON, pressed == Hud.HOME_UPGRADES);
-        drawTwoLineButton(canvas, hud.marketButton, "MARCHÉ",
-                model.getProgression().getGems() + " gemmes", Palette.MARKET, pressed == Hud.HOME_MARKET);
-        int chests = model.getProgression().getChests();
-        if (chests > 0) {
-            // Pastille dorée : des coffres attendent d'être ouverts
-            RectF u = hud.upgradesButton;
-            float br = 12 * density;
-            paint.setColor(Palette.GOLD);
-            canvas.drawCircle(u.right - 4 * density, u.top + 2 * density, br, paint);
-            paint.setColor(Palette.POPUP);
-            paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize((chests > 99 ? 9 : 12) * density);
-            canvas.drawText(chests > 999 ? "999+" : String.valueOf(chests),
-                    u.right - 4 * density, u.top + 6 * density, paint);
-        }
 
         // Options
         RectF o = hud.homeOptionsButton;
@@ -281,6 +302,11 @@ public class GameRenderer {
             drawCrown(canvas, cx, cy - r - 14 * density, 14 * density);
         }
 
+        // Niveau de nuit : petite lune à gauche du cercle
+        if (LevelSpec.isNightLevel(lv)) {
+            drawMoon(canvas, cx - r * 0.95f, cy - r * 0.75f, 9 * density);
+        }
+
         // Niveau à boss (10, 20, 30...) : étiquette rouge à droite du cercle
         if (lv % LevelSpec.BOSS_EVERY == 0) {
             paint.setTextSize(10 * density);
@@ -312,7 +338,7 @@ public class GameRenderer {
         }
         RectF n = hud.levelNodes[slot];
         LevelSpec spec = LevelSpec.forLevel(lv);
-        float bw = (spec.isGenerated() ? 150 : 130) * density;
+        float bw = (spec.isGenerated() ? (spec.nightLevel ? 184 : 150) : 130) * density;
         float bh = 46 * density;
         float crownSpace = (slot == GameModel.LEVELS_PER_PAGE) ? 30 * density : 0;
         float bottom = n.centerY() - 40 * density - crownSpace;
@@ -350,6 +376,9 @@ public class GameRenderer {
         canvas.drawText("Niveau " + lv, tmpRect.centerX(), tmpRect.centerY() - 2 * density, paint);
         paint.setTextSize(12 * density);
         String detail = spec.waves + " vagues";
+        if (spec.nightLevel) {
+            detail += " · NUIT";
+        }
         if (spec.hasBossLevel()) {
             detail += " · BOSS";
         } else if (spec.isGenerated()) {
@@ -409,6 +438,13 @@ public class GameRenderer {
                         p.top + 116 * density, 15);
             }
             drawChestsEarned(canvas, model.getLastChestsEarned(), p.top + 168 * density);
+            int diff = model.getSpec().endlessDifficulty;
+            String line = "Difficulté : " + LevelSpec.DIFFICULTY_NAMES[diff];
+            if (model.getLastBonusGems() > 0) {
+                line += " · +" + model.getLastBonusGems() + " gemmes";
+            }
+            ui.text(canvas, line, board.centerX(), p.top + 200 * density, 13, Palette.DIFFICULTY_COLORS[diff],
+                    Paint.Align.CENTER);
         } else {
             paint.setColor(Color.WHITE);
             drawCenteredText(canvas, "Niveau " + model.getLevel(), p.top + 86 * density, 18);
@@ -437,13 +473,21 @@ public class GameRenderer {
             canvas.drawRect(0, terrain.getWallTop(), board.width, board.gridTop, paint);
         }
 
-        drawGrid(canvas, model, dragged);
+        drawGrid(canvas, model, dragged, touch);
 
         // Zones au sol (lave, vapeur) sous les ennemis
         for (Zone z : model.getZones()) {
             attacks.drawZone(canvas, z);
         }
 
+        // Bouclier divin : dôme lumineux devant le rempart
+        if (model.isShielded()) {
+            drawShieldDome(canvas, model.getShield());
+        }
+
+        for (Knight k : model.getKnights()) {
+            drawKnight(canvas, k);
+        }
         for (Enemy enemy : model.getEnemies()) {
             drawEnemy(canvas, enemy, model.isStunned() || enemy.stunTimer > 0);
         }
@@ -467,11 +511,16 @@ public class GameRenderer {
             attacks.drawReaction(canvas, r);
         }
 
+        // Météorite : chute puis explosion
+        drawMeteor(canvas, model);
+
         drawRecruitButtons(canvas, model, touch.getPressedButton());
         drawTopInfo(canvas, model);
         drawBossBar(canvas, model);
         drawAnnounce(canvas, model);
+        drawSkillText(canvas, model);
         drawUltimateGauge(canvas, model);
+        drawGameButtons(canvas, model, touch.getPressedGameButton());
         drawShakeFeedback(canvas, model, shakeProgress);
         // Flash rouge quand le château est touché (s'estompe tout seul)
         float flash = model.getCastleHitFlash();
@@ -492,17 +541,34 @@ public class GameRenderer {
     }
 
     // ---------- Éléments ----------
-    private void drawGrid(Canvas canvas, GameModel model, Mage dragged) {
+    private void drawGrid(Canvas canvas, GameModel model, Mage dragged, TouchController touch) {
         for (int row = 0; row < Board.ROWS; row++) {
             for (int col = 0; col < Board.COLS; col++) {
                 float left = board.cellLeft(col);
                 float top = board.cellTop(row);
                 Mage mage = model.getMage(row, col);
 
+                // Case bloquée : chaînes, cadenas et prix en PO
+                if (model.isLocked(row, col)) {
+                    drawLockedCell(canvas, model, left, top,
+                            touch.getPressedLockedRow() == row && touch.getPressedLockedCol() == col);
+                    continue;
+                }
+
                 // (les cases elles-mêmes font partie du décor : dalles de la cour)
                 // Le mage en cours de déplacement n'est pas dessiné dans sa case
                 if (mage != null && mage != dragged) {
+                    if (model.isFury()) {
+                        // Rage arcanique : aura rouge qui palpite
+                        float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.3 + col);
+                        paint.setColor(Color.argb((int) (60 + 60 * pulse), 255, 70, 50));
+                        canvas.drawCircle(left + board.cellWidth / 2, top + board.cellHeight / 2,
+                                board.cellHeight * 0.45f, paint);
+                    }
                     drawMage(canvas, mage, left, top);
+                    if (mage.hasSkill()) {
+                        drawSkillRing(canvas, mage, left, top);
+                    }
                 }
 
                 // Pendant un glissement : indiquer où l'on peut lâcher
@@ -800,29 +866,287 @@ public class GameRenderer {
         canvas.drawArc(gaugeOval, 0, 360, false, paint);
 
         // Remplissage : part du haut (-90°) dans le sens des aiguilles d'une montre
-        paint.setColor(ready ? Palette.GOLD : Palette.GAUGE_CHARGING);
-        canvas.drawArc(gaugeOval, -90, 360 * model.getUltimateCharge(), false, paint);
+        // (pendant l'effet : la couleur de l'ultime, qui se vide)
+        int ult = model.getUltimateId();
+        int ultColor = Palette.ULTIMATE_COLORS[ult];
+        float active = model.isStunned() ? model.getStun() : model.isFury() ? model.getFury()
+                : model.isShielded() ? model.getShield() : model.isMeteorFalling() ? 1f : 0f;
+        if (active > 0) {
+            paint.setColor(ultColor);
+            canvas.drawArc(gaugeOval, -90, 360 * active, false, paint);
+        } else {
+            paint.setColor(ready ? Palette.GOLD : UiKit.shade(ultColor, 0.8f));
+            canvas.drawArc(gaugeOval, -90, 360 * model.getUltimateCharge(), false, paint);
+        }
 
         paint.setStyle(Paint.Style.FILL); // on remet le mode normal
 
         // Texte au centre (et en dessous quand c'est prêt)
-        paint.setTextAlign(Paint.Align.CENTER);
-        if (model.isStunned()) {
-            paint.setColor(Palette.STUNNED);
-            paint.setTextSize(14 * density);
-            canvas.drawText("STUN", cx, cy + 5 * density, paint);
+        String[] shortNames = {"STUN", "RAGE", "MÉTÉO", "ÉGIDE"};
+        if (active > 0) {
+            ui.text(canvas, shortNames[ult], cx, cy + 5 * density, 12, ultColor, Paint.Align.CENTER);
         } else if (ready) {
-            paint.setColor(Palette.GOLD);
-            paint.setTextSize(14 * density);
-            canvas.drawText("ULTI", cx, cy + 5 * density, paint);
-            paint.setTextSize(13 * density);
-            canvas.drawText("Secouez !", cx, cy + radius + 22 * density, paint);
+            ui.text(canvas, shortNames[ult], cx, cy + 5 * density, 12, Palette.GOLD, Paint.Align.CENTER);
+            ui.text(canvas, model.isAutoMode() ? "Auto" : "Secouez !", cx, cy + radius + 22 * density, 13,
+                    Palette.GOLD, Paint.Align.CENTER);
         } else {
-            paint.setColor(Color.WHITE);
-            paint.setTextSize(13 * density);
-            canvas.drawText(model.getUltimateKills() + "/" + GameModel.ULTIMATE_KILLS_REQUIRED,
-                    cx, cy + 5 * density, paint);
+            ui.text(canvas, model.getUltimateKills() + "/" + model.getUltimateKillsRequired(),
+                    cx, cy + 5 * density, 12, Color.WHITE, Paint.Align.CENTER);
         }
+    }
+
+    // ---------- Mise à jour : éléments de la partie ----------
+
+    // Case bloquée : dalle assombrie, chaînes en croix, cadenas et prix
+    private void drawLockedCell(Canvas canvas, GameModel model, float left, float top, boolean pressed) {
+        float m = 4 * density;
+        tmpRect.set(left + m, top + m, left + board.cellWidth - m, top + board.cellHeight - m);
+        paint.setColor(Color.argb(pressed ? 120 : 170, 10, 8, 20));
+        canvas.drawRoundRect(tmpRect, 8 * density, 8 * density, paint);
+        // Chaînes
+        paint.setColor(Color.argb(200, 150, 150, 165));
+        paint.setStrokeWidth(3 * density);
+        canvas.drawLine(tmpRect.left + 6 * density, tmpRect.top + 6 * density,
+                tmpRect.right - 6 * density, tmpRect.bottom - 6 * density, paint);
+        canvas.drawLine(tmpRect.right - 6 * density, tmpRect.top + 6 * density,
+                tmpRect.left + 6 * density, tmpRect.bottom - 6 * density, paint);
+        float cx = tmpRect.centerX();
+        float cy = tmpRect.top + tmpRect.height() * 0.36f;
+        float py = tmpRect.bottom - 5 * density; // (drawLock réutilise tmpRect : on retient la position avant)
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawCircle(cx, cy, 13 * density, paint);
+        drawLock(canvas, cx, cy, 7 * density);
+        // Prix : pièce + nombre (doré si on peut payer)
+        boolean can = model.canUnlockCell();
+        ui.coin(canvas, cx - 12 * density, py - 4.5f * density, 6 * density);
+        ui.text(canvas, String.valueOf(model.getUnlockCost()), cx - 3 * density, py, 13,
+                can ? Palette.GOLD : Palette.TEXT_INACTIVE, Paint.Align.LEFT);
+    }
+
+    // Compétence d'un mage de niveau 5 : anneau de recharge, puis étoile qui pulse quand c'est prêt
+    private void drawSkillRing(Canvas canvas, Mage mage, float left, float top) {
+        float cx = left + board.cellWidth - 14 * density;
+        float cy = top + 14 * density;
+        float r = 10 * density;
+        paint.setColor(Color.argb(210, 26, 22, 38));
+        canvas.drawCircle(cx, cy, r + 2 * density, paint);
+        if (mage.isSkillReady()) {
+            float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.2);
+            paint.setColor(Color.argb((int) (90 + 90 * pulse), 255, 215, 90));
+            canvas.drawCircle(cx, cy, r + (3 + 3 * pulse) * density, paint);
+            drawStar(canvas, cx, cy, r * 0.85f, true);
+        } else {
+            gaugeOval.set(cx - r, cy - r, cx + r, cy + r);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3 * density);
+            paint.setColor(Palette.GAUGE_EMPTY);
+            canvas.drawArc(gaugeOval, 0, 360, false, paint);
+            paint.setColor(Palette.ELEMENT_COLORS[mage.type]);
+            canvas.drawArc(gaugeOval, -90, 360 * mage.getSkillProgress(), false, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+    }
+
+    // Chevalier : sprite, coup d'épée en alternance quand il se bat, barre de vie
+    private void drawKnight(Canvas canvas, Knight k) {
+        int scale = Math.max(1, (int) (k.radius * 2.4f / Sprites.KNIGHT_HEIGHT));
+        float w = Sprites.KNIGHT_WIDTH * scale;
+        float h = Sprites.KNIGHT_HEIGHT * scale;
+        // Apparition : il grandit en sortant d'un cercle magique
+        float grow = Math.min(1f, k.age / 12f);
+        if (k.age < 20) {
+            paint.setColor(Color.argb((int) (160 * (1 - k.age / 20f)), 230, 110, 200));
+            canvas.drawCircle(k.x, k.y + h * 0.4f, k.radius * 1.6f, paint);
+        }
+        float bob = k.fighting ? 0 : (float) Math.sin(frame * 0.15 + k.x) * density;
+        tmpRect.set(k.x - w / 2 * grow, k.y - h / 2 * grow + bob, k.x + w / 2 * grow, k.y + h / 2 * grow + bob);
+        boolean strike = k.fighting && k.attackTimer > Knight.ATTACK_DELAY - 8;
+        canvas.drawBitmap(knightSprites[strike ? 1 : 0], null, tmpRect, k.hitTimer > 0 ? hitPaint : spritePaint);
+        // Barre de vie
+        float bw = k.radius * 2;
+        float bh = 3 * density;
+        float bl = k.x - k.radius;
+        float bt = tmpRect.top - bh - 3 * density;
+        paint.setColor(Color.DKGRAY);
+        canvas.drawRect(bl, bt, bl + bw, bt + bh, paint);
+        paint.setColor(Palette.KNIGHT_BAR);
+        canvas.drawRect(bl, bt, bl + bw * Math.max(0f, k.hp / k.maxHp), bt + bh, paint);
+    }
+
+    // Bouclier divin : dôme bleu translucide qui ondule devant le rempart
+    private void drawShieldDome(Canvas canvas, float t) {
+        float alpha = Math.min(1f, t * 4);
+        float top = board.gridTop - 70 * density;
+        float pulse = (float) Math.sin(frame * 0.15) * 4 * density;
+        tmpRect.set(board.playLeft - 30 * density, top - pulse, board.playRight() + 30 * density,
+                board.gridTop + 140 * density);
+        paint.setColor(Color.argb((int) (55 * alpha), 120, 200, 255));
+        canvas.drawOval(tmpRect, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4 * density);
+        paint.setColor(Color.argb((int) (200 * alpha), 170, 225, 255));
+        canvas.drawArc(tmpRect, 180, 180, false, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    // Météorite : boule de feu qui tombe en diagonale, puis grande explosion
+    private void drawMeteor(Canvas canvas, GameModel model) {
+        float tx = model.getMeteorX();
+        float ty = model.getMeteorY();
+        if (model.isMeteorFalling()) {
+            float t = model.getMeteorFall();
+            float sx = tx + board.playWidth * 0.6f;
+            float sy = -120 * density;
+            float x = sx + (tx - sx) * t;
+            float y = sy + (ty - sy) * t;
+            float r = (26 + 30 * t) * density;
+            // Ombre au sol qui grandit
+            paint.setColor(Color.argb((int) (120 * t), 0, 0, 0));
+            canvas.drawOval(tx - r * 1.4f, ty - r * 0.4f, tx + r * 1.4f, ty + r * 0.4f, paint);
+            // Traînée
+            for (int i = 1; i <= 6; i++) {
+                float k = i * 0.06f;
+                paint.setColor(Color.argb(150 - i * 20, 255, 160 - i * 15, 40));
+                canvas.drawCircle(x + (sx - tx) * k, y + (sy - ty) * k, r * (1 - i * 0.12f), paint);
+            }
+            paint.setColor(Palette.METEOR);
+            canvas.drawCircle(x, y, r, paint);
+            paint.setColor(Color.rgb(255, 230, 140));
+            canvas.drawCircle(x - r * 0.2f, y - r * 0.2f, r * 0.55f, paint);
+            paint.setColor(Color.rgb(110, 60, 40));
+            canvas.drawCircle(x + r * 0.3f, y + r * 0.25f, r * 0.22f, paint);
+        }
+        float b = model.getMeteorBlast();
+        if (b > 0) {
+            float p = 1 - b;
+            paint.setColor(Color.argb((int) (200 * b), 255, 200, 90));
+            canvas.drawCircle(tx, ty, board.playWidth * (0.2f + 0.6f * p), paint);
+            paint.setColor(Color.argb((int) (140 * b), 255, 255, 230));
+            canvas.drawRect(0, 0, board.width, board.height, paint);
+        }
+    }
+
+    // Nom de la compétence lancée, au-dessus du terrain
+    private void drawSkillText(Canvas canvas, GameModel model) {
+        float t = model.getSkillText();
+        if (t <= 0) {
+            return;
+        }
+        int alpha = (int) (255 * Math.min(1f, t * 3));
+        int c = Palette.ELEMENT_COLORS[model.getSkillTextType()];
+        float grow = t > 0.85f ? 1 + (t - 0.85f) * 2 : 1;
+        ui.text(canvas, model.getSkillTextString(), board.centerX(), 205 * density + board.topShift, 22 * grow,
+                Color.argb(alpha, Color.red(c), Color.green(c), Color.blue(c)), Paint.Align.CENTER);
+    }
+
+    // Boutons ronds de la partie : vitesse, mode automatique, soin, mage au hasard
+    private void drawGameButtons(Canvas canvas, GameModel model, int pressed) {
+        // Vitesse ×1 / ×2 / ×3
+        RectF s = hud.speedButton;
+        int speed = model.getGameSpeed();
+        ui.medallion(canvas, s.centerX(), s.centerY(), s.width() / 2,
+                speed > 1 ? Palette.MARKET : Palette.MENU_BUTTON, pressed == Hud.GAME_SPEED, 215);
+        ui.text(canvas, "×" + speed, s.centerX(), s.centerY() + 6 * density + sink(pressed == Hud.GAME_SPEED), 16,
+                Color.WHITE, Paint.Align.CENTER);
+
+        // Mode automatique (ultime et compétences)
+        RectF a = hud.autoButton;
+        boolean auto = model.isAutoMode();
+        ui.medallion(canvas, a.centerX(), a.centerY(), a.width() / 2, auto ? Palette.RESUME : Palette.MENU_BUTTON,
+                pressed == Hud.GAME_AUTO, 215);
+        ui.text(canvas, "AUTO", a.centerX(), a.centerY() + 4 * density + sink(pressed == Hud.GAME_AUTO), 11,
+                auto ? Color.WHITE : Palette.TEXT_INACTIVE, Paint.Align.CENTER);
+
+        // Soin du château (3 au maximum)
+        RectF h = hud.healButton;
+        boolean canHeal = model.canHeal();
+        boolean healsLeft = model.getHealsLeft() > 0;
+        ui.medallion(canvas, h.centerX(), h.centerY(), h.width() / 2, canHeal ? Palette.HEAL : Palette.DISABLED,
+                canHeal && pressed == Hud.GAME_HEAL, 215);
+        float hy = h.centerY() + sink(canHeal && pressed == Hud.GAME_HEAL);
+        paint.setColor(canHeal ? Color.WHITE : Palette.ICON_DISABLED);
+        float arm = 4 * density;
+        float len = 12 * density;
+        canvas.drawRect(h.centerX() - arm, hy - len, h.centerX() + arm, hy + len, paint);
+        canvas.drawRect(h.centerX() - len, hy - arm, h.centerX() + len, hy + arm, paint);
+        drawPriceTag(canvas, h, healsLeft ? String.valueOf(model.getHealCost()) : "—", canHeal,
+                model.getHealsLeft() + "/" + GameModel.MAX_HEALS);
+
+        // Mage au hasard, moins cher
+        RectF r = hud.randomButton;
+        boolean canRandom = model.canRecruitRandom() && model.hasFreeCell();
+        ui.medallion(canvas, r.centerX(), r.centerY(), r.width() / 2, canRandom ? Palette.ENDLESS : Palette.DISABLED,
+                canRandom && pressed == Hud.GAME_RANDOM, 215);
+        drawDice(canvas, r.centerX(), r.centerY() + sink(canRandom && pressed == Hud.GAME_RANDOM), 11 * density,
+                canRandom);
+        drawPriceTag(canvas, r, String.valueOf(GameModel.RANDOM_MAGE_COST), canRandom, null);
+    }
+
+    // Prix en PO sous un bouton rond (et petite mention à droite, ex. soins restants)
+    private void drawPriceTag(Canvas canvas, RectF b, String price, boolean can, String extra) {
+        float y = b.bottom + 14 * density;
+        ui.coin(canvas, b.centerX() - 9 * density, y - 4.5f * density, 5.5f * density);
+        ui.text(canvas, price, b.centerX() - 1 * density, y, 12, can ? Palette.GOLD : Palette.TEXT_INACTIVE,
+                Paint.Align.LEFT);
+        if (extra != null) {
+            ui.text(canvas, extra, b.right + 2 * density, b.top + 10 * density, 10, Color.WHITE, Paint.Align.LEFT);
+        }
+    }
+
+    // Dé : carré arrondi blanc avec 5 points
+    private void drawDice(Canvas canvas, float cx, float cy, float s, boolean enabled) {
+        tmpRect.set(cx - s, cy - s, cx + s, cy + s);
+        paint.setColor(enabled ? Color.WHITE : Palette.ICON_DISABLED);
+        canvas.drawRoundRect(tmpRect, s * 0.3f, s * 0.3f, paint);
+        paint.setColor(UiKit.OUTLINE);
+        float o = s * 0.5f;
+        float pr = s * 0.17f;
+        canvas.drawCircle(cx, cy, pr, paint);
+        canvas.drawCircle(cx - o, cy - o, pr, paint);
+        canvas.drawCircle(cx + o, cy - o, pr, paint);
+        canvas.drawCircle(cx - o, cy + o, pr, paint);
+        canvas.drawCircle(cx + o, cy + o, pr, paint);
+    }
+
+    // Lune (niveau de nuit)
+    private void drawMoon(Canvas canvas, float cx, float cy, float r) {
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawCircle(cx, cy, r + 1.5f * density, paint);
+        paint.setColor(Palette.NIGHT_LEVEL);
+        canvas.drawCircle(cx, cy, r, paint);
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawCircle(cx + r * 0.45f, cy - r * 0.3f, r * 0.8f, paint);
+    }
+
+    // Bandeau « succès débloqué » en haut de l'écran
+    private void drawToast(Canvas canvas, GameModel model) {
+        int id = model.getToastId();
+        if (id < 0) {
+            return;
+        }
+        float t = model.getToast(); // 1 → 0
+        float slide = t > 0.9f ? (1 - t) * 10 : t < 0.1f ? t * 10 : 1; // descend, reste, remonte
+        float h = 58 * density;
+        float top = board.topShift + 8 * density - (1 - slide) * (h + 20 * density);
+        tmpRect.set(board.playLeft + 16 * density, top, board.playRight() - 16 * density, top + h);
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawRoundRect(tmpRect, 12 * density, 12 * density, paint);
+        tmpRect.inset(2 * density, 2 * density);
+        paint.setColor(UiKit.GOLD_DARK);
+        canvas.drawRoundRect(tmpRect, 10 * density, 10 * density, paint);
+        tmpRect.inset(2 * density, 2 * density);
+        paint.setColor(UiKit.SLATE_TOP);
+        canvas.drawRoundRect(tmpRect, 9 * density, 9 * density, paint);
+        drawStar(canvas, tmpRect.left + 22 * density, tmpRect.centerY(), 13 * density, true);
+        float tx = tmpRect.left + 44 * density;
+        float maxW = tmpRect.right - tx - 64 * density;
+        ui.textPx(canvas, "Succès : " + Achievement.NAMES[id], tx, tmpRect.centerY() - 3 * density, 15 * density,
+                Palette.ACHIEVEMENT, Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, Achievement.description(id), tx, tmpRect.centerY() + 14 * density, 11 * density,
+                Color.WHITE, Paint.Align.LEFT, maxW);
+        drawGem(canvas, tmpRect.right - 46 * density, tmpRect.centerY() - 1 * density, 8 * density);
+        ui.text(canvas, "+" + Achievement.reward(id), tmpRect.right - 34 * density, tmpRect.centerY() + 6 * density,
+                16, Palette.GEM, Paint.Align.LEFT);
     }
 
     // Feedback de secousse : grand anneau au centre de la zone de jeu
@@ -901,6 +1225,11 @@ public class GameRenderer {
         // Fenêtre
         RectF p = hud.pausePopup;
         ui.panel(canvas, p, "PAUSE", UiKit.RIBBON);
+        // Partie reprise après la fermeture de l'appli : elle repart au début de la vague
+        if (model.isResumed()) {
+            ui.text(canvas, "Partie reprise · vague " + model.getWave(), board.centerX(), p.top + 60 * density, 13,
+                    Palette.GOLD, Paint.Align.CENTER);
+        }
 
         int pressed = touch.getPressedMenuButton();
 
@@ -988,7 +1317,7 @@ public class GameRenderer {
     private void drawOptionsScreen(Canvas canvas, GameModel model, TouchController touch) {
         // Derrière la fenêtre : l'écran d'où l'on vient (carte ou partie en pause)
         if (model.getOptionsReturnState() == GameState.START) {
-            drawStartScreen(canvas, model, -1); // -1 : aucun bouton de la carte n'est appuyé
+            drawHome(canvas, model, touch, -1); // -1 : aucun bouton de l'accueil n'est appuyé
         } else {
             drawGame(canvas, model, touch, 0);
         }
@@ -1099,6 +1428,20 @@ public class GameRenderer {
         // Coffres gagnés, sous les étoiles (juste au-dessus des boutons)
         if (stateFrames >= 60) { // après l'apparition des étoiles
             drawChestsEarned(canvas, model.getLastChestsEarned(), p.top + 186 * density);
+            // Boss vaincu pour la première fois : un artefact
+            int art = model.getLastArtifact();
+            if (art != Artifact.NONE) {
+                float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12);
+                ui.textPx(canvas, "Artefact : " + Artifact.NAMES[art], board.centerX(), p.top + 214 * density,
+                        15 * density, UiKit.tint(Palette.ARTIFACT, 0.3f * pulse), Paint.Align.CENTER,
+                        p.width() - 24 * density);
+                ui.textPx(canvas, Palette.ELEMENT_NAMES[Artifact.typeOf(art)] + " · " + Artifact.DESCRIPTIONS[art],
+                        board.centerX(), p.top + 232 * density, 11 * density, Color.WHITE, Paint.Align.CENTER,
+                        p.width() - 24 * density);
+            } else if (model.getLastArtifactGems() > 0) {
+                ui.text(canvas, "Tous les artefacts : +" + model.getLastArtifactGems() + " gemmes", board.centerX(),
+                        p.top + 222 * density, 14, Palette.GEM, Paint.Align.CENTER);
+            }
         }
 
         // Étoiles : elles apparaissent une par une, avec un petit effet "pop"
@@ -1304,92 +1647,357 @@ public class GameRenderer {
         canvas.restore();
     }
 
-    // Écran MAGES : ouvrir les coffres et améliorer chaque élément de façon permanente
-    private void drawUpgradesScreen(Canvas canvas, GameModel model, int pressed) {
-        Progression prog = model.getProgression();
+    // =====================================================================
+    //  Accueil : onglets et pages (Marché, Mages, Infini, Château)
+    // =====================================================================
+    private static final String[] TAB_NAMES = {"Marché", "Mages", "Campagne", "Infini", "Château"};
 
-        drawStartScreen(canvas, model, -1); // la carte reste visible derrière
-        paint.setColor(Color.argb(160, 0, 0, 0));
-        canvas.drawRect(0, 0, board.width, board.height, paint);
-
-        RectF p = hud.upgradesPopup;
-        ui.panel(canvas, p, "MAGES", UiKit.RIBBON);
-
-        // Pages (4 mages par page) : flèches de part et d'autre de RETOUR
-        int pages = model.getUpgradePageCount();
-        if (pages > 1) {
-            RectF back = hud.upgradeButtons[Hud.UPGRADE_BACK];
-            ui.text(canvas, "Page " + (model.getUpgradePage() + 1) + " / " + pages, board.centerX(),
-                    back.top - 6 * density, 11, Palette.TEXT_INACTIVE, Paint.Align.CENTER);
-            if (model.canChangeUpgradePage(-1)) {
-                drawPageArrow(canvas, hud.upgradeButtons[Hud.UPGRADE_PREV], false, pressed == Hud.UPGRADE_PREV);
+    // Barre d'onglets : l'onglet de la page affichée est en relief et doré
+    private void drawTabBar(Canvas canvas, GameModel model, int pressed) {
+        RectF bar = hud.tabBar;
+        tmpRect.set(bar.left - 4 * density, bar.top - 4 * density, bar.right + 4 * density, bar.bottom + 4 * density);
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawRoundRect(tmpRect, 12 * density, 12 * density, paint);
+        tmpRect.inset(2 * density, 2 * density);
+        paint.setColor(UiKit.WOOD_DARK);
+        canvas.drawRoundRect(tmpRect, 10 * density, 10 * density, paint);
+        int page = model.getHomePage();
+        for (int i = 0; i < GameModel.PAGE_COUNT; i++) {
+            RectF b = hud.tabButtons[i];
+            boolean sel = i == page;
+            RectF f;
+            if (sel) {
+                f = ui.button(canvas, b, UiKit.GOLD_DARK, pressed == Hud.HOME_TAB_0 + i, true);
+            } else {
+                tmpRect.set(b);
+                tmpRect.inset(2 * density, 4 * density);
+                if (pressed == Hud.HOME_TAB_0 + i) {
+                    paint.setColor(Color.argb(60, 255, 255, 255));
+                    canvas.drawRoundRect(tmpRect, 8 * density, 8 * density, paint);
+                }
+                f = tmpRect;
             }
-            if (model.canChangeUpgradePage(1)) {
-                drawPageArrow(canvas, hud.upgradeButtons[Hud.UPGRADE_NEXT], true, pressed == Hud.UPGRADE_NEXT);
-            }
+            float cx = f.centerX();
+            float cy = f.centerY() - 7 * density;
+            float labelY = f.bottom - 5 * density; // (l'icône réutilise tmpRect : on retient la position avant)
+            drawTabIcon(canvas, i, cx, cy, (sel ? 13 : 11) * density, model);
+            ui.textPx(canvas, TAB_NAMES[i], cx, labelY, (sel ? 11 : 10) * density,
+                    sel ? Color.WHITE : Palette.TEXT_INACTIVE, Paint.Align.CENTER, b.width() - 4 * density);
         }
+        // Pastille : des coffres attendent sur la page Mages
+        int chests = model.getProgression().getChests();
+        if (chests > 0) {
+            RectF u = hud.tabButtons[GameModel.PAGE_MAGES];
+            drawBadge(canvas, u.right - 10 * density, u.top + 6 * density, chests > 999 ? "999+" : String.valueOf(chests));
+        }
+    }
 
-        // --- Coffres et gemmes ---
+    private void drawBadge(Canvas canvas, float x, float y, String text) {
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawCircle(x, y, 12 * density, paint);
+        paint.setColor(Palette.QUIT);
+        canvas.drawCircle(x, y, 10.5f * density, paint);
+        ui.textPx(canvas, text, x, y + 4 * density, (text.length() > 2 ? 8 : 11) * density, Color.WHITE,
+                Paint.Align.CENTER, 20 * density);
+    }
+
+    private void drawTabIcon(Canvas canvas, int tab, float cx, float cy, float s, GameModel model) {
+        switch (tab) {
+            case GameModel.PAGE_MARKET:
+                drawGem(canvas, cx, cy, s * 0.9f);
+                break;
+            case GameModel.PAGE_MAGES: {
+                float sw = s * 2.2f;
+                float sh = sw * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
+                spriteRect.set(cx - sw / 2, cy - sh / 2, cx + sw / 2, cy + sh / 2);
+                canvas.drawBitmap(mageSprites[Mage.FIRE][2], null, spriteRect, spritePaint);
+                break;
+            }
+            case GameModel.PAGE_CAMPAIGN:
+                drawCrown(canvas, cx, cy, s);
+                break;
+            case GameModel.PAGE_ENDLESS:
+                ui.textPx(canvas, "∞", cx, cy + s * 0.7f, s * 2.2f, Palette.ENDLESS_TEXT, Paint.Align.CENTER, 0);
+                break;
+            case GameModel.PAGE_CASTLE:
+                drawTower(canvas, cx, cy, s);
+                break;
+        }
+    }
+
+    // Tour de château : corps, créneaux et porte
+    private void drawTower(Canvas canvas, float cx, float cy, float s) {
+        paint.setColor(UiKit.OUTLINE);
+        tmpRect.set(cx - s * 0.8f, cy - s * 0.6f, cx + s * 0.8f, cy + s);
+        canvas.drawRect(tmpRect, paint);
+        for (int i = 0; i < 3; i++) {
+            float x = cx - s * 0.8f + i * s * 0.6f;
+            canvas.drawRect(x, cy - s, x + s * 0.4f, cy - s * 0.5f, paint);
+        }
+        paint.setColor(Color.rgb(170, 170, 185));
+        tmpRect.inset(s * 0.12f, s * 0.12f);
+        canvas.drawRect(tmpRect, paint);
+        for (int i = 0; i < 3; i++) {
+            float x = cx - s * 0.8f + i * s * 0.6f + s * 0.1f;
+            canvas.drawRect(x, cy - s * 0.9f, x + s * 0.2f, cy - s * 0.5f, paint);
+        }
+        paint.setColor(UiKit.WOOD);
+        canvas.drawRect(cx - s * 0.25f, cy + s * 0.25f, cx + s * 0.25f, cy + s * 0.88f, paint);
+    }
+
+    // Titre de la page (ruban) et réserves : gemmes et coffres
+    private void drawPageHeader(Canvas canvas, GameModel model, String title, int color) {
+        float cx = board.centerX();
+        ui.ribbon(canvas, cx, board.topShift + 52 * density, Math.min(board.playWidth * 0.62f, 230 * density),
+                title, color);
+        Progression prog = model.getProgression();
+        String gems = String.valueOf(prog.getGems());
+        String chests = String.valueOf(prog.getChests());
+        float y = board.topShift + 96 * density;
+        drawGem(canvas, cx - 70 * density, y - 5 * density, 8 * density);
+        ui.text(canvas, gems, cx - 58 * density, y, 16, Palette.GEM, Paint.Align.LEFT);
+        drawChest(canvas, cx + 24 * density, y - 9 * density, 10 * density, 0);
+        ui.text(canvas, chests, cx + 40 * density, y, 16, Palette.GOLD, Paint.Align.LEFT);
+    }
+
+    // Page Mages : coffres (×1, ×5, ×10) puis la liste des mages
+    private void drawMagesPage(Canvas canvas, GameModel model, float scroll, int pressed) {
+        Progression prog = model.getProgression();
+        drawPageHeader(canvas, model, "MAGES", UiKit.RIBBON);
+
         RectF c = hud.chestRow;
         ui.inset(canvas, c);
-
         int chests = prog.getChests();
         // Des coffres à ouvrir : le coffre se dandine pour attirer l'œil
         float wiggle = chests > 0 && (frame % 120) < 24 ? (float) Math.sin(frame * 0.8) * 6 : 0;
         canvas.save();
         canvas.rotate(wiggle, c.left + 36 * density, c.centerY() + 10 * density);
-        drawChest(canvas, c.left + 36 * density, c.centerY() + 4 * density, 20 * density, 0);
+        drawChest(canvas, c.left + 36 * density, c.centerY() + 2 * density, 20 * density, 0);
         canvas.restore();
-
-        float tx = c.left + 70 * density;
-        float textRight = hud.upgradeButtons[Hud.UPGRADE_OPEN_CHEST].left - 8 * density;
-        ui.textPx(canvas, "Coffres : " + chests, tx, c.centerY() - 2 * density, 17 * density, Color.WHITE,
+        float tx = c.left + 66 * density;
+        float textRight = hud.chestButtons[0].left - 6 * density;
+        ui.textPx(canvas, "Coffres", tx, c.centerY() - 4 * density, 15 * density, Color.WHITE,
                 Paint.Align.LEFT, textRight - tx);
-        // Gemmes (pour le Marché)
-        float gy = c.centerY() + 16 * density;
-        drawGem(canvas, tx + 6 * density, gy - 4 * density, 6 * density);
-        ui.textPx(canvas, prog.getGems() + " gemmes", tx + 16 * density, gy, 13 * density, Palette.GEM,
-                Paint.Align.LEFT, textRight - tx - 16 * density);
-
-        boolean canOpen = chests > 0;
-        drawSmallButton(canvas, hud.upgradeButtons[Hud.UPGRADE_OPEN_CHEST], "OUVRIR",
-                canOpen ? Palette.RESUME : Palette.DISABLED, canOpen && pressed == Hud.UPGRADE_OPEN_CHEST, 15);
-
-        // --- Consigne ---
-        paint.setColor(Palette.TEXT_INACTIVE);
-        drawCenteredText(canvas, "Touchez un portrait pour composer l'équipe ("
-                + prog.teamCount() + "/" + Progression.TEAM_SIZE + ")", c.bottom + 24 * density, 12);
-        if (prog.ownedCount() < Mage.TYPE_COUNT) {
-            drawCenteredText(canvas, "Coffres : fin de niveau et mode infini", c.bottom + 40 * density, 11);
+        ui.textPx(canvas, chests + " à ouvrir", tx, c.centerY() + 14 * density, 12 * density, Palette.GOLD,
+                Paint.Align.LEFT, textRight - tx);
+        for (int i = 0; i < Hud.CHEST_BATCHES.length; i++) {
+            // ×5 et ×10 ouvrent ce qu'il reste s'il y a moins de coffres
+            int batch = Hud.CHEST_BATCHES[i];
+            drawSmallButton(canvas, hud.chestButtons[i], "×" + batch,
+                    chests > 0 ? Palette.RESUME : Palette.DISABLED, pressed == Hud.HOME_CHEST_0 + i, 15);
         }
 
-        // --- Une ligne par mage possédé (4 par page) ---
-        for (int row = 0; row < Hud.UPGRADE_ROWS; row++) {
-            int type = model.upgradeTypeAtRow(row);
-            if (type != -1) {
-                drawUpgradeRow(canvas, prog, row, type, pressed == row, pressed == Hud.UPGRADE_TEAM_0 + row);
-            }
-        }
-
-        drawPillButton(canvas, hud.upgradeButtons[Hud.UPGRADE_BACK], "RETOUR",
-                Palette.MENU_BUTTON, pressed == Hud.UPGRADE_BACK);
+        drawList(canvas, model, GameModel.PAGE_MAGES, hud.magesViewport, scroll, pressed);
     }
 
-    // Une ligne de l'écran MAGES : portrait (équipe), rang, bonus, barre de fragments, bouton +1 RANG
-    private void drawUpgradeRow(Canvas canvas, Progression prog, int row, int type,
-                                boolean pressed, boolean portraitPressed) {
-        RectF r = hud.upgradeRows[row];
-        RectF btn = hud.upgradeButtons[row];
+    // Pages Marché et Château : titre, réserves, liste qui défile
+    private void drawListPage(Canvas canvas, GameModel model, int page, String title, int color, float scroll,
+                              int pressed) {
+        drawPageHeader(canvas, model, title, color);
+        drawList(canvas, model, page, hud.listViewport, scroll, pressed);
+    }
+
+    // Liste qui défile : seules les lignes visibles sont dessinées, dans la zone de la liste
+    private void drawList(Canvas canvas, GameModel model, int page, RectF vp, float scroll, int pressed) {
+        menu.build(page, model);
+        canvas.save();
+        canvas.clipRect(vp.left - 4 * density, vp.top, vp.right + 4 * density, vp.bottom);
+        for (int i = 0; i < menu.count; i++) {
+            menu.rowRect(i, vp, scroll, rowRect);
+            if (rowRect.bottom < vp.top || rowRect.top > vp.bottom) {
+                continue;
+            }
+            int base = Hud.HOME_LIST_0 + i * 4;
+            drawListRow(canvas, model, i, new RectF(rowRect), pressed - base);
+        }
+        canvas.restore();
+        // Fondu en haut et en bas (le contenu glisse sous les bords) et barre de défilement
+        float max = menu.maxScroll(vp.height());
+        if (max > 0) {
+            float trackH = vp.height();
+            float thumbH = Math.max(30 * density, trackH * vp.height() / (vp.height() + max));
+            float thumbTop = vp.top + (trackH - thumbH) * (scroll / max);
+            paint.setColor(Color.argb(90, 255, 255, 255));
+            tmpRect.set(vp.right + 1 * density, thumbTop, vp.right + 4 * density, thumbTop + thumbH);
+            canvas.drawRoundRect(tmpRect, 2 * density, 2 * density, paint);
+        }
+    }
+
+    // Une ligne de liste ; pressedButton = bouton appuyé dans cette ligne (BTN_xxx), sinon autre valeur
+    private void drawListRow(Canvas canvas, GameModel model, int i, RectF r, int pressedButton) {
+        Progression prog = model.getProgression();
+        int a = menu.arg[i];
+        boolean mainPressed = pressedButton == MenuList.BTN_MAIN;
+        switch (menu.kind[i]) {
+            case MenuList.HEADER:
+                ui.text(canvas, menu.text[i], r.left + 6 * density, r.bottom - 10 * density, 15, Palette.GOLD,
+                        Paint.Align.LEFT);
+                paint.setColor(Color.argb(80, 240, 192, 64));
+                canvas.drawRect(r.left + 6 * density, r.bottom - 4 * density, r.right - 6 * density,
+                        r.bottom - 3 * density, paint);
+                return;
+            case MenuList.INFO:
+                ui.textPx(canvas, menu.text[i], r.centerX(), r.centerY() + 4 * density, 11 * density,
+                        Palette.TEXT_INACTIVE, Paint.Align.CENTER, r.width());
+                return;
+            case MenuList.MAGE:
+                drawMageRow(canvas, prog, i, a, r, pressedButton);
+                return;
+            case MenuList.ACHIEVEMENT:
+                drawAchievementRow(canvas, model, a, r);
+                return;
+        }
+
+        ui.inset(canvas, r);
+        menu.buttonRect(i, MenuList.BTN_MAIN, r, btnRect);
+        float iconCx = r.left + 36 * density;
+        float iconCy = r.centerY();
+        float tx = r.left + 74 * density;
+        float maxW = btnRect.left - 8 * density - tx;
+        String title = "";
+        String desc = "";
+        String status = "";
+        int titleColor = Color.WHITE;
+        int statusColor = Palette.TEXT_INACTIVE;
+
+        switch (menu.kind[i]) {
+            case MenuList.SHOP_CHEST:
+                drawChest(canvas, iconCx, iconCy - 4 * density, 22 * density, 0);
+                title = "Coffre magique";
+                titleColor = Palette.GOLD;
+                desc = "3 lots de fragments et 1 à 3 gemmes";
+                status = "Vous en avez " + prog.getChests();
+                drawPriceButton(canvas, btnRect, Progression.CHEST_PRICE, prog.canBuyChest(), mainPressed);
+                break;
+            case MenuList.SHOP_UNIT: {
+                boolean owned = prog.isOwned(a);
+                float box = 56 * density;
+                float sh = box * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
+                spriteRect.set(iconCx - box / 2, iconCy - sh / 2, iconCx + box / 2, iconCy + sh / 2);
+                canvas.drawBitmap(mageSprites[a][2], null, spriteRect, owned ? spritePaint : lockedPaint);
+                title = Palette.ELEMENT_NAMES[a];
+                titleColor = Palette.ELEMENT_COLORS[a];
+                desc = Palette.ELEMENT_DESCRIPTIONS[a];
+                if (owned) {
+                    statusColor = Palette.TEAM;
+                    status = prog.isInTeam(a) ? "Dans l'équipe" : "À ajouter à l'équipe (Mages)";
+                    drawSmallButton(canvas, btnRect, "ACQUIS", Palette.TEAM, false, 13);
+                } else {
+                    status = prog.canBuy(a) ? "Unité exclusive" : "Il manque " + (Progression.price(a) - prog.getGems()) + " gemmes";
+                    statusColor = prog.canBuy(a) ? Palette.GOLD : Palette.TEXT_INACTIVE;
+                    drawPriceButton(canvas, btnRect, Progression.price(a), prog.canBuy(a), mainPressed);
+                }
+                break;
+            }
+            case MenuList.SHOP_ULTIMATE: {
+                boolean owned = prog.ownsUltimate(a);
+                drawUltimateIcon(canvas, a, iconCx, iconCy, 24 * density, owned);
+                title = Ultimate.NAMES[a];
+                titleColor = Palette.ULTIMATE_COLORS[a];
+                desc = Ultimate.DESCRIPTIONS[a];
+                if (owned) {
+                    statusColor = Palette.TEAM;
+                    status = prog.getEquippedUltimate() == a ? "Équipé" : "À équiper (page Château)";
+                    drawSmallButton(canvas, btnRect, "ACQUIS", Palette.TEAM, false, 13);
+                } else {
+                    status = "Jauge : " + Ultimate.killsRequired(a) + " gobelins";
+                    drawPriceButton(canvas, btnRect, Ultimate.price(a), prog.canBuyUltimate(a), mainPressed);
+                }
+                break;
+            }
+            case MenuList.SHOP_SPEED: {
+                ui.medallion(canvas, iconCx, iconCy, 24 * density, Palette.MARKET, false, 255);
+                ui.text(canvas, "×3", iconCx, iconCy + 7 * density, 19, Color.WHITE, Paint.Align.CENTER);
+                title = "Vitesse ×3";
+                titleColor = Palette.GOLD;
+                desc = "Bouton de vitesse en partie : ×1, ×2, ×3";
+                if (prog.hasSpeed3()) {
+                    statusColor = Palette.TEAM;
+                    status = "Achat définitif";
+                    drawSmallButton(canvas, btnRect, "ACQUIS", Palette.TEAM, false, 13);
+                } else {
+                    status = "Achat définitif (×2 est gratuit)";
+                    drawPriceButton(canvas, btnRect, Progression.SPEED3_PRICE, prog.canBuySpeed3(), mainPressed);
+                }
+                break;
+            }
+            case MenuList.CASTLE_HP: {
+                drawTower(canvas, iconCx, iconCy, 20 * density);
+                int lv = prog.getCastleHpLevel();
+                boolean max = lv >= Progression.CASTLE_HP_MAX_LEVEL;
+                int now = Math.round(GameModel.CASTLE_MAX_HP * prog.castleHpMultiplier());
+                int next = Math.round(GameModel.CASTLE_MAX_HP * (prog.castleHpMultiplier() + Progression.CASTLE_HP_PER_LEVEL));
+                title = "Remparts renforcés";
+                titleColor = Palette.CASTLE;
+                desc = max ? "PV max : " + now : "PV max : " + now + " → " + next;
+                status = "Niveau " + lv + " / " + Progression.CASTLE_HP_MAX_LEVEL;
+                if (max) {
+                    drawSmallButton(canvas, btnRect, "MAX", Palette.TEAM, false, 14);
+                } else {
+                    drawPriceButton(canvas, btnRect, prog.castleHpCost(), prog.canUpgradeCastleHp(), mainPressed);
+                }
+                break;
+            }
+            case MenuList.CASTLE_RES: {
+                ui.medallion(canvas, iconCx, iconCy, 22 * density, Palette.SHIELD, false, 255);
+                drawShieldGlyph(canvas, iconCx, iconCy, 12 * density);
+                int lv = prog.getCastleResLevel();
+                boolean max = lv >= Progression.CASTLE_RES_MAX_LEVEL;
+                int pct = Math.round(Progression.CASTLE_RES_PER_LEVEL * lv * 100);
+                title = "Pierres enchantées";
+                titleColor = Palette.SHIELD;
+                desc = max ? "Dégâts subis −" + pct + " %"
+                        : "Dégâts subis −" + pct + " % → −" + (pct + Math.round(Progression.CASTLE_RES_PER_LEVEL * 100)) + " %";
+                status = "Niveau " + lv + " / " + Progression.CASTLE_RES_MAX_LEVEL;
+                if (max) {
+                    drawSmallButton(canvas, btnRect, "MAX", Palette.TEAM, false, 14);
+                } else {
+                    drawPriceButton(canvas, btnRect, prog.castleResCost(), prog.canUpgradeCastleRes(), mainPressed);
+                }
+                break;
+            }
+            case MenuList.ULTIMATE: {
+                boolean owned = prog.ownsUltimate(a);
+                boolean equipped = prog.getEquippedUltimate() == a;
+                drawUltimateIcon(canvas, a, iconCx, iconCy, 22 * density, owned);
+                title = Ultimate.NAMES[a];
+                titleColor = owned ? Palette.ULTIMATE_COLORS[a] : Palette.TEXT_INACTIVE;
+                desc = Ultimate.DESCRIPTIONS[a];
+                status = "Jauge : " + Ultimate.killsRequired(a) + " gobelins";
+                if (equipped) {
+                    paint.setColor(Palette.TEAM);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(2.5f * density);
+                    canvas.drawRoundRect(r, 10 * density, 10 * density, paint);
+                    paint.setStyle(Paint.Style.FILL);
+                    drawSmallButton(canvas, btnRect, "ÉQUIPÉ", Palette.TEAM, false, 13);
+                } else if (owned) {
+                    drawSmallButton(canvas, btnRect, "ÉQUIPER", Palette.RESUME, mainPressed, 13);
+                } else {
+                    drawSmallButton(canvas, btnRect, "MARCHÉ", Palette.MARKET, mainPressed, 13);
+                }
+                break;
+            }
+        }
+        boolean tall = r.height() > 80 * density;
+        float y0 = r.top + (tall ? 28 : 24) * density;
+        float step = (tall ? 20 : 18) * density;
+        ui.textPx(canvas, title, tx, y0, 16 * density, titleColor, Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, desc, tx, y0 + step, 11.5f * density, Color.WHITE, Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, status, tx, y0 + 2 * step, 11 * density, statusColor, Paint.Align.LEFT, maxW);
+    }
+
+    // Ligne d'un mage : portrait (équipe), rang, bonus, fragments, +1 RANG, compétence, bandeau d'artefact
+    private void drawMageRow(Canvas canvas, Progression prog, int i, int type, RectF r, int pressedButton) {
         int rank = prog.getRank(type);
+        ui.inset(canvas, r);
 
-        ui.inset(canvas, r); // alcôve creusée
-
-        // Portrait : cadre vert si le mage fait partie de l'équipe
-        RectF portrait = hud.upgradeButtons[Hud.UPGRADE_TEAM_0 + row];
-        boolean inTeam = prog.isInTeam(type);
         // Portrait : petit vitrail de la couleur de l'élément, cadre vert si dans l'équipe
+        menu.buttonRect(i, MenuList.BTN_PORTRAIT, r, btnRect);
+        RectF portrait = new RectF(btnRect);
+        boolean inTeam = prog.isInTeam(type);
         tmpRect.set(portrait);
-        tmpRect.inset(4 * density, 4 * density);
+        tmpRect.inset(2 * density, 2 * density);
         paint.setColor(inTeam ? Palette.TEAM : UiKit.GOLD_DARK);
         canvas.drawRoundRect(tmpRect, 9 * density, 9 * density, paint);
         tmpRect.inset(2.5f * density, 2.5f * density);
@@ -1398,18 +2006,12 @@ public class GameRenderer {
         canvas.drawRoundRect(tmpRect, 7 * density, 7 * density, paint);
         paint.setColor(Color.argb(70, Color.red(ec), Color.green(ec), Color.blue(ec)));
         canvas.drawCircle(tmpRect.centerX(), tmpRect.centerY() - 2 * density, tmpRect.width() * 0.42f, paint);
-        if (portraitPressed) {
-            drawPressedOverlay(canvas, portrait, 10 * density);
-        }
-
         // Sprite : son apparence évolue tous les 10 rangs (comme les fusions)
         int tier = Math.min(GameModel.MAX_LEVEL, 1 + (rank - 1) / 10);
-        float box = r.height() - 12 * density;
-        float sw = box;
-        float sh = box * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
-        float sx = r.left + 6 * density;
-        float sy = r.centerY() - sh / 2;
-        spriteRect.set(sx, sy, sx + sw, sy + sh);
+        float sw = tmpRect.width() * 0.9f;
+        float sh = sw * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
+        spriteRect.set(tmpRect.centerX() - sw / 2, tmpRect.centerY() - sh / 2 - 3 * density,
+                tmpRect.centerX() + sw / 2, tmpRect.centerY() + sh / 2 - 3 * density);
         canvas.drawBitmap(mageSprites[type][tier - 1], null, spriteRect, spritePaint);
         if (inTeam) {
             paint.setTextSize(9 * density);
@@ -1422,27 +2024,21 @@ public class GameRenderer {
             paint.setTextAlign(Paint.Align.CENTER);
             canvas.drawText("ÉQUIPE", tmpRect.centerX(), tmpRect.bottom - 3 * density, paint);
         }
+        if (pressedButton == MenuList.BTN_PORTRAIT) {
+            drawPressedOverlay(canvas, portrait, 10 * density);
+        }
 
-        float tx = sx + sw + 10 * density;
-        float maxW = btn.left - 10 * density - tx;
+        menu.buttonRect(i, MenuList.BTN_MAIN, r, btnRect);
+        float tx = portrait.right + 8 * density;
+        float maxW = btnRect.left - 8 * density - tx;
 
         // Ligne 1 : élément (dans sa couleur) et rang
         String name = Palette.ELEMENT_NAMES[type];
-        ui.text(canvas, name, tx, r.top + 22 * density, 15, Palette.ELEMENT_COLORS[type], Paint.Align.LEFT);
-        paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        paint.setTextSize(15 * density);
-        float nameW = paint.measureText(name + " ");
-        paint.setTypeface(android.graphics.Typeface.DEFAULT);
-        ui.text(canvas, "Rang " + rank, tx + nameW, r.top + 22 * density, 15, Palette.GOLD, Paint.Align.LEFT);
-
+        ui.textPx(canvas, name + " · Rang " + rank, tx, r.top + 22 * density, 15 * density, ec, Paint.Align.LEFT, maxW);
         // Ligne 2 : bonus permanents
         String bonus = String.format(java.util.Locale.FRANCE, "Dégâts ×%.1f · Cadence +%d %%",
                 Progression.damageMultiplier(rank), Math.round(Progression.speedBonus(rank) * 100));
-        paint.setColor(Palette.TEXT_INACTIVE);
-        paint.setTextSize(11 * density);
-        fitText(bonus, maxW);
-        canvas.drawText(bonus, tx, r.top + 38 * density, paint);
-
+        ui.textPx(canvas, bonus, tx, r.top + 38 * density, 11 * density, Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
         // Ligne 3 : barre de fragments vers le rang suivant
         boolean maxed = rank >= Progression.MAX_RANK;
         int frags = prog.getFragments(type);
@@ -1451,14 +2047,149 @@ public class GameRenderer {
         float barH = 14 * density;
         tmpRect.set(tx, barTop, tx + maxW, barTop + barH);
         float ratio = maxed ? 1f : Math.min(1f, frags / (float) cost);
-        ui.bar(canvas, tmpRect, ratio, Palette.ELEMENT_COLORS[type]);
+        ui.bar(canvas, tmpRect, ratio, ec);
         ui.text(canvas, maxed ? "MAX" : frags + " / " + cost, tx + maxW / 2, barTop + barH - 3.5f * density, 10,
                 Color.WHITE, Paint.Align.CENTER);
+        // Compétence de niveau 5
+        ui.textPx(canvas, "Niv. 5 : " + Mage.SKILL_NAMES[type] + " (toucher le mage)", tx, r.top + 74 * density,
+                10 * density, UiKit.tint(ec, 0.4f), Paint.Align.LEFT, r.right - 10 * density - tx);
 
-        // Bouton
+        // Bouton +1 RANG
         boolean can = prog.canUpgrade(type);
-        drawSmallButton(canvas, btn, maxed ? "MAX" : "+1 RANG",
-                can ? Palette.RESUME : Palette.DISABLED, can && pressed, 14);
+        drawSmallButton(canvas, btnRect, maxed ? "MAX" : "+1 RANG",
+                can ? Palette.RESUME : Palette.DISABLED, can && pressedButton == MenuList.BTN_MAIN, 14);
+
+        // Bandeau d'artefact : toucher pour changer
+        menu.buttonRect(i, MenuList.BTN_ARTIFACT, r, btnRect);
+        int owned = prog.artifactCount(type);
+        int art = prog.getEquippedArtifact(type);
+        if (owned > 0) {
+            RectF f = ui.button(canvas, btnRect, UiKit.shade(Palette.ARTIFACT, 0.6f),
+                    pressedButton == MenuList.BTN_ARTIFACT, true);
+            String label = art == Artifact.NONE ? "Aucun artefact équipé (" + owned + "/3) · toucher pour changer"
+                    : Artifact.NAMES[art] + " · " + Artifact.DESCRIPTIONS[art];
+            ui.textPx(canvas, label, f.centerX(), f.centerY() + 4 * density, 11.5f * density,
+                    art == Artifact.NONE ? Palette.TEXT_INACTIVE : Color.WHITE, Paint.Align.CENTER,
+                    f.width() - 10 * density);
+        } else {
+            paint.setColor(Color.argb(90, 0, 0, 0));
+            canvas.drawRoundRect(btnRect, 8 * density, 8 * density, paint);
+            ui.textPx(canvas, "Artefact : aucun (0/3) · battez un boss", btnRect.centerX(),
+                    btnRect.centerY() + 4 * density, 11 * density, Palette.TEXT_INACTIVE, Paint.Align.CENTER,
+                    btnRect.width() - 10 * density);
+        }
+    }
+
+    // Ligne d'un succès : étoile (pleine si obtenu), nom, description, progression, récompense
+    private void drawAchievementRow(Canvas canvas, GameModel model, int id, RectF r) {
+        boolean done = model.getProgression().isAchieved(id);
+        ui.inset(canvas, r);
+        drawStar(canvas, r.left + 26 * density, r.centerY(), 14 * density, done);
+        float tx = r.left + 50 * density;
+        float maxW = r.width() - 50 * density - 80 * density;
+        ui.textPx(canvas, Achievement.NAMES[id], tx, r.top + 22 * density, 14 * density,
+                done ? Palette.ACHIEVEMENT : Color.WHITE, Paint.Align.LEFT, maxW);
+        long value = Math.min(model.statValue(Achievement.stat(id)), Achievement.target(id));
+        String progress = done ? "Obtenu" : value + " / " + Achievement.target(id);
+        ui.textPx(canvas, Achievement.description(id) + " · " + progress, tx, r.top + 40 * density, 10.5f * density,
+                done ? Palette.TEAM : Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
+        drawGem(canvas, r.right - 52 * density, r.centerY() - 1 * density, 7 * density);
+        ui.text(canvas, "+" + Achievement.reward(id), r.right - 40 * density, r.centerY() + 5 * density, 15,
+                done ? Palette.TEXT_INACTIVE : Palette.GEM, Paint.Align.LEFT);
+    }
+
+    // Icône d'un ultime : médaillon de sa couleur et symbole
+    private void drawUltimateIcon(Canvas canvas, int id, float cx, float cy, float r, boolean owned) {
+        int color = owned ? Palette.ULTIMATE_COLORS[id] : Palette.DISABLED;
+        ui.medallion(canvas, cx, cy, r, UiKit.shade(color, 0.7f), false, 255);
+        paint.setColor(owned ? Color.WHITE : Palette.ICON_DISABLED);
+        float s = r * 0.5f;
+        switch (id) {
+            case Ultimate.STUN:
+                drawStar(canvas, cx, cy, s, true);
+                break;
+            case Ultimate.FURY:
+                path.reset();
+                path.moveTo(cx, cy - s * 1.2f);
+                path.lineTo(cx + s * 0.8f, cy + s * 0.2f);
+                path.lineTo(cx + s * 0.4f, cy + s);
+                path.lineTo(cx - s * 0.4f, cy + s);
+                path.lineTo(cx - s * 0.8f, cy + s * 0.2f);
+                path.close();
+                canvas.drawPath(path, paint);
+                break;
+            case Ultimate.METEOR:
+                paint.setColor(owned ? Palette.METEOR : Palette.ICON_DISABLED);
+                canvas.drawCircle(cx - s * 0.2f, cy + s * 0.2f, s * 0.7f, paint);
+                paint.setStrokeWidth(s * 0.3f);
+                canvas.drawLine(cx + s * 0.2f, cy - s * 0.2f, cx + s, cy - s, paint);
+                break;
+            default:
+                drawShieldGlyph(canvas, cx, cy, s);
+                break;
+        }
+    }
+
+    // Écu : bouclier pointu
+    private void drawShieldGlyph(Canvas canvas, float cx, float cy, float s) {
+        paint.setColor(Color.WHITE);
+        path.reset();
+        path.moveTo(cx - s, cy - s);
+        path.lineTo(cx + s, cy - s);
+        path.lineTo(cx + s, cy);
+        path.lineTo(cx, cy + s * 1.2f);
+        path.lineTo(cx - s, cy);
+        path.close();
+        canvas.drawPath(path, paint);
+    }
+
+    // Page Infini : difficultés (avec leur record), récompenses, JOUER
+    private void drawEndlessPage(Canvas canvas, GameModel model, int pressed) {
+        Progression prog = model.getProgression();
+        drawPageHeader(canvas, model, "MODE INFINI", Palette.ENDLESS);
+        RectF p = hud.endlessPanel;
+        ui.inset(canvas, p);
+        float cx = p.centerX();
+        ui.text(canvas, "Choisissez la difficulté", cx, p.top + 28 * density, 15, Color.WHITE, Paint.Align.CENTER);
+        ui.text(canvas, "Vagues sans fin · nuit une vague sur " + LevelSpec.ENDLESS_NIGHT_EVERY + " · boss toutes les "
+                + LevelSpec.BOSS_EVERY, cx, p.top + 50 * density, 11, Palette.TEXT_INACTIVE, Paint.Align.CENTER);
+
+        int sel = model.getEndlessDifficulty();
+        for (int d = 0; d < LevelSpec.DIFFICULTY_COUNT; d++) {
+            RectF b = hud.difficultyButtons[d];
+            int color = Palette.DIFFICULTY_COLORS[d];
+            if (d == sel) {
+                tmpRect.set(b);
+                tmpRect.inset(-3 * density, -3 * density);
+                paint.setColor(UiKit.GOLD);
+                canvas.drawRoundRect(tmpRect, 12 * density, 12 * density, paint);
+            }
+            RectF f = ui.button(canvas, b, d == sel ? color : UiKit.shade(color, 0.6f), pressed == Hud.HOME_DIFF_0 + d,
+                    true);
+            ui.textPx(canvas, LevelSpec.DIFFICULTY_NAMES[d], f.centerX(), f.centerY() - 1 * density, 16 * density,
+                    Color.WHITE, Paint.Align.CENTER, f.width() - 8 * density);
+            int best = prog.getBestEndlessWave(d);
+            ui.textPx(canvas, best > 0 ? "Record : vague " + best : "Aucun record", f.centerX(),
+                    f.centerY() + 16 * density, 10.5f * density, Color.argb(230, 255, 240, 200), Paint.Align.CENTER,
+                    f.width() - 8 * density);
+        }
+
+        // Ce que change la difficulté choisie
+        float y = hud.difficultyButtons[LevelSpec.DIFFICULTY_COUNT - 1].bottom + 30 * density;
+        int pct = Math.round(LevelSpec.difficultyMultiplier(sel) * 100);
+        ui.text(canvas, LevelSpec.DIFFICULTY_NAMES[sel] + " : gobelins à " + pct + " %", cx, y, 14,
+                Palette.DIFFICULTY_COLORS[sel], Paint.Align.CENTER);
+        String reward = "1 coffre toutes les " + LevelSpec.wavesPerChest(sel) + " vagues";
+        if (LevelSpec.bonusGemsPerChest(sel) > 0) {
+            reward += " · +" + LevelSpec.bonusGemsPerChest(sel) + " gemmes par coffre";
+        }
+        ui.textPx(canvas, reward, cx, y + 22 * density, 12 * density, Palette.GOLD, Paint.Align.CENTER,
+                p.width() - 16 * density);
+        ui.textPx(canvas, "Les coffres sont gagnés même en abandonnant", cx, y + 42 * density, 11 * density,
+                Palette.TEXT_INACTIVE, Paint.Align.CENTER, p.width() - 16 * density);
+
+        drawPillButton(canvas, hud.endlessPlayButton, "JOUER · " + LevelSpec.DIFFICULTY_NAMES[sel].toUpperCase(),
+                Palette.ENDLESS, pressed == Hud.HOME_ENDLESS_PLAY);
     }
 
     // =====================================================================
@@ -1467,14 +2198,14 @@ public class GameRenderer {
     //  Façon jeu de cartes : le coffre tombe en bas de l'écran puis attend. Chaque toucher fait sortir
     //  UNE carte : elle jaillit du coffre (dos visible), se retourne, s'affiche en grand avec des rayons
     //  de sa couleur, et son nombre monte jusqu'au total. Après la dernière : récapitulatif du butin.
-    private void drawChestOpening(Canvas canvas, GameModel model, int pressed) {
+    private void drawChestOpening(Canvas canvas, GameModel model, TouchController touch, int pressed) {
         int f = model.getChestAnimFrame();
         int cf = model.getChestCardFrame();
         int revealed = model.getChestRevealed();
         int n = model.getChestCardCount();
         int intro = GameModel.CHEST_INTRO_FRAMES;
 
-        drawUpgradesScreen(canvas, model, -1); // l'écran MAGES reste derrière
+        drawHome(canvas, model, touch, -1); // la page Mages reste derrière
         paint.setColor(Color.argb(228, 8, 6, 22));
         canvas.drawRect(0, 0, board.width, board.height, paint);
 
@@ -1558,7 +2289,8 @@ public class GameRenderer {
 
         // Titre et consigne
         ui.ribbon(canvas, cx, board.topShift + 58 * density, Math.min(board.playWidth * 0.7f, 240 * density),
-                "COFFRE MAGIQUE", UiKit.RIBBON);
+                model.getProgression().getLastChestCount() > 1
+                        ? model.getProgression().getLastChestCount() + " COFFRES" : "COFFRE MAGIQUE", UiKit.RIBBON);
         if (revealed > 0) {
             ui.text(canvas, "Carte " + revealed + " / " + n, cx, board.topShift + 96 * density, 13,
                     Palette.TEXT_INACTIVE, Paint.Align.CENTER);
@@ -1788,77 +2520,6 @@ public class GameRenderer {
         canvas.drawPath(path, paint);
         paint.setColor(Color.argb(220, 255, 255, 255));
         canvas.drawCircle(cx + s * 0.2f, cy - s * 0.55f, s * 0.15f, paint);
-    }
-
-    // =====================================================================
-    //  Marché
-    // =====================================================================
-    private void drawMarketScreen(Canvas canvas, GameModel model, int pressed) {
-        Progression prog = model.getProgression();
-        drawStartScreen(canvas, model, -1);
-        paint.setColor(Color.argb(160, 0, 0, 0));
-        canvas.drawRect(0, 0, board.width, board.height, paint);
-
-        RectF p = hud.marketPopup;
-        ui.panel(canvas, p, "MARCHÉ", Palette.MARKET);
-
-        // Gemmes du joueur
-        String gems = prog.getGems() + " gemmes";
-        paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        paint.setTextSize(16 * density);
-        float gw = paint.measureText(gems) + 20 * density;
-        paint.setTypeface(android.graphics.Typeface.DEFAULT);
-        float gx = board.centerX() - gw / 2;
-        drawGem(canvas, gx + 7 * density, p.top + 74 * density, 7 * density);
-        ui.text(canvas, gems, gx + 20 * density, p.top + 80 * density, 16, Palette.GEM, Paint.Align.LEFT);
-
-        for (int i = 0; i < Hud.MARKET_ROWS; i++) {
-            int type = Mage.BASE_TYPES + i;
-            RectF r = hud.marketRows[i];
-            RectF btn = hud.marketButtons[i];
-            boolean owned = prog.isOwned(type);
-            ui.inset(canvas, r);
-
-            // Portrait (apparence de niveau 3 : on voit l'emblème de l'élément)
-            float box = r.height() - 16 * density;
-            float sh = box * Sprites.MAGE_HEIGHT / Sprites.MAGE_WIDTH;
-            spriteRect.set(r.left + 8 * density, r.centerY() - sh / 2, r.left + 8 * density + box, r.centerY() + sh / 2);
-            canvas.drawBitmap(mageSprites[type][2], null, spriteRect, owned ? spritePaint : lockedPaint);
-
-            float tx = spriteRect.right + 10 * density;
-            float maxW = btn.left - 8 * density - tx;
-            ui.textPx(canvas, Palette.ELEMENT_NAMES[type], tx, r.top + 28 * density, 17 * density,
-                    Palette.ELEMENT_COLORS[type], Paint.Align.LEFT, maxW);
-            paint.setTextAlign(Paint.Align.LEFT);
-            paint.setColor(Palette.TEXT_INACTIVE);
-            paint.setTextSize(12 * density);
-            String desc = Palette.ELEMENT_DESCRIPTIONS[type];
-            fitText(desc, maxW);
-            canvas.drawText(desc, tx, r.top + 48 * density, paint);
-            paint.setTextSize(11 * density);
-            String status;
-            if (owned) {
-                paint.setColor(Palette.TEAM);
-                status = prog.isInTeam(type) ? "Dans l'équipe" : "À ajouter à l'équipe (MAGES)";
-            } else if (prog.canBuy(type)) {
-                paint.setColor(Palette.GOLD);
-                status = "Unité exclusive";
-            } else {
-                paint.setColor(Palette.TEXT_INACTIVE);
-                status = "Il manque " + (Progression.price(type) - prog.getGems()) + " gemmes";
-            }
-            fitText(status, maxW);
-            canvas.drawText(status, tx, r.top + 68 * density, paint);
-
-            if (owned) {
-                drawSmallButton(canvas, btn, "ACQUIS", Palette.TEAM, false, 13);
-            } else {
-                drawPriceButton(canvas, btn, Progression.price(type), prog.canBuy(type), pressed == i);
-            }
-        }
-
-        drawPillButton(canvas, hud.marketButtons[Hud.MARKET_BACK], "RETOUR",
-                Palette.MENU_BUTTON, pressed == Hud.MARKET_BACK);
     }
 
     // Bouton de prix : gemme + nombre

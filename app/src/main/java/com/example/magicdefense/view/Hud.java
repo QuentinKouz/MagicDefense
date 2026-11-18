@@ -4,6 +4,7 @@ import android.graphics.RectF;
 
 import com.example.magicdefense.model.Board;
 import com.example.magicdefense.model.GameModel;
+import com.example.magicdefense.model.LevelSpec;
 import com.example.magicdefense.model.Progression;
 
 // Position des boutons et fenêtres de l'interface.
@@ -18,6 +19,17 @@ public class Hud {
     public final RectF pauseButton = new RectF();
     public float gaugeCenterX, gaugeCenterY; // jauge d'ultime
     public float gaugeRadius;
+    // En jeu : vitesse et mode automatique (sous le son), soin et mage au hasard (sous la jauge)
+    public final RectF speedButton = new RectF();
+    public final RectF autoButton = new RectF();
+    public final RectF healButton = new RectF();
+    public final RectF randomButton = new RectF();
+    public static final int GAME_PAUSE = 0;
+    public static final int GAME_SOUND = 1;
+    public static final int GAME_SPEED = 2;
+    public static final int GAME_AUTO = 3;
+    public static final int GAME_HEAL = 4;
+    public static final int GAME_RANDOM = 5;
 
     // Boutons de la fenêtre de pause
     public static final int PAUSE_QUIT = 0;
@@ -50,7 +62,11 @@ public class Hud {
     public final RectF victoryPopup = new RectF();
     public final RectF[] victoryButtons = new RectF[2];
 
-    // Carte des niveaux (écran d'accueil)
+    // ---------- Accueil : pages parcourues en glissant, barre d'onglets en bas ----------
+    public final RectF tabBar = new RectF();
+    public final RectF[] tabButtons = new RectF[GameModel.PAGE_COUNT];
+
+    // Page Campagne : carte des niveaux
     public static final int HOME_PLAY = 0;  // bouton JOUER ; les niveaux utilisent leur emplacement (1 à 6)
     public final RectF playButton = new RectF();
     public final RectF[] levelNodes = new RectF[GameModel.LEVELS_PER_PAGE + 1]; // index = emplacement dans la page
@@ -59,41 +75,32 @@ public class Hud {
     public static final int HOME_SOUND = 101;
     public static final int HOME_PREV_PAGE = 102;
     public static final int HOME_NEXT_PAGE = 103;
-    public static final int HOME_ENDLESS = 104;
-    public static final int HOME_UPGRADES = 105;
-    public static final int HOME_MARKET = 106;
+    public static final int HOME_TAB_0 = 110;    // onglets : 110 à 114
+    public static final int HOME_CHEST_0 = 120;  // page Mages : ouvrir ×1, ×5, ×10
+    public static final int HOME_DIFF_0 = 130;   // page Infini : difficultés 130 à 133
+    public static final int HOME_ENDLESS_PLAY = 140;
+    public static final int HOME_LIST_0 = 1000;  // listes : 1000 + ligne × 4 + bouton
     public final RectF homeOptionsButton = new RectF();
     public final RectF homeSoundButton = new RectF();
     public final RectF prevPageButton = new RectF();
     public final RectF nextPageButton = new RectF();
-    public final RectF endlessButton = new RectF();
-    public final RectF upgradesButton = new RectF();
-    public final RectF marketButton = new RectF();
 
-    // Écran MAGES : 4 lignes par page. Indices des boutons :
-    //   0 à 3 : +1 RANG de la ligne ; 4 : OUVRIR (coffre) ; 5 : RETOUR ; 6-7 : pages ; 8 à 11 : portrait (équipe)
-    public static final int UPGRADE_ROWS = GameModel.UPGRADE_ROWS_PER_PAGE;
-    public static final int UPGRADE_OPEN_CHEST = 4;
-    public static final int UPGRADE_BACK = 5;
-    public static final int UPGRADE_PREV = 6;
-    public static final int UPGRADE_NEXT = 7;
-    public static final int UPGRADE_TEAM_0 = 8;
-    public final RectF upgradesPopup = new RectF();
-    public final RectF[] upgradeButtons = new RectF[UPGRADE_TEAM_0 + UPGRADE_ROWS];
-    public final RectF[] upgradeRows = new RectF[UPGRADE_ROWS]; // ligne de chaque élément (dessin)
+    // Pages à liste (Marché, Château) : zone qui défile ; page Mages : sous la ligne des coffres
+    public final RectF listViewport = new RectF();
+    public final RectF magesViewport = new RectF();
     public final RectF chestRow = new RectF();
+    public static final int[] CHEST_BATCHES = {1, 5, 10};
+    public final RectF[] chestButtons = new RectF[CHEST_BATCHES.length];
+
+    // Page Infini : panneau, difficultés, JOUER
+    public final RectF endlessPanel = new RectF();
+    public final RectF[] difficultyButtons = new RectF[LevelSpec.DIFFICULTY_COUNT];
+    public final RectF endlessPlayButton = new RectF();
 
     // Animation d'ouverture de coffre : OUVRIR ENCORE (le reste de l'écran = continuer)
     public static final int CHEST_AGAIN = 0;
     public static final int CHEST_CONTINUE = 1;
     public final RectF chestAgainButton = new RectF();
-
-    // Marché : une ligne par unité exclusive, puis RETOUR
-    public static final int MARKET_ROWS = 3;
-    public static final int MARKET_BACK = MARKET_ROWS;
-    public final RectF marketPopup = new RectF();
-    public final RectF[] marketRows = new RectF[MARKET_ROWS];
-    public final RectF[] marketButtons = new RectF[MARKET_ROWS + 1];
 
     // Position de chaque niveau : x en fraction de la colonne de jeu, y en fraction de l'écran
     // (resize() étire ensuite ces hauteurs entre le titre et le bouton JOUER) ; zigzag du bas vers le haut
@@ -113,10 +120,9 @@ public class Hud {
         init(optionsButtons);
         init(victoryButtons);
         init(levelNodes);
-        init(upgradeButtons);
-        init(upgradeRows);
-        init(marketRows);
-        init(marketButtons);
+        init(tabButtons);
+        init(chestButtons);
+        init(difficultyButtons);
     }
 
     private static void init(RectF[] rects) {
@@ -169,9 +175,19 @@ public class Hud {
         gaugeCenterX = leftHanded ? right - 16 * d - gaugeRadius : left + 16 * d + gaugeRadius;
         gaugeCenterY = 40 * d + shift + gaugeRadius;
 
-        // Accueil : options et son l'un sous l'autre, du même côté que la pause
+        // Son sous la pause ; puis vitesse et mode automatique (plus petits)
         homeOptionsButton.set(pauseButton);
         homeSoundButton.set(bx, top + size + 12 * d, bx + size, top + 2 * size + 12 * d);
+        float small = 48 * d;
+        float sx = bx + (size - small) / 2;
+        float sy = homeSoundButton.bottom + 12 * d;
+        speedButton.set(sx, sy, sx + small, sy + small);
+        autoButton.set(sx, sy + small + 10 * d, sx + small, sy + 2 * small + 10 * d);
+        // Sous la jauge (après la consigne « Secouez ! ») : soin et mage au hasard
+        float gx = gaugeCenterX - small / 2;
+        float gy = gaugeCenterY + gaugeRadius + 34 * d;
+        healButton.set(gx, gy, gx + small, gy + small);
+        randomButton.set(gx, gy + small + 22 * d, gx + small, gy + 2 * small + 22 * d);
 
         // Fenêtres : même largeur pour toutes, centrées dans la colonne
         float pw = cw * 0.78f;
@@ -217,27 +233,27 @@ public class Hud {
         float backW = pw * 0.6f;
         optionsButtons[OPTIONS_BACK].set(cx - backW / 2, oTop + oH - 70 * d, cx + backW / 2, oTop + oH - 18 * d);
 
-        // Fenêtre de victoire (et de game over) : titre, 3 étoiles, coffres, puis 2 boutons
-        float vH = 340 * d;
+        // Fenêtre de victoire (et de game over) : titre, 3 étoiles, coffres, artefact, puis 2 boutons
+        float vH = 380 * d;
         float vTop = popupTop(h, vH);
         victoryPopup.set(pLeft, vTop, pLeft + pw, vTop + vH);
 
         float vBtnW = pw * 0.75f;
-        victoryButtons[VICTORY_NEXT].set(cx - vBtnW / 2, vTop + 206 * d, cx + vBtnW / 2, vTop + 258 * d);
-        victoryButtons[VICTORY_MENU].set(cx - vBtnW / 2, vTop + 272 * d, cx + vBtnW / 2, vTop + 324 * d);
+        victoryButtons[VICTORY_NEXT].set(cx - vBtnW / 2, vTop + 246 * d, cx + vBtnW / 2, vTop + 298 * d);
+        victoryButtons[VICTORY_MENU].set(cx - vBtnW / 2, vTop + 312 * d, cx + vBtnW / 2, vTop + 364 * d);
 
-        // JOUER : large, en bas (zone facile au pouce)
+        // ---------- Accueil ----------
+        // Barre d'onglets en bas (zone du pouce)
+        float tabH = 62 * d;
+        tabBar.set(left, h - tabH - 6 * d, right, h - 6 * d);
+        float tabW = cw / GameModel.PAGE_COUNT;
+        for (int i = 0; i < GameModel.PAGE_COUNT; i++) {
+            tabButtons[i].set(left + i * tabW + 2 * d, tabBar.top, left + (i + 1) * tabW - 2 * d, tabBar.bottom);
+        }
+
+        // Page Campagne : JOUER, juste au-dessus des onglets
         float playW = cw * 0.6f;
-        playButton.set(cx - playW / 2, h - 150 * d, cx + playW / 2, h - 86 * d);
-
-        // Sous JOUER : INFINI, MAGES, MARCHÉ côte à côte
-        float rowW = cw * 0.92f;
-        float gap = 8 * d;
-        float smallW = (rowW - 2 * gap) / 3;
-        float rowLeft = cx - rowW / 2;
-        endlessButton.set(rowLeft, h - 76 * d, rowLeft + smallW, h - 24 * d);
-        upgradesButton.set(rowLeft + smallW + gap, h - 76 * d, rowLeft + 2 * smallW + gap, h - 24 * d);
-        marketButton.set(rowLeft + 2 * (smallW + gap), h - 76 * d, rowLeft + rowW, h - 24 * d);
+        playButton.set(cx - playW / 2, tabBar.top - 74 * d, cx + playW / 2, tabBar.top - 12 * d);
 
         // Carte : les niveaux occupent l'espace entre le titre et le bouton JOUER,
         // quelle que soit la hauteur de l'écran (petit téléphone, tablette en paysage...)
@@ -260,55 +276,38 @@ public class Hud {
         prevPageButton.set(left + 8 * d, arrowY - arrow / 2, left + 8 * d + arrow, arrowY + arrow / 2);
         nextPageButton.set(right - 8 * d - arrow, arrowY - arrow / 2, right - 8 * d, arrowY + arrow / 2);
 
-        // Écran MAGES : titre (avec les flèches de page), coffres, 4 lignes, RETOUR
-        float uw = cw * 0.92f;
-        float uLeft = cx - uw / 2;
-        float uH = 580 * d;
-        float uTop = popupTop(h, uH);
-        upgradesPopup.set(uLeft, uTop, uLeft + uw, uTop + uH);
-        float btnW = 84 * d;
-        float pad = 12 * d;
-
-
-        chestRow.set(uLeft + pad, uTop + 64 * d, uLeft + uw - pad, uTop + 136 * d);
-        upgradeButtons[UPGRADE_OPEN_CHEST].set(chestRow.right - btnW, chestRow.centerY() - 26 * d,
-                chestRow.right, chestRow.centerY() + 26 * d);
-
-        float rowsTop = uTop + 184 * d; // sous la consigne
-        float rowH = 76 * d;
-        for (int i = 0; i < UPGRADE_ROWS; i++) {
-            float rTop = rowsTop + i * rowH;
-            upgradeRows[i].set(uLeft + pad, rTop, uLeft + uw - pad, rTop + rowH - 8 * d);
-            RectF r = upgradeRows[i];
-            upgradeButtons[i].set(r.right - btnW, r.centerY() - 26 * d, r.right, r.centerY() + 26 * d);
-            // Portrait : toucher le mage l'ajoute à l'équipe ou l'en retire
-            upgradeButtons[UPGRADE_TEAM_0 + i].set(r.left, r.top, r.left + r.height(), r.bottom);
+        // Pages à liste : sous le titre et les gemmes, au-dessus des onglets
+        float lw = cw * 0.94f;
+        float lLeft = cx - lw / 2;
+        float listTop = shift + 112 * d;
+        listViewport.set(lLeft, listTop, lLeft + lw, tabBar.top - 8 * d);
+        // Page Mages : ligne des coffres (ouvrir ×1, ×5, ×10), puis la liste
+        chestRow.set(lLeft, listTop, lLeft + lw, listTop + 76 * d);
+        float cbW = 58 * d;
+        for (int i = 0; i < chestButtons.length; i++) {
+            float r = chestRow.right - 8 * d - (chestButtons.length - 1 - i) * (cbW + 6 * d);
+            chestButtons[i].set(r - cbW, chestRow.centerY() - 24 * d, r, chestRow.centerY() + 24 * d);
         }
+        magesViewport.set(lLeft, chestRow.bottom + 8 * d, lLeft + lw, tabBar.top - 8 * d);
 
-        float uBackW = uw * 0.5f;
-        upgradeButtons[UPGRADE_BACK].set(cx - uBackW / 2, uTop + uH - 70 * d,
-                cx + uBackW / 2, uTop + uH - 18 * d);
-        // Pages : flèches de part et d'autre de RETOUR (en bas, zone du pouce)
-        float ay = upgradeButtons[UPGRADE_BACK].centerY() - 2 * d;
-        upgradeButtons[UPGRADE_PREV].set(uLeft + 16 * d, ay - arrow / 2, uLeft + 16 * d + arrow, ay + arrow / 2);
-        upgradeButtons[UPGRADE_NEXT].set(uLeft + uw - 16 * d - arrow, ay - arrow / 2, uLeft + uw - 16 * d, ay + arrow / 2);
+        // Page Infini : panneau des records, difficultés en 2 × 2, JOUER
+        endlessPlayButton.set(cx - playW / 2, tabBar.top - 74 * d, cx + playW / 2, tabBar.top - 12 * d);
+        float epTop = shift + 112 * d;
+        endlessPanel.set(lLeft, epTop, lLeft + lw, endlessPlayButton.top - 12 * d);
+        float dW = (lw - 3 * 10 * d) / 2;
+        float dH = 64 * d;
+        float dTop = epTop + 70 * d;
+        for (int i = 0; i < difficultyButtons.length; i++) {
+            int c = i % 2;
+            int r = i / 2;
+            float x0 = lLeft + 10 * d + c * (dW + 10 * d);
+            float y0 = dTop + r * (dH + 10 * d);
+            difficultyButtons[i].set(x0, y0, x0 + dW, y0 + dH);
+        }
 
         // Animation de coffre : OUVRIR ENCORE en bas, zone du pouce
         float againW = cw * 0.7f;
         chestAgainButton.set(cx - againW / 2, h - 170 * d, cx + againW / 2, h - 118 * d);
-
-        // Marché : titre, gemmes, 3 unités exclusives, RETOUR
-        float mH = 470 * d;
-        float mTop = popupTop(h, mH);
-        marketPopup.set(uLeft, mTop, uLeft + uw, mTop + mH);
-        float mRowH = 96 * d;
-        for (int i = 0; i < MARKET_ROWS; i++) {
-            float rTop = mTop + 100 * d + i * mRowH;
-            marketRows[i].set(uLeft + pad, rTop, uLeft + uw - pad, rTop + mRowH - 10 * d);
-            RectF r = marketRows[i];
-            marketButtons[i].set(r.right - btnW - 6 * d, r.centerY() - 25 * d, r.right - 6 * d, r.centerY() + 25 * d);
-        }
-        marketButtons[MARKET_BACK].set(cx - uBackW / 2, mTop + mH - 70 * d, cx + uBackW / 2, mTop + mH - 18 * d);
     }
 
     // Ligne d'interrupteur, sous le titre du réglage (titleY en dp depuis le haut de la fenêtre)
@@ -343,6 +342,29 @@ public class Hud {
         return pauseButton.contains(x, y);
     }
 
+    // Boutons ronds de la partie (pause, son, vitesse, auto, soin, mage au hasard), ou -1
+    public int gameButtonAt(float x, float y) {
+        if (pauseButton.contains(x, y)) {
+            return GAME_PAUSE;
+        }
+        if (homeSoundButton.contains(x, y)) {
+            return GAME_SOUND;
+        }
+        if (speedButton.contains(x, y)) {
+            return GAME_SPEED;
+        }
+        if (autoButton.contains(x, y)) {
+            return GAME_AUTO;
+        }
+        if (healButton.contains(x, y)) {
+            return GAME_HEAL;
+        }
+        if (randomButton.contains(x, y)) {
+            return GAME_RANDOM;
+        }
+        return -1;
+    }
+
     public int pauseMenuButtonAt(float x, float y) {
         return indexAt(pauseMenuButtons, x, y);
     }
@@ -355,51 +377,73 @@ public class Hud {
         return indexAt(victoryButtons, x, y);
     }
 
-    public int upgradeButtonAt(float x, float y) {
-        return indexAt(upgradeButtons, x, y);
-    }
-
-    public int marketButtonAt(float x, float y) {
-        return indexAt(marketButtons, x, y);
-    }
-
     // Animation de coffre : OUVRIR ENCORE, ou n'importe où ailleurs pour continuer
     public int chestButtonAt(float x, float y) {
         return chestAgainButton.contains(x, y) ? CHEST_AGAIN : CHEST_CONTINUE;
     }
 
-    // HOME_xxx, emplacement du niveau touché (1 à 6), ou -1
-    public int homeButtonAt(float x, float y) {
-        if (homeOptionsButton.contains(x, y)) {
-            return HOME_OPTIONS;
+    // Onglet sous le point, ou -1
+    public int tabAt(float x, float y) {
+        int i = indexAt(tabButtons, x, y);
+        return i >= 0 ? HOME_TAB_0 + i : -1;
+    }
+
+    // Boutons fixes de la page (hors listes) : HOME_xxx, emplacement du niveau (1 à 6), ou -1
+    public int homeButtonAt(int page, float x, float y) {
+        int tab = tabAt(x, y);
+        if (tab >= 0) {
+            return tab;
         }
-        if (homeSoundButton.contains(x, y)) {
-            return HOME_SOUND;
-        }
-        if (playButton.contains(x, y)) {
-            return HOME_PLAY;
-        }
-        if (endlessButton.contains(x, y)) {
-            return HOME_ENDLESS;
-        }
-        if (upgradesButton.contains(x, y)) {
-            return HOME_UPGRADES;
-        }
-        if (marketButton.contains(x, y)) {
-            return HOME_MARKET;
-        }
-        if (prevPageButton.contains(x, y)) {
-            return HOME_PREV_PAGE;
-        }
-        if (nextPageButton.contains(x, y)) {
-            return HOME_NEXT_PAGE;
-        }
-        for (int slot = 1; slot < levelNodes.length; slot++) {
-            if (levelNodes[slot].contains(x, y)) {
-                return slot;
+        switch (page) {
+            case GameModel.PAGE_CAMPAIGN:
+                if (homeOptionsButton.contains(x, y)) {
+                    return HOME_OPTIONS;
+                }
+                if (homeSoundButton.contains(x, y)) {
+                    return HOME_SOUND;
+                }
+                if (playButton.contains(x, y)) {
+                    return HOME_PLAY;
+                }
+                if (prevPageButton.contains(x, y)) {
+                    return HOME_PREV_PAGE;
+                }
+                if (nextPageButton.contains(x, y)) {
+                    return HOME_NEXT_PAGE;
+                }
+                for (int slot = 1; slot < levelNodes.length; slot++) {
+                    if (levelNodes[slot].contains(x, y)) {
+                        return slot;
+                    }
+                }
+                return -1;
+            case GameModel.PAGE_MAGES: {
+                int c = indexAt(chestButtons, x, y);
+                return c >= 0 ? HOME_CHEST_0 + c : -1;
             }
+            case GameModel.PAGE_ENDLESS: {
+                if (endlessPlayButton.contains(x, y)) {
+                    return HOME_ENDLESS_PLAY;
+                }
+                int c = indexAt(difficultyButtons, x, y);
+                return c >= 0 ? HOME_DIFF_0 + c : -1;
+            }
+            default:
+                return -1;
         }
-        return -1;
+    }
+
+    // Zone de liste qui défile sur cette page (null : pas de liste)
+    public RectF viewportFor(int page) {
+        switch (page) {
+            case GameModel.PAGE_MARKET:
+            case GameModel.PAGE_CASTLE:
+                return listViewport;
+            case GameModel.PAGE_MAGES:
+                return magesViewport;
+            default:
+                return null;
+        }
     }
 
     // Volume (de 0 à 1) correspondant à une position horizontale sur le rail

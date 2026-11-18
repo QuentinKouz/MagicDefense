@@ -286,6 +286,56 @@ public final class Sprites {
         return p;
     }
 
+    // ---------- Chevalier (invoqué par l'Invocateur) : 13 x 15 pixels ----------
+    // Armure d'argent, plumet magenta (couleur de l'Invocateur), épée et bouclier
+    private static final String[] KNIGHT_GUARD = {
+            "....MM.......",
+            "...MMm.......",
+            "..KKKKK......",
+            ".KAAAAAK...W.",
+            ".KAKKKAK...W.",
+            ".KAAAAAK...W.",
+            "KKKAAAKKK..W.",
+            "KMMKAAAAAKKYK",
+            "KMYMKAaAAAKK.",
+            "KMMKAAaAAK...",
+            "KMMKAaAAAK...",
+            ".KKKAAAAAK...",
+            "...KaK.KaK...",
+            "...KaK.KaK...",
+            "...KKK.KKK...",
+    };
+    // Coup d'épée : la lame passe devant
+    private static final String[] KNIGHT_STRIKE = {
+            "....MM.......",
+            "...MMm.......",
+            "..KKKKK......",
+            ".KAAAAAK.....",
+            ".KAKKKAK.....",
+            ".KAAAAAK.....",
+            "KKKAAAKKK....",
+            "KMMKAAAAAKKYK",
+            "KMYMKAaAAAWWW",
+            "KMMKAAaAAKWWW",
+            "KMMKAaAAAK.WW",
+            ".KKKAAAAAK...",
+            "...KaK.KaK...",
+            "...KaK.KaK...",
+            "...KKK.KKK...",
+    };
+    public static final int KNIGHT_WIDTH = 13;
+    public static final int KNIGHT_HEIGHT = 15;
+
+    public static Bitmap[] buildKnight() {
+        int[] p = commonPalette();
+        p['A'] = Color.rgb(196, 204, 218);   // armure
+        p['a'] = Color.rgb(130, 138, 160);   // armure ombrée
+        p['M'] = Color.rgb(220, 90, 170);    // plumet et bouclier (Invocateur)
+        p['m'] = Color.rgb(150, 50, 115);
+        p['W'] = Color.rgb(240, 240, 250);   // lame
+        return new Bitmap[]{toBitmap(KNIGHT_GUARD, p), toBitmap(KNIGHT_STRIKE, p)};
+    }
+
     // ---------- Construction des images ----------
 
     // mages[type][niveau - 1]

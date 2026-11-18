@@ -27,10 +27,47 @@ public class LevelSpec {
     public static final int BIOME_COUNT = BIOME_NAMES.length;
     public static final int ENDLESS_WAVES_PER_BIOME = 10;
 
+    // Nuit : certains niveaux générés de la campagne se jouent de nuit (7, 11, 15, 19...),
+    // et en mode infini, une vague sur trois tombe la nuit (3, 6, 9...)
+    public static final int NIGHT_LEVEL_EVERY = 4;
+    public static final int NIGHT_LEVEL_OFFSET = 3;
+    public static final int ENDLESS_NIGHT_EVERY = 3;
+
+    // Difficultés du mode infini
+    public static final int EASY = 0;
+    public static final int NORMAL = 1;
+    public static final int HARD = 2;
+    public static final int INFERNAL = 3;
+    public static final int DIFFICULTY_COUNT = 4;
+    public static final String[] DIFFICULTY_NAMES = {"Facile", "Normal", "Difficile", "Infernal"};
+    private static final float[] DIFFICULTY_MULT = {0.6f, 1f, 1.5f, 2.2f};       // PV, dégâts, vitesse
+    private static final float[] DIFFICULTY_SPEED = {0.9f, 1f, 1.1f, 1.2f};      // vitesse en plus
+    private static final int[] DIFFICULTY_WAVES_PER_CHEST = {5, 3, 3, 2};         // 1 coffre toutes les N vagues
+    private static final int[] DIFFICULTY_BONUS_GEMS = {0, 0, 1, 2};             // gemmes par coffre en plus
+
+    // PV, dégâts et vitesse des gobelins par rapport au mode Normal
+    public static float difficultyMultiplier(int difficulty) {
+        return DIFFICULTY_MULT[clampDifficulty(difficulty)];
+    }
+
+    public static int wavesPerChest(int difficulty) {
+        return DIFFICULTY_WAVES_PER_CHEST[clampDifficulty(difficulty)];
+    }
+
+    public static int bonusGemsPerChest(int difficulty) {
+        return DIFFICULTY_BONUS_GEMS[clampDifficulty(difficulty)];
+    }
+
+    public static int clampDifficulty(int d) {
+        return Math.max(0, Math.min(DIFFICULTY_COUNT - 1, d));
+    }
+
     public final boolean endless;
     public final int level;     // numéro du niveau (1 en mode infini)
     public final int waves;     // nombre de vagues (0 = infini)
     public final int profile;
+    public final int endlessDifficulty; // difficulté du mode infini (NORMAL en campagne)
+    public final boolean nightLevel;    // niveau de campagne joué de nuit
     private final float fastBase, tankBase; // proportions au début du niveau
     private final float fastGrowth, tankGrowth; // augmentation par vague
     private final float shamanBase, shamanGrowth;
@@ -39,6 +76,15 @@ public class LevelSpec {
     private LevelSpec(boolean endless, int level, int waves, int profile,
                       float fastBase, float tankBase, float fastGrowth, float tankGrowth,
                       float shamanBase, float shamanGrowth, int spawnDelay) {
+        this(endless, level, waves, profile, fastBase, tankBase, fastGrowth, tankGrowth, shamanBase, shamanGrowth,
+                spawnDelay, NORMAL);
+    }
+
+    private LevelSpec(boolean endless, int level, int waves, int profile,
+                      float fastBase, float tankBase, float fastGrowth, float tankGrowth,
+                      float shamanBase, float shamanGrowth, int spawnDelay, int endlessDifficulty) {
+        this.endlessDifficulty = clampDifficulty(endlessDifficulty);
+        this.nightLevel = !endless && isNightLevel(level);
         this.endless = endless;
         this.level = level;
         this.waves = waves;
@@ -107,8 +153,30 @@ public class LevelSpec {
 
     // Mode vague infinie (chamans à partir de la vague 7)
     public static LevelSpec endless() {
+        return endless(NORMAL);
+    }
+
+    public static LevelSpec endless(int difficulty) {
         return new LevelSpec(true, 1, 0, PROFILE_MIXED, -0.06f, -0.08f, 0.02f, 0.015f,
-                -0.06f, 0.01f, BASE_SPAWN_DELAY);
+                -0.06f, 0.01f, BASE_SPAWN_DELAY, difficulty);
+    }
+
+    // Niveau de campagne joué de nuit (seulement parmi les niveaux générés)
+    public static boolean isNightLevel(int lv) {
+        return lv > HANDMADE_LEVELS && lv % NIGHT_LEVEL_EVERY == NIGHT_LEVEL_OFFSET;
+    }
+
+    // Cette vague se joue-t-elle de nuit ? (en plus du capteur de luminosité)
+    public boolean isNight(int wave) {
+        if (endless) {
+            return wave > 0 && wave % ENDLESS_NIGHT_EVERY == 0;
+        }
+        return nightLevel;
+    }
+
+    // Vitesse des gobelins en plus, selon la difficulté du mode infini
+    public float speedMultiplier() {
+        return endless ? DIFFICULTY_SPEED[endlessDifficulty] : 1f;
     }
 
     public boolean isGenerated() {
@@ -148,7 +216,8 @@ public class LevelSpec {
     // Difficulté d'une vague : pilote les PV, la vitesse et les dégâts des gobelins
     public float difficulty(int wave) {
         if (endless) {
-            return wave + wave * wave / 40f; // accélère doucement : vague 20 → 30, vague 40 → 80
+            // accélère doucement : vague 20 → 30, vague 40 → 80 (en Normal)
+            return (wave + wave * wave / 40f) * DIFFICULTY_MULT[endlessDifficulty];
         }
         return wave * (1 + 0.75f * (level - 1)); // formule d'origine
     }

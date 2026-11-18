@@ -17,8 +17,9 @@ Projet réalisé en binôme dans le cadre du TP d'IHM (M2) — application Andro
 **[⬇️ Télécharger MagicDefense.apk](https://github.com/QuentinKouz/MagicDefense/releases/latest/download/MagicDefense.apk)**  
 (toutes les versions : [page des releases](https://github.com/QuentinKouz/MagicDefense/releases))
 
-**Version 2 (branche `v2`)** : l'APK est directement dans le dépôt, [`apk/MagicDefense-v2.apk`](https://github.com/QuentinKouz/MagicDefense/raw/v2/apk/MagicDefense-v2.apk).  
-Si une version précédente est installée et qu'Android refuse la mise à jour (« application non installée »), désinstallez d'abord l'ancienne version : elles ne sont pas signées avec la même clé.
+**Version 2 (branche `v2`)** : l'APK est directement dans le dépôt, [`apk/MagicDefense-v2.apk`](https://github.com/QuentinKouz/MagicDefense/raw/v2/apk/MagicDefense-v2.apk) (version 2.1).  
+**Mise à jour sans perte** : installez le nouvel APK par-dessus l'ancien, sans désinstaller. Tous les APK de la branche `v2` sont signés avec la même clé (`app/signing/magicdefense.keystore`), donc Android accepte la mise à jour et garde la sauvegarde (progression, coffres, gemmes, partie en cours).  
+Seule exception : passer de la V1 (Releases GitHub) à la V2 demande encore de désinstaller la V1, signée avec une autre clé.
 
 1. Ouvrez le lien ci-dessus **depuis votre téléphone Android** (ou transférez-y le fichier).
 2. Ouvrez `MagicDefense.apk` une fois téléchargé.
@@ -34,10 +35,14 @@ Si une version précédente est installée et qu'Android refuse la mise à jour 
 
 Les gobelins sortent de la forêt et marchent vers le rempart. Vos mages, placés sur un damier de 4 × 3 cases devant le château, les attaquent automatiquement.
 
-- **Recruter** : chaque bouton du bas place un mage de l'élément choisi sur une case libre (10 PO).
+- **Recruter** : chaque bouton du bas place un mage de l'élément choisi sur une case libre (10 PO). Le bouton **dé** (sous la jauge) place un mage **au hasard** de l'équipe pour 7 PO.
+- **Cases bloquées** : la rangée du fond du damier (4 cases) est enchaînée au début de chaque partie. Touchez une case pour la débloquer avec des PO (30, puis 50, 80, 120).
+- **Soigner** : le bouton **+** (sous la jauge) rend 25 % des PV max du château, sans jamais dépasser le maximum. 3 soins par partie (50, 75, puis 100 PO).
+- **Vitesse ×1 / ×2 / ×3** : bouton sous le son. ×2 est gratuit, ×3 s'achète une fois pour toutes au Marché.
+- **AUTO** : le mode automatique lance seul l'ultime et les compétences dès qu'ils sont prêts.
 - **Fusionner** : glissez un mage sur un autre **du même élément et du même niveau** → il passe au niveau supérieur (niveau 5 maximum). Glisser sur une case vide déplace le mage.
 - **Gagner de l'or** : chaque gobelin tué rapporte des pièces d'or.
-- **Protéger le château** : il a 10 000 PV. Les étoiles obtenues dépendent des PV restants à la fin du niveau (3 étoiles à partir de 70 %, 2 à partir de 40 %).
+- **Protéger le château** : il a 10 000 PV (plus avec les améliorations de la page Château). Les étoiles obtenues dépendent des PV restants à la fin du niveau (3 étoiles à partir de 70 %, 2 à partir de 40 %).
 
 ### Les éléments
 
@@ -49,13 +54,58 @@ Les gobelins sortent de la forêt et marchent vers le rempart. Vos mages, placé
 | **Foudre** | Tir instantané et cadence rapide | éclair violet → ramifications → double éclair doré |
 | **Poison** *(exclusif)* | Faibles dégâts directs, empoisonne 3 s (dégâts sur la durée) | boule toxique → épines en orbite |
 | **Air** *(exclusif)* | Rafale qui repousse l'ennemi vers la forêt | croissants de vent qui tournent |
-| **Invocateur** *(exclusif)* | Esprit lent qui frappe fort et étourdit | esprit magenta → couronne d'étincelles |
+| **Invocateur** *(exclusif)* | Invoque des **chevaliers** devant le château (1 à 3 selon le niveau) : ils se placent face au gobelin le plus proche, le bloquent et le combattent à l'épée. Les gobelins doivent les abattre avant d'avancer | chevalier d'argent au plumet magenta |
 
-Les unités exclusives s'achètent au **Marché** avec des gemmes (Poison 15, Air 25, Invocateur 40).
+Les unités exclusives s'achètent au **Marché** avec des gemmes (Poison 60, Air 100, Invocateur 160).
+
+### Compétences (niveau 5)
+
+Un mage de niveau 5 a une **compétence active** : touchez-le (sans le glisser) pour la lancer. Un anneau autour de lui montre la recharge (≈ 20 s), une étoile dorée qu'elle est prête.
+
+| Élément | Compétence |
+|---|---|
+| Eau | **Raz-de-marée** : repousse, ralentit et blesse tous les gobelins |
+| Feu | **Pluie de feu** : 8 boules de feu tombent du ciel |
+| Terre | **Séisme** : étourdit et blesse tous les gobelins |
+| Foudre | **Tempête** : 10 éclairs sur le terrain |
+| Poison | **Peste** : empoisonne tous les gobelins |
+| Air | **Tornade** : renvoie tous les gobelins vers la forêt |
+| Invocateur | **Appel aux armes** : 3 chevaliers d'élite (PV doublés) |
+
+### Ultimes
+
+La jauge se remplit en tuant des gobelins ; **secouer le téléphone** (ou le mode AUTO) lance l'ultime **équipé** sur la page Château.
+
+| Ultime | Effet | Jauge | Prix |
+|---|---|---|---|
+| Onde de choc | tous les gobelins étourdis 4 s | 20 | offert |
+| Rage arcanique | dégâts des mages ×2 pendant 8 s | 25 | 120 gemmes |
+| Météorite géante | une météorite s'écrase : 70 % des PV de chaque gobelin (20 % pour le boss) | 30 | 220 gemmes |
+| Bouclier divin | château invincible 10 s | 25 | 160 gemmes |
+
+### Artefacts
+
+21 artefacts, 3 par mage. Battre un **boss de la campagne** (niveaux 10, 20, 30…) pour la première fois en donne un au hasard (pour un mage possédé en priorité ; 20 gemmes s'ils sont tous obtenus). Chaque mage en équipe un (bandeau de sa ligne, page Mages) : il le spécialise avec un avantage et un inconvénient, par exemple *Baguette de corail* (Eau, cadence bien plus rapide, −30 % de dégâts), *Cœur de volcan* (Feu, +70 % de dégâts, tire moins vite), *Fronde de granit* (Terre, un projectile de plus), *Grimoire incandescent* (compétence deux fois plus souvent), *Bannière royale* (Invocateur, un chevalier de plus)…
 
 ### Équipe
 
-On emmène **4 mages** en partie : sur l'écran MAGES, toucher le portrait d'un mage l'ajoute à l'équipe ou l'en retire (cadre vert « ÉQUIPE »). La barre de recrutement affiche les mages de l'équipe.
+On emmène **4 mages** en partie : sur la page Mages, toucher le portrait d'un mage l'ajoute à l'équipe ou l'en retire (cadre vert « ÉQUIPE »). La barre de recrutement affiche les mages de l'équipe.
+
+### Navigation : 5 pages en glissant
+
+L'accueil se parcourt en **glissant le doigt** vers la gauche ou la droite (ou avec la barre d'onglets en bas) :
+
+**Marché · Mages · Campagne · Infini · Château** (le jeu s'ouvre sur la Campagne, au centre).
+
+- **Marché** (liste qui défile) : coffres (10 gemmes), unités exclusives, ultimes, vitesse ×3 (300 gemmes).
+- **Mages** (liste qui défile) : ouvrir les coffres **×1, ×5 ou ×10**, monter les rangs, composer l'équipe, changer d'artefact.
+- **Campagne** : la carte des niveaux et JOUER.
+- **Infini** : choix de la difficulté et records.
+- **Château** (liste qui défile) : améliorations permanentes du château avec des gemmes (**PV max** +10 % par niveau, jusqu'à 20 ; **résistance** −3 % de dégâts subis par niveau, jusqu'à 15), choix de l'ultime équipé, et **succès**.
+
+### Succès
+
+22 succès (niveaux, gobelins tués, fusions, réactions, boss, mode infini, coffres, étoiles, artefacts, rangs, compétences, chevaliers…). Chacun donne des **gemmes** dès qu'il est accompli, avec un bandeau en haut de l'écran. La liste et la progression sont sur la page Château.
 
 ### Réactions élémentaires
 
@@ -109,13 +159,26 @@ Des niveaux **sans fin**, débloqués l'un après l'autre sur une carte affiché
 
 L'accueil change de décor à chaque page de la carte : **Prairie** (1-6), **Désert** (7-12), **Toundra** (13-18), **Marais** (19-24), **Volcan** (25-30), **Crépuscule** (31-36), puis le cycle recommence. Chaque biome a son ciel, ses collines, son décor (arbres, cactus, sapins enneigés, roseaux, rochers et lave, cristaux) et ses particules animées (lucioles, poussière, neige, braises). Le terrain de jeu prend la teinte du biome ; en mode infini, le biome change toutes les 10 vagues.
 
+### Nuit dans la campagne et cycle jour / nuit
+
+- Certains niveaux générés de la campagne se jouent **de nuit** (7, 11, 15, 19… : lune sur la carte).
+- En mode infini, **une vague sur trois** tombe de nuit (3, 6, 9…).
+- Le capteur de luminosité peut toujours faire tomber la nuit à tout moment.
+
 ### Mode infini
 
-Bouton **INFINI** de l'accueil : les vagues s'enchaînent, de plus en plus fortes et variées, jusqu'à la chute du château. Le record (vague atteinte) est sauvegardé.
+Page **Infini** : les vagues s'enchaînent, de plus en plus fortes et variées, jusqu'à la chute du château. Quatre difficultés, chacune avec son record :
+
+| Difficulté | Gobelins | Coffres | Bonus |
+|---|---|---|---|
+| Facile | 60 % | 1 toutes les 5 vagues | — |
+| Normal | 100 % | 1 toutes les 3 vagues | — |
+| Difficile | 150 %, plus rapides | 1 toutes les 3 vagues | +1 gemme par coffre |
+| Infernal | 220 %, encore plus rapides | 1 toutes les 2 vagues | +2 gemmes par coffre |
 
 ### Coffres et améliorations permanentes
 
-- **Coffres** : 1 coffre par niveau terminé (+1 tous les 4 niveaux : 2 coffres à partir du niveau 5, 3 à partir du 9…). En mode infini, 1 coffre toutes les 3 vagues repoussées, même en abandonnant la partie.
+- **Coffres** : 1 coffre par niveau terminé (+1 tous les 4 niveaux : 2 coffres à partir du niveau 5, 3 à partir du 9…). En mode infini, selon la difficulté (voir ci-dessus), même en abandonnant la partie. Ils s'achètent aussi au Marché (10 gemmes) et s'ouvrent par 1, 5 ou 10 (le butin est additionné).
 - **Ouverture carte par carte** : le coffre (pixel art) tombe puis attend. Chaque toucher fait sortir **une** carte : elle jaillit du coffre de dos, se retourne, s'affiche en grand avec des rayons de sa couleur et son nombre qui monte. Une pastille indique les cartes restantes ; les gemmes sortent en dernier. Un récapitulatif « BUTIN » clôt l'ouverture, avec « OUVRIR ENCORE » s'il reste des coffres.
 - **Contenu** : 3 lots de 4 à 8 fragments (chacun d'un élément possédé tiré au hasard) et 1 à 3 **gemmes**.
 - **Rangs** (écran **MAGES**) : chaque élément a un rang permanent, de 1 à 999. Passer du rang *n* au rang *n + 1* coûte **10 × n fragments** de cet élément. Chaque rang donne **+10 % de dégâts** et **+1 % de cadence** (plafonnée à +30 %) à tous les mages de cet élément, dans toutes les parties. L'apparence du mage sur l'écran MAGES évolue tous les 10 rangs.
@@ -134,9 +197,15 @@ Bouton **INFINI** de l'accueil : les vagues s'enchaînent, de plus en plus forte
 | Capteur | Action | Robustesse |
 |---|---|---|
 | **Accéléromètre** | **Secouer le téléphone** lance l'ultime (tous les gobelins étourdis 4 s) quand la jauge est pleine (20 gobelins tués) | Secousse forte (> 2,2 g) et **maintenue 1,5 s** ; un anneau de progression et des vibrations guident le joueur |
-| **Capteur de luminosité** | **Cacher le capteur** (ou jouer dans le noir) fait tomber la nuit : gobelins 30 % plus rapides, torches, yeux rouges, mais +20 % d'or | Seuils différents pour entrer et sortir de la nuit (30 / 80 lux) et confirmation de 600 ms pour éviter le clignotement ; désactivable dans les options |
+| **Capteur de luminosité** | **Cacher le capteur** (ou jouer dans une pièce sombre) fait tomber la nuit : gobelins 30 % plus rapides, torches, yeux rouges, mais +20 % d'or | Seuils relatifs à la lumière de la pièce, assouplis : la nuit tombe sous 50 % de la lumière habituelle (ou sous 10 lux) et le jour revient au-dessus de 70 % ; confirmation de 400 ms pour éviter le clignotement ; désactivable dans les options (les niveaux de nuit restent de nuit) |
 
 Les capteurs sont coupés quand l'application passe en arrière-plan.
+
+### Sauvegarde
+
+- Tout est sauvegardé dès que ça change (achats, coffres, rangs, succès) et quand l'application passe en arrière-plan.
+- **Partie en cours** : si l'application est quittée (ou fermée par le téléphone) en plein niveau, la partie est sauvegardée. Au prochain lancement, elle reprend **en pause, au début de la vague en cours**, avec les mages, les PO, les PV et les cases débloquées.
+- **Mises à jour** : installer un nouvel APK par-dessus l'ancien garde la sauvegarde (même clé de signature, voir « Télécharger et jouer »). Les données ajoutées par une mise à jour ont toutes une valeur par défaut : une ancienne sauvegarde se charge sans problème.
 
 ### Style de l'interface
 Toute l'interface reprend la direction artistique pixel art médiéval-fantasy du décor (classe `UiKit`) : boutons en **tuiles en relief** qui s'enfoncent à l'appui, boutons ronds en **médaillons dorés**, fenêtres en **planches de bois cloutées** avec un **ruban** de titre, listes en **alcôves creusées**, barres encadrées, texte gras à contour sombre, curseurs en pièces d'or, bulle de la carte en parchemin.
@@ -178,10 +247,14 @@ com.example.magicdefense
 ├── MainActivity           Plein écran, cycle de vie (pause / reprise)
 ├── model/                 Règles du jeu, sans dessin ni toucher
 │   ├── GameModel          État de la partie, vagues, tirs, fusion, victoire, événements
-│   ├── GameState          START, PLAYING, PAUSED, OPTIONS, VICTORY, GAME_OVER, UPGRADES
+│   ├── GameState          START (5 pages), PLAYING, PAUSED, OPTIONS, VICTORY, GAME_OVER, CHEST_OPENING
 │   ├── Board              Géométrie : colonne de jeu, damier, adaptation à l'écran
 │   ├── LevelSpec          Description d'un niveau : faits main (1-6), générés (7+), mode infini, boss, biomes
 │   ├── Progression        Progression permanente : coffres, fragments, rangs, gemmes, unités, équipe, record
+│   ├── Ultimate           Les 4 ultimes (prix, jauge, effets)
+│   ├── Artifact           Les 21 artefacts (3 par mage) et leurs modificateurs
+│   ├── Achievement        Les succès (statistique suivie, seuil, gemmes)
+│   ├── Knight             Chevaliers invoqués par l'Invocateur
 │   ├── Reaction, Zone     Réactions élémentaires et zones au sol (lave, vapeur)
 │   ├── Mage, Enemy        Unités (caractéristiques par élément, niveau, rang ; types de gobelins)
 │   └── Projectile, Bolt, Splash, HitEffect   Attaques et effets
@@ -192,17 +265,18 @@ com.example.magicdefense
 │   ├── TerrainRenderer    Décor pixel art généré (forêt, prairie, rempart, cour)
 │   ├── Sprites            Mages et gobelins en pixel art
 │   ├── Hud                Position de tous les boutons et fenêtres (miroir en mode gaucher)
+│   ├── MenuList           Contenu des listes qui défilent (Marché, Mages, Château), partagé dessin / touchers
 │   ├── UiKit              Style de l'interface : tuiles, médaillons, fenêtres en bois, rubans
 │   ├── Palette            Couleurs
 │   ├── SoundManager       Bruitages (SoundPool)
 │   ├── MusicPlayer        Musique de fond (MediaPlayer)
 │   └── Haptics            Vibrations
 ├── controller/            Entrées du joueur
-│   ├── TouchController    Touchers, glisser-déposer, boutons, curseur de volume
+│   ├── TouchController    Touchers, glisser-déposer, glissement entre pages, défilement, boutons
 │   ├── ShakeDetector      Accéléromètre → ultime
 │   └── LightSensor        Luminosité → mode nuit
 └── data/
-    └── SaveManager        Sauvegarde (SharedPreferences) : niveaux, étoiles, options, coffres, fragments, rangs
+    └── SaveManager        Sauvegarde (SharedPreferences) : progression, options, partie en cours à reprendre
 ```
 
 Le modèle prévient la vue de ce qui se passe (château touché, fusion, victoire…) par l'interface `GameModel.GameListener`, ce qui déclenche sons, vibrations et sauvegarde.

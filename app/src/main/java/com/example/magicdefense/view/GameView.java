@@ -11,6 +11,7 @@ import android.view.WindowInsets;
 import com.example.magicdefense.controller.TouchController;
 import com.example.magicdefense.model.Board;
 import com.example.magicdefense.model.GameModel;
+import com.example.magicdefense.model.GameState;
 import com.example.magicdefense.controller.ShakeDetector;
 import com.example.magicdefense.controller.LightSensor;
 import com.example.magicdefense.data.SaveManager;
@@ -139,6 +140,17 @@ public class GameView extends View {
             }
 
             @Override
+            public void onSkill() {
+                haptics.merge();
+                sounds.ultimate();
+            }
+
+            @Override
+            public void onAchievement() {
+                sounds.victory();
+            }
+
+            @Override
             public void onProgressChanged() {
                 saveManager.save(model); // coffres, fragments, rangs : sauvegardés tout de suite
             }
@@ -198,7 +210,13 @@ public class GameView extends View {
                 relayout(getWidth(), getHeight()); // option "Mode gaucher" : interface en miroir
             }
             model.setNightMode(lightSensor.isNight());
-            model.update();
+            model.updateUi();       // animations des menus, bandeaux de succès (une fois par image)
+            touchController.tick(); // glissement entre les pages, inertie des listes
+            // Vitesse du jeu : ×2 ou ×3 = 2 ou 3 étapes de jeu par image
+            int steps = model.getState() == GameState.PLAYING ? model.getGameSpeed() : 1;
+            for (int i = 0; i < steps; i++) {
+                model.update();
+            }
             // Pendant une secousse (jauge pleine) : une impulsion toutes les 8 images (≈ 7 par seconde)
             float shake = model.isUltimateReady() ? shakeDetector.getProgress() : 0;
             if (shake > 0) {

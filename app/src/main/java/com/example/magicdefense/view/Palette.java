@@ -17,7 +17,7 @@ public class Palette {
     // Description courte (Marché)
     public static final String[] ELEMENT_DESCRIPTIONS = {
             "Dégâts de zone", "Dégâts qui explosent", "Salve de cristaux", "Tir éclair",
-            "Empoisonne : dégâts sur la durée", "Repousse les ennemis", "Esprit qui frappe et étourdit",
+            "Empoisonne : dégâts sur la durée", "Repousse les ennemis", "Invoque des chevaliers gardiens",
     };
 
     // Réactions élémentaires (indice = Reaction.xxx)
@@ -132,5 +132,19 @@ public class Palette {
     public static final int TEAM = Color.rgb(90, 200, 110);           // cadre « dans l'équipe »
     public static final int PARCHMENT = Color.rgb(240, 224, 184);     // bulle de la carte
     public static final int PARCHMENT_DARK = Color.rgb(200, 176, 128);
+
+    // Mise à jour : ultimes, château, succès, artefacts, navigation
+    public static final int FURY = Color.rgb(255, 80, 60);            // Rage arcanique
+    public static final int SHIELD = Color.rgb(120, 200, 255);        // Bouclier divin
+    public static final int METEOR = Color.rgb(255, 140, 40);         // Météorite
+    public static final int ARTIFACT = Color.rgb(255, 170, 60);       // artefacts (orangé doré)
+    public static final int ACHIEVEMENT = Color.rgb(250, 210, 80);    // succès
+    public static final int CASTLE_PAGE = Color.rgb(90, 110, 150);    // page Château
+    public static final int HEAL = Color.rgb(80, 190, 110);           // soin du château
+    public static final int NIGHT_LEVEL = Color.rgb(150, 170, 255);   // niveau de nuit (lune)
+    public static final int KNIGHT_BAR = Color.rgb(230, 120, 200);    // PV des chevaliers
+    public static final int[] DIFFICULTY_COLORS = {
+            Color.rgb(80, 170, 100), Color.rgb(80, 120, 200), Color.rgb(200, 120, 40), Color.rgb(190, 40, 50)};
+    public static final int[] ULTIMATE_COLORS = {STUNNED, FURY, METEOR, SHIELD};
 
 }

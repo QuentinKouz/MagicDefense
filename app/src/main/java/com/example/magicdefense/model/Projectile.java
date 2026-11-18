@@ -31,7 +31,14 @@ public class Projectile {
         this.radius = 6 * density;
         this.poisonDps = mage.getPoisonDps();
         this.knockback = mage.getKnockback() * density;
-        this.stunFrames = mage.getStunFrames();
+        this.stunFrames = 0;
+    }
+
+    // Dégâts multipliés (Rage arcanique)
+    public Projectile boost(float mult) {
+        damage *= mult;
+        poisonDps *= mult;
+        return this;
     }
 
     // Projectile créé par une réaction (Feux follets) : il n'a pas d'élément, donc ne pose pas de marque

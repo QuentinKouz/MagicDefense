@@ -15,11 +15,12 @@ import android.util.Log;
 public class LightSensor implements SensorEventListener {
     private static final String TAG = "LightSensor";
 
-    private static final float NIGHT_RATIO = 0.25f;   // nuit : moins de 25 % de la lumière habituelle
-    private static final float DAY_RATIO = 0.5f;      // jour : retour au-dessus de 50 % (hystérésis)
-    private static final float DARK_LUX = 3f;         // noir complet : toujours la nuit
+    // Seuils assouplis : la nuit tombe plus facilement (avant : 25 % de la lumière, noir < 3 lux, 0,6 s)
+    private static final float NIGHT_RATIO = 0.5f;    // nuit : moins de 50 % de la lumière habituelle
+    private static final float DAY_RATIO = 0.7f;      // jour : retour au-dessus de 70 % (hystérésis)
+    private static final float DARK_LUX = 10f;        // pièce sombre : toujours la nuit
     private static final float MIN_REFERENCE_LUX = 10f;
-    private static final long CONFIRM_DELAY_MS = 600; // le changement doit durer 0,6 s
+    private static final long CONFIRM_DELAY_MS = 400; // le changement doit durer 0,4 s
 
     private final SensorManager sensorManager;
     private final Sensor lightSensor;

@@ -20,3 +20,5 @@ app/release/
 *.aab
 # Exception (branche v2) : l'APK de la V2 est versionné dans le dépôt
 !/apk/MagicDefense-v2.apk
+# Exception : clé de signature partagée (mises à jour de l'APK sans désinstaller ni perdre la sauvegarde)
+!/app/signing/magicdefense.keystore
