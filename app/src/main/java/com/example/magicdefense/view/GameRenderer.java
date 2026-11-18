@@ -102,7 +102,7 @@ public class GameRenderer {
         terrain.build(board);
     }
 
-    public void draw(Canvas canvas, GameModel model, TouchController touch, float shakeProgress) {
+    public void draw(Canvas canvas, GameModel model, TouchController touch) {
         frame++;
         attacks.setFrame(frame);
         if (model.getState() != lastState) {
@@ -119,7 +119,7 @@ public class GameRenderer {
                 drawHome(canvas, model, touch, touch.getPressedMenuButton());
                 break;
             case PLAYING:
-                drawGame(canvas, model, touch, shakeProgress);
+                drawGame(canvas, model, touch);
                 break;
             case PAUSED:
                 drawPauseScreen(canvas, model, touch);
@@ -417,7 +417,7 @@ public class GameRenderer {
 
     // Écran Game Over : même fenêtre que la victoire, partie figée derrière
     private void drawGameOverScreen(Canvas canvas, GameModel model, TouchController touch) {
-        drawGame(canvas, model, touch, 0);
+        drawGame(canvas, model, touch);
 
         paint.setColor(Color.argb(160, 0, 0, 0));
         canvas.drawRect(0, 0, board.width, board.height, paint);
@@ -461,7 +461,7 @@ public class GameRenderer {
                 Palette.MENU_BUTTON, pressed == Hud.GAMEOVER_MENU);
     }
 
-    private void drawGame(Canvas canvas, GameModel model, TouchController touch, float shakeProgress) {
+    private void drawGame(Canvas canvas, GameModel model, TouchController touch) {
         Mage dragged = touch.getDraggedMage();
 
         terrain.draw(canvas, night, model.getBiome()); // forêt, prairie, rempart, cour... teintés selon le biome
@@ -514,14 +514,14 @@ public class GameRenderer {
         // Météorite : chute puis explosion
         drawMeteor(canvas, model);
 
-        drawRecruitButtons(canvas, model, touch.getPressedButton());
+        drawRecruitButtons(canvas, model, touch.getPressedButton(),
+                touch.getPressedGameButton() == Hud.GAME_RANDOM);
         drawTopInfo(canvas, model);
         drawBossBar(canvas, model);
         drawAnnounce(canvas, model);
         drawSkillText(canvas, model);
         drawUltimateGauge(canvas, model);
         drawGameButtons(canvas, model, touch.getPressedGameButton());
-        drawShakeFeedback(canvas, model, shakeProgress);
         // Flash rouge quand le château est touché (s'estompe tout seul)
         float flash = model.getCastleHitFlash();
         if (flash > 0) {
@@ -757,7 +757,7 @@ public class GameRenderer {
         drawCenteredText(canvas, model.getAnnounceSubtitle(), cy + 16 * density, 13);
     }
 
-    private void drawRecruitButtons(Canvas canvas, GameModel model, int pressedButton) {
+    private void drawRecruitButtons(Canvas canvas, GameModel model, int pressedButton, boolean pressedRandom) {
         boolean canAfford = model.canAffordMage();
 
         for (int i = 0; i < hud.recruitButtons.length; i++) {
@@ -777,14 +777,27 @@ public class GameRenderer {
             ui.textPx(canvas, Palette.ELEMENT_NAMES[type], f.centerX(), f.centerY() - 1 * density, 14 * density,
                     textColor, Paint.Align.CENTER, f.width() - 8 * density); // « Invocateur » tient dans la tuile
 
-            // Prix : pièce d'or + 10
-            String cost = String.valueOf(GameModel.MAGE_COST);
-            float coinR = 6 * density;
-            float priceY = f.centerY() + 15 * density;
-            ui.coin(canvas, f.centerX() - 8 * density, priceY - 4.5f * density, coinR);
-            ui.text(canvas, cost, f.centerX() + 1 * density, priceY, 13, canAfford ? Palette.GOLD : textColor,
-                    Paint.Align.LEFT);
+            // Prix : pièce d'or + prix (il monte de 2 à chaque mage choisi)
+            drawBarPrice(canvas, f, model.getMageCost(), canAfford, textColor);
         }
+
+        // Dernière case : mage au hasard parmi l'équipe, prix fixe
+        RectF r = hud.randomButton;
+        boolean canRandom = model.canRecruitRandom() && model.hasFreeCell();
+        boolean pressed = canRandom && pressedRandom;
+        RectF f = ui.button(canvas, r, Palette.ENDLESS, pressed, canRandom);
+        drawDice(canvas, f.centerX(), f.centerY() - 4 * density, 9 * density, canRandom);
+        drawBarPrice(canvas, f, GameModel.RANDOM_MAGE_COST, canRandom,
+                canRandom ? Color.WHITE : Color.rgb(170, 168, 182));
+    }
+
+    private void drawBarPrice(Canvas canvas, RectF f, int price, boolean can, int textColor) {
+        float priceY = f.centerY() + 15 * density;
+        String cost = String.valueOf(price);
+        float half = (12 * density + cost.length() * 7.5f * density) / 2; // pièce + chiffres, centrés
+        ui.coin(canvas, f.centerX() - half + 6 * density, priceY - 4.5f * density, 6 * density);
+        ui.text(canvas, cost, f.centerX() - half + 14 * density, priceY, 13, can ? Palette.GOLD : textColor,
+                Paint.Align.LEFT);
     }
 
     private void drawTopInfo(Canvas canvas, GameModel model) {
@@ -887,8 +900,14 @@ public class GameRenderer {
             ui.text(canvas, shortNames[ult], cx, cy + 5 * density, 12, ultColor, Paint.Align.CENTER);
         } else if (ready) {
             ui.text(canvas, shortNames[ult], cx, cy + 5 * density, 12, Palette.GOLD, Paint.Align.CENTER);
-            ui.text(canvas, model.isAutoMode() ? "Auto" : "Secouez !", cx, cy + radius + 22 * density, 13,
+            ui.text(canvas, model.isAutoMode() ? "Auto" : "Touchez !", cx, cy + radius + 22 * density, 13,
                     Palette.GOLD, Paint.Align.CENTER);
+        } else if (model.getUltimateCooldown() > 0) {
+            // Recharge d'une minute : voile qui se retire et secondes restantes
+            paint.setColor(Color.argb(150, 10, 8, 20));
+            canvas.drawArc(gaugeOval, -90, 360 * model.getUltimateCooldown(), true, paint);
+            ui.text(canvas, model.getUltimateCooldownSeconds() + " s", cx, cy + 5 * density, 12,
+                    Palette.TEXT_INACTIVE, Paint.Align.CENTER);
         } else {
             ui.text(canvas, model.getUltimateKills() + "/" + model.getUltimateKillsRequired(),
                     cx, cy + 5 * density, 12, Color.WHITE, Paint.Align.CENTER);
@@ -1052,11 +1071,13 @@ public class GameRenderer {
         ui.text(canvas, "×" + speed, s.centerX(), s.centerY() + 6 * density + sink(pressed == Hud.GAME_SPEED), 16,
                 Color.WHITE, Paint.Align.CENTER);
 
-        // Mode automatique (ultime et compétences)
+        // Mode automatique (ultime et compétences) : grisé tant qu'il n'est pas acheté au Marché
         RectF a = hud.autoButton;
         boolean auto = model.isAutoMode();
-        ui.medallion(canvas, a.centerX(), a.centerY(), a.width() / 2, auto ? Palette.RESUME : Palette.MENU_BUTTON,
-                pressed == Hud.GAME_AUTO, 215);
+        boolean autoOwned = model.getProgression().hasAuto();
+        ui.medallion(canvas, a.centerX(), a.centerY(), a.width() / 2,
+                !autoOwned ? Palette.DISABLED : auto ? Palette.RESUME : Palette.MENU_BUTTON,
+                autoOwned && pressed == Hud.GAME_AUTO, 215);
         ui.text(canvas, "AUTO", a.centerX(), a.centerY() + 4 * density + sink(pressed == Hud.GAME_AUTO), 11,
                 auto ? Color.WHITE : Palette.TEXT_INACTIVE, Paint.Align.CENTER);
 
@@ -1075,14 +1096,17 @@ public class GameRenderer {
         drawPriceTag(canvas, h, healsLeft ? String.valueOf(model.getHealCost()) : "—", canHeal,
                 model.getHealsLeft() + "/" + GameModel.MAX_HEALS);
 
-        // Mage au hasard, moins cher
-        RectF r = hud.randomButton;
-        boolean canRandom = model.canRecruitRandom() && model.hasFreeCell();
-        ui.medallion(canvas, r.centerX(), r.centerY(), r.width() / 2, canRandom ? Palette.ENDLESS : Palette.DISABLED,
-                canRandom && pressed == Hud.GAME_RANDOM, 215);
-        drawDice(canvas, r.centerX(), r.centerY() + sink(canRandom && pressed == Hud.GAME_RANDOM), 11 * density,
-                canRandom);
-        drawPriceTag(canvas, r, String.valueOf(GameModel.RANDOM_MAGE_COST), canRandom, null);
+        // Le joueur se prépare : grand bouton « Lancer la vague »
+        if (model.isWaitingForWave()) {
+            RectF l = hud.launchButton;
+            float pulse = 1 + 0.04f * (float) Math.sin(frame * 0.12);
+            tmpRect.set(l.centerX() - l.width() / 2 * pulse, l.centerY() - l.height() / 2 * pulse,
+                    l.centerX() + l.width() / 2 * pulse, l.centerY() + l.height() / 2 * pulse);
+            drawPillButton(canvas, tmpRect, "LANCER LA VAGUE " + model.getWave(), Palette.RESUME,
+                    pressed == Hud.GAME_LAUNCH);
+            ui.text(canvas, "Placez vos mages, puis lancez", l.centerX(), l.bottom + 22 * density, 13,
+                    Color.WHITE, Paint.Align.CENTER);
+        }
     }
 
     // Prix en PO sous un bouton rond (et petite mention à droite, ex. soins restants)
@@ -1152,35 +1176,6 @@ public class GameRenderer {
                 16, Palette.GEM, Paint.Align.LEFT);
     }
 
-    // Feedback de secousse : grand anneau au centre de la zone de jeu
-    private void drawShakeFeedback(Canvas canvas, GameModel model, float shakeProgress) {
-        if (!model.isUltimateReady() || shakeProgress <= 0) {
-            return;
-        }
-
-        // Voile sombre pour faire ressortir l'anneau
-        paint.setColor(Color.argb(140, 0, 0, 0));
-        canvas.drawRect(0, 0, board.width, board.height, paint);
-
-        float cx = board.centerX();
-        float cy = board.gridTop / 2f;          // milieu de la zone des ennemis
-        float radius = board.playWidth * 0.25f; // grand : un quart de la colonne de jeu
-        gaugeOval.set(cx - radius, cy - radius, cx + radius, cy + radius);
-
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(16 * density);
-        paint.setColor(Palette.GAUGE_EMPTY);
-        canvas.drawArc(gaugeOval, 0, 360, false, paint);
-        paint.setColor(Palette.GOLD);
-        canvas.drawArc(gaugeOval, -90, 360 * shakeProgress, false, paint);
-        paint.setStyle(Paint.Style.FILL);
-
-        // Textes en gros
-        paint.setColor(Color.WHITE);
-        drawCenteredText(canvas, (int) (shakeProgress * 100) + "%", cy + 12 * density, 34);
-        drawCenteredText(canvas, "Continuez !", cy + radius + 44 * density, 26);
-    }
-
     // Halo de la torche : deux cercles transparents qui respirent (le jeu de lumière d'avant)
     private void drawTorchGlow(Canvas canvas, float fx, float fy, Enemy enemy) {
         float r = enemy.radius;
@@ -1220,7 +1215,7 @@ public class GameRenderer {
 
     // Écran pause : partie figée derrière un voile, fenêtre de la maquette au centre
     private void drawPauseScreen(Canvas canvas, GameModel model, TouchController touch) {
-        drawGame(canvas, model, touch, 0);
+        drawGame(canvas, model, touch);
 
         paint.setColor(Color.argb(160, 0, 0, 0));
         canvas.drawRect(0, 0, board.width, board.height, paint);
@@ -1239,6 +1234,15 @@ public class GameRenderer {
         // QUITTER
         drawPillButton(canvas, hud.pauseMenuButtons[Hud.PAUSE_QUIT], "QUITTER", Palette.QUIT,
                 pressed == Hud.PAUSE_QUIT);
+
+        // Vibrations Non / Oui
+        paint.setColor(Color.WHITE);
+        drawCenteredText(canvas, "Vibrations", p.top + Hud.PAUSE_VIBRATION_Y * density, 17);
+        RectF vib = hud.pauseMenuButtons[Hud.PAUSE_VIBRATION];
+        if (pressed == Hud.PAUSE_VIBRATION) {
+            drawPressedOverlay(canvas, vib, 12 * density);
+        }
+        drawToggle(canvas, vib, model.isVibrationEnabled());
 
         // Trois médaillons : recommencer, reprendre (mis en avant), options
         for (int i = Hud.PAUSE_RESTART; i <= Hud.PAUSE_OPTIONS; i++) {
@@ -1322,7 +1326,7 @@ public class GameRenderer {
         if (model.getOptionsReturnState() == GameState.START) {
             drawHome(canvas, model, touch, -1); // -1 : aucun bouton de l'accueil n'est appuyé
         } else {
-            drawGame(canvas, model, touch, 0);
+            drawGame(canvas, model, touch);
         }
 
         paint.setColor(Color.argb(160, 0, 0, 0));
@@ -1332,16 +1336,16 @@ public class GameRenderer {
         RectF p = hud.optionsPopup;
         ui.panel(canvas, p, "OPTIONS", UiKit.RIBBON);
         paint.setColor(Color.WHITE);
-        drawCenteredText(canvas, "Désactiver le mode nuit", p.top + Hud.OPT_NIGHT_Y * density, 18);
+        drawCenteredText(canvas, "Vibrations", p.top + Hud.OPT_VIBRATION_Y * density, 18);
 
         int pressed = touch.getPressedMenuButton();
 
         // Interrupteur Non / Oui
-        RectF row = hud.optionsButtons[Hud.OPTIONS_NIGHT_TOGGLE];
-        if (pressed == Hud.OPTIONS_NIGHT_TOGGLE) {
+        RectF row = hud.optionsButtons[Hud.OPTIONS_VIBRATION];
+        if (pressed == Hud.OPTIONS_VIBRATION) {
             drawPressedOverlay(canvas, row, 12 * density);
         }
-        drawToggle(canvas, row, model.isNightModeDisabled());
+        drawToggle(canvas, row, model.isVibrationEnabled());
 
         // Musique de fond Non / Oui
         paint.setColor(Color.WHITE);
@@ -1419,7 +1423,7 @@ public class GameRenderer {
 
     // Écran victoire : partie figée derrière, fenêtre avec les étoiles gagnées
     private void drawVictoryScreen(Canvas canvas, GameModel model, TouchController touch) {
-        drawGame(canvas, model, touch, 0);
+        drawGame(canvas, model, touch);
 
         paint.setColor(Color.argb(160, 0, 0, 0));
         canvas.drawRect(0, 0, board.width, board.height, paint);
@@ -1431,7 +1435,7 @@ public class GameRenderer {
         // Coffres gagnés, sous les étoiles (juste au-dessus des boutons)
         if (stateFrames >= 60) { // après l'apparition des étoiles
             drawChestsEarned(canvas, model.getLastChestsEarned(), p.top + 186 * density);
-            // Boss vaincu pour la première fois : un artefact
+            // Niveau de boss en 3 étoiles : 10 % de chances d'artefact
             int art = model.getLastArtifact();
             if (art != Artifact.NONE) {
                 float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12);
@@ -1444,6 +1448,12 @@ public class GameRenderer {
             } else if (model.getLastArtifactGems() > 0) {
                 ui.text(canvas, "Tous les artefacts : +" + model.getLastArtifactGems() + " gemmes", board.centerX(),
                         p.top + 222 * density, 14, Palette.GEM, Paint.Align.CENTER);
+            } else if (model.isLastArtifactRolled()) {
+                ui.text(canvas, "Pas d'artefact cette fois (10 % de chances)", board.centerX(),
+                        p.top + 222 * density, 12, Palette.TEXT_INACTIVE, Paint.Align.CENTER);
+            } else if (model.getSpec().hasBossLevel()) {
+                ui.text(canvas, "Artefact possible seulement en 3 étoiles", board.centerX(),
+                        p.top + 222 * density, 12, Palette.TEXT_INACTIVE, Paint.Align.CENTER);
             }
         }
 
@@ -1471,6 +1481,8 @@ public class GameRenderer {
         // Les niveaux sont infinis : il y a toujours un niveau suivant
         drawPillButton(canvas, hud.victoryButtons[Hud.VICTORY_NEXT], "NIVEAU SUIVANT",
                 Palette.RESUME, pressed == Hud.VICTORY_NEXT);
+        drawPillButton(canvas, hud.victoryButtons[Hud.VICTORY_RESTART], "REJOUER",
+                Palette.MENU_BUTTON, pressed == Hud.VICTORY_RESTART);
         drawPillButton(canvas, hud.victoryButtons[Hud.VICTORY_MENU], "MENU",
                 Palette.MENU_BUTTON, pressed == Hud.VICTORY_MENU);
     }
@@ -1923,6 +1935,23 @@ public class GameRenderer {
                     boolean locked = a == 3 && !prog.hasSpeed2();
                     status = locked ? "Débloquez d'abord la vitesse ×2" : "Achat définitif";
                     drawPriceButton(canvas, btnRect, Progression.speedPrice(a), prog.canBuySpeed(a), mainPressed);
+                }
+                break;
+            }
+            case MenuList.SHOP_AUTO: {
+                boolean owned = prog.hasAuto();
+                ui.medallion(canvas, iconCx, iconCy, 24 * density, owned ? Palette.RESUME : Palette.DISABLED, false, 255);
+                ui.text(canvas, "AUTO", iconCx, iconCy + 5 * density, 12, Color.WHITE, Paint.Align.CENTER);
+                title = "Mode automatique";
+                titleColor = Palette.GOLD;
+                desc = "Ultime et compétences lancés tout seuls";
+                if (owned) {
+                    statusColor = Palette.TEAM;
+                    status = "Achat définitif · bouton en partie";
+                    drawSmallButton(canvas, btnRect, "ACQUIS", Palette.TEAM, false, 13);
+                } else {
+                    status = "Achat définitif";
+                    drawPriceButton(canvas, btnRect, Progression.AUTO_PRICE, prog.canBuyAuto(), mainPressed);
                 }
                 break;
             }

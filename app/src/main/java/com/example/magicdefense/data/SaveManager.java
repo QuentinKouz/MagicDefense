@@ -55,6 +55,8 @@ public class SaveManager {
     private static final String KEY_STAT_CHESTS = "stat_chests_opened";
     private static final String KEY_SPEED = "game_speed";
     private static final String KEY_AUTO = "auto_mode";
+    private static final String KEY_AUTO_OWNED = "auto_owned";
+    private static final String KEY_VIBRATION = "vibration";
     private static final String KEY_DIFFICULTY = "endless_difficulty";
     private static final String KEY_RUN = "run_in_progress";      // partie à reprendre (vide = aucune)
 
@@ -70,8 +72,8 @@ public class SaveManager {
         for (int lv = 1; lv <= unlocked; lv++) {
             stars[lv] = prefs.getInt(KEY_STARS + lv, 0);
         }
-        boolean nightDisabled = prefs.getBoolean(KEY_NIGHT_DISABLED, false);
-        model.loadProgress(unlocked, stars, nightDisabled);
+        model.setVibrationEnabled(prefs.getBoolean(KEY_VIBRATION, true));
+        model.loadProgress(unlocked, stars);
         model.setMusicEnabled(prefs.getBoolean(KEY_MUSIC, true)); // musique activée la 1re fois
 
         model.setLeftHanded(prefs.getBoolean(KEY_LEFT_HANDED, false));
@@ -126,6 +128,7 @@ public class SaveManager {
                 prefs.getBoolean(KEY_STAT_MAX_MAGE, false), prefs.getInt(KEY_STAT_CHESTS, 0), done);
 
         model.setGameSpeed(prefs.getInt(KEY_SPEED, 1));
+        p.loadAuto(prefs.getBoolean(KEY_AUTO_OWNED, false));
         model.setAutoMode(prefs.getBoolean(KEY_AUTO, false));
         model.setEndlessDifficulty(prefs.getInt(KEY_DIFFICULTY, LevelSpec.NORMAL));
 
@@ -140,7 +143,8 @@ public class SaveManager {
         for (int lv = 1; lv <= model.getUnlockedLevel(); lv++) {
             editor.putInt(KEY_STARS + lv, model.getBestStars(lv));
         }
-        editor.putBoolean(KEY_NIGHT_DISABLED, model.isNightModeDisabled());
+        editor.putBoolean(KEY_VIBRATION, model.isVibrationEnabled());
+        editor.remove(KEY_NIGHT_DISABLED); // option retirée
         editor.putBoolean(KEY_MUSIC, model.isMusicEnabled());
 
         Progression p = model.getProgression();
@@ -185,6 +189,7 @@ public class SaveManager {
         editor.putInt(KEY_STAT_CHESTS, p.getChestsOpened());
         editor.putInt(KEY_SPEED, model.getGameSpeed());
         editor.putBoolean(KEY_AUTO, model.isAutoMode());
+        editor.putBoolean(KEY_AUTO_OWNED, p.hasAuto());
         editor.putInt(KEY_DIFFICULTY, model.getEndlessDifficulty());
 
         if (model.hasRunInProgress()) {

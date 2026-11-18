@@ -26,8 +26,9 @@ public class Progression {
 
     // Marché (gemmes)
     public static final int CHEST_PRICE = 10;             // un coffre
-    public static final int SPEED2_PRICE = 120;           // vitesse ×2, achat définitif
-    public static final int SPEED3_PRICE = 300;           // vitesse ×3, achat définitif (après ×2)
+    public static final int SPEED2_PRICE = 250;           // vitesse ×2, achat définitif
+    public static final int AUTO_PRICE = 400;             // mode automatique, achat définitif
+    public static final int SPEED3_PRICE = 600;           // vitesse ×3, achat définitif (après ×2)
     // Prix des unités exclusives (indice = type ; 0 = possédé dès le départ)
     private static final int[] PRICES = {0, 0, 0, 0, 60, 100, 160};
 
@@ -53,6 +54,7 @@ public class Progression {
     private int equippedUltimate = Ultimate.STUN;
     private boolean speed2 = false;
     private boolean speed3 = false;
+    private boolean auto = false;          // mode automatique acheté
     private int castleHpLevel = 0;
     private int castleResLevel = 0;
     private final boolean[] artifacts = new boolean[Artifact.COUNT];
@@ -244,6 +246,26 @@ public class Progression {
         return buySpeed(3);
     }
 
+    // ---------- Mode automatique (achat définitif) ----------
+    public boolean hasAuto() { return auto; }
+
+    public boolean canBuyAuto() {
+        return !auto && gems >= AUTO_PRICE;
+    }
+
+    public boolean buyAuto() {
+        if (!canBuyAuto()) {
+            return false;
+        }
+        gems -= AUTO_PRICE;
+        auto = true;
+        return true;
+    }
+
+    public void loadAuto(boolean owned) {
+        auto = owned;
+    }
+
     // ---------- Coffres achetés ----------
     public boolean canBuyChest() {
         return gems >= CHEST_PRICE;
@@ -272,11 +294,11 @@ public class Progression {
     }
 
     public int castleHpCost() {
-        return 15 * (castleHpLevel + 1);
+        return 25 * (castleHpLevel + 1);
     }
 
     public int castleResCost() {
-        return 20 * (castleResLevel + 1);
+        return 30 * (castleResLevel + 1);
     }
 
     public boolean canUpgradeCastleHp() {

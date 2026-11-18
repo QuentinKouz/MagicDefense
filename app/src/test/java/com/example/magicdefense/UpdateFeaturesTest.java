@@ -37,8 +37,8 @@ public class UpdateFeaturesTest {
         assertEquals(0, Ultimate.price(Ultimate.STUN));
         assertTrue(Ultimate.price(Ultimate.METEOR) > Ultimate.price(Ultimate.FURY));
         assertEquals(10, Progression.CHEST_PRICE);
-        assertEquals(120, Progression.SPEED2_PRICE);
-        assertEquals(300, Progression.SPEED3_PRICE);
+        assertEquals(250, Progression.SPEED2_PRICE);
+        assertEquals(600, Progression.SPEED3_PRICE);
     }
 
     @Test
@@ -182,8 +182,10 @@ public class UpdateFeaturesTest {
         for (int col = 0; col < Board.COLS; col++) {
             assertEquals(null, m.getMage(GameModel.LOCKED_ROW, col));
         }
-        assertEquals(0, m.getGold());
+        assertEquals(10, m.getGold()); // 2e mage à 12 PO : pas assez
         assertFalse(m.canHeal()); // PV au maximum : pas de soin
+        assertTrue(m.recruitRandom());  // mage au hasard : 7 PO, prix fixe
+        assertEquals(3, m.getGold());
         assertFalse(m.recruitRandom());
     }
 

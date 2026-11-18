@@ -24,6 +24,7 @@ public class MenuList {
     public static final int ULTIMATE = 8;      // Château : ultime à équiper
     public static final int ACHIEVEMENT = 9;   // Château : succès
     public static final int INFO = 10;         // ligne de texte (consigne)
+    public static final int SHOP_AUTO = 11;    // Marché : mode automatique
 
     // Boutons d'une ligne
     public static final int BTN_MAIN = 0;      // bouton de droite (acheter, +1 rang, équiper...)
@@ -76,6 +77,7 @@ public class MenuList {
                 add(HEADER, 0, "Bonus", 34);
                 add(SHOP_SPEED, 2, null, 88);   // vitesse ×2
                 add(SHOP_SPEED, 3, null, 88);   // vitesse ×3 (après ×2)
+                add(SHOP_AUTO, 0, null, 88);    // mode automatique
                 break;
             case GameModel.PAGE_MAGES:
                 add(INFO, 0, "Portrait : équipe · bandeau : artefact", 22);

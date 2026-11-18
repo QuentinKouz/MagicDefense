@@ -18,7 +18,7 @@ public final class Ultimate {
     };
 
     // Prix au Marché, en gemmes (0 = possédé dès le départ)
-    private static final int[] PRICES = {0, 120, 220, 160};
+    private static final int[] PRICES = {0, 250, 450, 350};
     // Gobelins à tuer pour remplir la jauge
     private static final int[] KILLS_REQUIRED = {20, 25, 30, 25};
 

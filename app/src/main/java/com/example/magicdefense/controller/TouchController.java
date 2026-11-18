@@ -127,7 +127,7 @@ public class TouchController {
                 gesture = GESTURE_NONE;
                 scrollVelocity = 0;
                 if (model.getState() == GameState.PLAYING) {
-                    pressedGameButton = hud.gameButtonAt(tx, ty);
+                    pressedGameButton = gameButtonAt(tx, ty);
                     if (pressedGameButton == -1) {
                         pressedButton = hud.buttonAt(tx, ty);
                         if (pressedButton != -1 && model.teamTypeAt(pressedButton) == -1) {
@@ -165,7 +165,7 @@ public class TouchController {
                 if (pressedMenuButton != -1 && menuButtonAt(tx, ty) != pressedMenuButton) {
                     pressedMenuButton = -1;
                 }
-                if (pressedGameButton != -1 && hud.gameButtonAt(tx, ty) != pressedGameButton) {
+                if (pressedGameButton != -1 && gameButtonAt(tx, ty) != pressedGameButton) {
                     pressedGameButton = -1;
                 }
                 if (lockedRow != -1) {
@@ -288,7 +288,7 @@ public class TouchController {
     // Toutes les actions se déclenchent au relâchement (choix du dossier de design)
     private void handleRelease(float tx, float ty) {
         boolean menuClick = pressedMenuButton != -1 && menuButtonAt(tx, ty) == pressedMenuButton;
-        boolean gameClick = pressedGameButton != -1 && hud.gameButtonAt(tx, ty) == pressedGameButton;
+        boolean gameClick = pressedGameButton != -1 && gameButtonAt(tx, ty) == pressedGameButton;
         if (menuClick || gameClick) {
             click();
         }
@@ -339,6 +339,12 @@ public class TouchController {
                         case Hud.GAME_HEAL:
                             model.buyHeal();
                             break;
+                        case Hud.GAME_ULTIMATE:
+                            model.triggerUltimate();
+                            break;
+                        case Hud.GAME_LAUNCH:
+                            model.launchWave();
+                            break;
                         case Hud.GAME_RANDOM:
                             model.recruitRandom();
                             break;
@@ -363,6 +369,9 @@ public class TouchController {
                         case Hud.PAUSE_RESUME:
                             model.resume();
                             break;
+                        case Hud.PAUSE_VIBRATION:
+                            model.toggleVibration();
+                            break;
                         case Hud.PAUSE_OPTIONS:
                             model.openOptions();
                             break;
@@ -372,8 +381,8 @@ public class TouchController {
 
             case OPTIONS:
                 if (menuClick) {
-                    if (pressedMenuButton == Hud.OPTIONS_NIGHT_TOGGLE) {
-                        model.toggleNightModeDisabled();
+                    if (pressedMenuButton == Hud.OPTIONS_VIBRATION) {
+                        model.toggleVibration();
                     } else if (pressedMenuButton == Hud.OPTIONS_MUSIC_TOGGLE) {
                         model.toggleMusic();
                     } else if (pressedMenuButton == Hud.OPTIONS_LEFT_HANDED) {
@@ -388,6 +397,8 @@ public class TouchController {
                 if (menuClick) {
                     if (pressedMenuButton == Hud.VICTORY_NEXT) {
                         model.nextLevel();
+                    } else if (pressedMenuButton == Hud.VICTORY_RESTART) {
+                        model.restartLevel();
                     } else if (pressedMenuButton == Hud.VICTORY_MENU) {
                         model.quitToMenu();
                     }
@@ -452,6 +463,9 @@ public class TouchController {
             case MenuList.SHOP_ULTIMATE:
                 model.buyUltimate(a);
                 break;
+            case MenuList.SHOP_AUTO:
+                model.buyAuto();
+                break;
             case MenuList.SHOP_SPEED:
                 model.buySpeed(a);
                 break;
@@ -504,7 +518,7 @@ public class TouchController {
                 return b;
             }
             case GAME_OVER:
-                return hud.victoryButtonAt(x, y); // même fenêtre que la victoire
+                return hud.gameOverButtonAt(x, y); // même fenêtre que la victoire
             case CHEST_OPENING: {
                 int c = hud.chestButtonAt(x, y);
                 // OUVRIR ENCORE n'existe qu'à la fin de l'animation, s'il reste des coffres
@@ -517,6 +531,14 @@ public class TouchController {
             default:
                 return -1;
         }
+    }
+
+    // Boutons de la partie ; « Lancer la vague » seulement tant que la vague attend
+    private int gameButtonAt(float x, float y) {
+        if (model.isWaitingForWave() && hud.launchButton.contains(x, y)) {
+            return Hud.GAME_LAUNCH;
+        }
+        return hud.gameButtonAt(x, y);
     }
 
     private void startDrag(float x, float y) {

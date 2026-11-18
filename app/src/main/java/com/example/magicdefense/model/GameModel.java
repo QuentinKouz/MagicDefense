@@ -37,7 +37,10 @@ public class GameModel {
     // ---------- Réglages (équilibrage) ----------
     public static final int START_GOLD = 20;
     public static final int MAGE_COST = 10;
-    public static final int RANDOM_MAGE_COST = 7;          // mage au hasard (parmi l'équipe), moins cher
+    public static final int MAGE_COST_STEP = 2;            // chaque mage choisi coûte 2 PO de plus (dans la partie)
+    public static final int RANDOM_MAGE_COST = 7;          // mage au hasard (parmi l'équipe) : prix fixe
+    public static final int ULTIMATE_COOLDOWN = 3600;      // ≈ 60 s entre deux ultimes, en plus de la jauge
+    public static final float ARTIFACT_DROP_CHANCE = 0.10f; // niveau de boss gagné en 3 étoiles : 10 %
     public static final int GOLD_PER_KILL = 5;
     public static final int MAX_LEVEL = 5;                 // niveau de fusion maximal d'un mage
     public static final boolean SAME_TYPE_REQUIRED = true; // fusion du même élément uniquement
@@ -104,6 +107,10 @@ public class GameModel {
     private boolean[][] locked = new boolean[Board.ROWS][Board.COLS];
     private int cellsUnlocked = 0;
     private int healsUsed = 0;
+    private int magesBought = 0;          // mages choisis dans la partie (le prix monte)
+    private int ultimateCooldown = 0;     // > 0 : l'ultime se recharge
+    private boolean waitingForWave = false; // le joueur se prépare : la vague attend son signal
+    private int lowestStars = 3;          // étoiles perdues : un soin ne les rend pas
 
     private int gold = 0;
     private int wave = 0;
@@ -120,7 +127,7 @@ public class GameModel {
     private float meteorX, meteorY;
     private boolean sensorNight = false;       // le capteur de luminosité veut la nuit
     private boolean nightMode = false;         // nuit effective (capteur, niveau de nuit, cycle du mode infini)
-    private boolean nightModeDisabled = false; // option du joueur (capteur)
+    private boolean vibrationEnabled = true;   // option du joueur : vibrations
     private boolean musicEnabled = true;       // option du joueur : musique de fond
     private boolean leftHanded = false;        // option du joueur : interface en miroir
     private int gameSpeed = 1;                 // ×1, ×2, ×3
@@ -147,6 +154,7 @@ public class GameModel {
     private int lastBonusGems = 0;          // gemmes en plus (difficulté du mode infini)
     private int lastArtifact = Artifact.NONE; // artefact gagné contre le boss
     private int lastArtifactGems = 0;
+    private boolean lastArtifactRolled = false; // la victoire donnait une chance d'artefact
     private boolean endlessRewarded = false; // la partie infinie en cours a déjà été récompensée
     private boolean lastEndlessRecord = false; // la dernière partie infinie a battu le record
     private int chestAnimFrame = 0;          // images depuis l'ouverture du coffre
@@ -193,7 +201,9 @@ public class GameModel {
     public Mage getMage(int row, int col) { return grid[row][col]; }
     public int getGold() { return gold; }
     public int getWave() { return wave; }
-    public boolean canAffordMage() { return gold >= MAGE_COST; }
+    public boolean canAffordMage() { return gold >= getMageCost(); }
+    public int getMageCost() { return MAGE_COST + MAGE_COST_STEP * magesBought; }
+    public boolean isWaitingForWave() { return waitingForWave; }
     public Progression getProgression() { return progression; }
     public boolean isEndless() { return spec.endless; }
     public LevelSpec getSpec() { return spec; }
@@ -201,6 +211,7 @@ public class GameModel {
     public int getLastBonusGems() { return lastBonusGems; }
     public int getLastArtifact() { return lastArtifact; }
     public int getLastArtifactGems() { return lastArtifactGems; }
+    public boolean isLastArtifactRolled() { return lastArtifactRolled; }
     public boolean isLastEndlessRecord() { return lastEndlessRecord; }
     public List<Zone> getZones() { return zones; }
     public List<Reaction> getReactions() { return reactions; }
@@ -278,10 +289,21 @@ public class GameModel {
         return stunTimer > 0 || furyTimer > 0 || shieldTimer > 0 || meteorTimer > 0;
     }
 
+    // Prêt : jauge pleine, aucun effet en cours, et la minute de recharge est passée
     public boolean isUltimateReady() {
         return state == GameState.PLAYING
                 && ultimateCharge >= getUltimateKillsRequired()
+                && ultimateCooldown == 0
                 && !isUltimateActive();
+    }
+
+    // Recharge de l'ultime : 1 juste après le lancement, 0 quand elle est finie
+    public float getUltimateCooldown() {
+        return ultimateCooldown / (float) ULTIMATE_COOLDOWN;
+    }
+
+    public int getUltimateCooldownSeconds() {
+        return (ultimateCooldown + 59) / 60;
     }
 
     public boolean isStunned() { return stunTimer > 0; }
@@ -306,9 +328,9 @@ public class GameModel {
         return nightMode;
     }
 
-    // Le capteur propose, l'option du joueur a le dernier mot (les niveaux de nuit restent la nuit)
+    // Le capteur de luminosité (en plus des niveaux de nuit et du cycle du mode infini)
     public void setNightMode(boolean night) {
-        sensorNight = night && !nightModeDisabled;
+        sensorNight = night;
         refreshNight();
     }
 
@@ -322,12 +344,16 @@ public class GameModel {
         nightMode = newMode;
     }
 
-    public boolean isNightModeDisabled() {
-        return nightModeDisabled;
+    public boolean isVibrationEnabled() {
+        return vibrationEnabled;
     }
 
-    public void toggleNightModeDisabled() {
-        nightModeDisabled = !nightModeDisabled;
+    public void setVibrationEnabled(boolean on) {
+        vibrationEnabled = on;
+    }
+
+    public void toggleVibration() {
+        vibrationEnabled = !vibrationEnabled;
     }
 
     public boolean isMusicEnabled() {
@@ -370,8 +396,9 @@ public class GameModel {
         gameSpeed = gameSpeed >= max ? 1 : gameSpeed + 1;
     }
 
+    // Mode automatique : seulement s'il est acheté au Marché
     public boolean isAutoMode() {
-        return autoMode;
+        return autoMode && progression.hasAuto();
     }
 
     public void setAutoMode(boolean on) {
@@ -379,7 +406,17 @@ public class GameModel {
     }
 
     public void toggleAutoMode() {
-        autoMode = !autoMode;
+        if (progression.hasAuto()) {
+            autoMode = !autoMode;
+        }
+    }
+
+    public boolean buyAuto() {
+        boolean ok = afterPurchase(inMenu() && progression.buyAuto());
+        if (ok) {
+            autoMode = true;
+        }
+        return ok;
     }
 
     // Pause ou accueil → Options (on retient d'où l'on vient)
@@ -407,8 +444,12 @@ public class GameModel {
     }
 
     // Étoiles encore possibles selon les PV restants
+    // (une étoile perdue l'est pour de bon : les soins ne la rendent pas)
     public int getStars() {
-        float ratio = getCastleHpRatio();
+        return Math.min(lowestStars, starsForRatio(getCastleHpRatio()));
+    }
+
+    private static int starsForRatio(float ratio) {
         if (ratio >= STARS_3_MIN) {
             return 3;
         }
@@ -532,13 +573,12 @@ public class GameModel {
     }
 
     // Chargement de la sauvegarde
-    public void loadProgress(int unlocked, int[] stars, boolean nightDisabled) {
+    public void loadProgress(int unlocked, int[] stars) {
         unlockedLevel = Math.max(1, unlocked);
         bestStars = new int[Math.max(unlockedLevel, LEVELS_PER_PAGE) + 1];
         for (int lv = 1; lv < stars.length && lv < bestStars.length; lv++) {
             bestStars[lv] = stars[lv];
         }
-        nightModeDisabled = nightDisabled;
         selectedLevel = unlockedLevel;
         showPageOf(selectedLevel);
     }
@@ -550,7 +590,6 @@ public class GameModel {
         if (level >= bestStars.length) {
             bestStars = Arrays.copyOf(bestStars, level * 2 + 1); // tableau agrandi
         }
-        boolean firstClear = bestStars[level] == 0;
         if (stars > bestStars[level]) {
             bestStars[level] = stars;
         }
@@ -564,7 +603,9 @@ public class GameModel {
         progression.addChests(lastChestsEarned);
         lastArtifact = Artifact.NONE;
         lastArtifactGems = 0;
-        if (firstClear && spec.hasBossLevel()) {
+        // Niveau de boss gagné en 3 étoiles : 10 % de chances d'obtenir un artefact (à chaque fois)
+        lastArtifactRolled = spec.hasBossLevel() && stars >= 3;
+        if (lastArtifactRolled && random.nextFloat() < ARTIFACT_DROP_CHANCE) {
             lastArtifact = progression.grantRandomArtifact(random);
             if (lastArtifact == Artifact.NONE) {
                 lastArtifactGems = BOSS_ARTIFACT_FALLBACK_GEMS;
@@ -649,9 +690,12 @@ public class GameModel {
         grid = new Mage[Board.ROWS][Board.COLS];
         lockBackRow();
         healsUsed = 0;
+        magesBought = 0;
+        lowestStars = 3;
         gold = START_GOLD;
         wave = 0;
         ultimateCharge = 0;
+        ultimateCooldown = 0;
         stunTimer = 0;
         furyTimer = 0;
         shieldTimer = 0;
@@ -669,9 +713,11 @@ public class GameModel {
         lastArtifactGems = 0;
         endlessRewarded = false;
         lastEndlessRecord = false;
+        lastArtifactRolled = false;
         resumed = false;
-        setGameSpeed(gameSpeed); // ×3 seulement si elle est achetée
+        gameSpeed = 1;           // chaque combat commence en ×1
         startNextWave();
+        waitingForWave = true;   // la 1re vague attend que le joueur la lance
         state = GameState.PLAYING;
         nightMode = sensorNight || spec.isNight(wave); // pas de bandeau au lancement
         if (spec.nightLevel) {
@@ -699,6 +745,15 @@ public class GameModel {
         if (hasNextLevel()) {
             startLevel(level + 1);
         }
+    }
+
+    // Bouton « Lancer la vague » : le joueur a fini de se préparer
+    public boolean launchWave() {
+        if (state != GameState.PLAYING || !waitingForWave) {
+            return false;
+        }
+        waitingForWave = false;
+        return true;
     }
 
     public void pause() {
@@ -1050,6 +1105,9 @@ public class GameModel {
         if (furyTimer > 0) {
             furyTimer--;
         }
+        if (ultimateCooldown > 0) {
+            ultimateCooldown--;
+        }
         if (shieldTimer > 0) {
             shieldTimer--;
         }
@@ -1119,7 +1177,7 @@ public class GameModel {
         }
 
         // 1. Apparition des ennemis de la vague (le boss en dernier)
-        if (enemiesLeftToSpawn > 0) {
+        if (enemiesLeftToSpawn > 0 && !waitingForWave) {
             spawnTimer--;
             if (spawnTimer <= 0) {
                 if (bossPending && enemiesLeftToSpawn == 1) {
@@ -1181,6 +1239,7 @@ public class GameModel {
                     }
                     castleHp -= enemyDamage(enemy);
                     castleHitTimer = HIT_FLASH_DURATION;
+                    lowestStars = getStars(); // l'étoile perdue ne reviendra pas
 
                     if (listener != null) {
                         listener.onCastleHit();     // vibration et son
@@ -1330,7 +1389,7 @@ public class GameModel {
         }
 
         // 7. Mode automatique : ultime et compétences lancés dès qu'ils sont prêts (s'il y a des gobelins)
-        if (autoMode && hasVisibleEnemy()) {
+        if (isAutoMode() && hasVisibleEnemy()) {
             triggerUltimate();
             for (int row = 0; row < Board.ROWS; row++) {
                 for (int col = 0; col < Board.COLS; col++) {
@@ -1904,8 +1963,11 @@ public class GameModel {
     }
 
     // Place un mage du type donné sur une case libre au hasard
+    // (chaque mage choisi fait monter le prix du suivant de 2 PO ; le mage au hasard n'en tient pas compte)
     public void recruitMage(int type) {
-        placeMage(type, MAGE_COST);
+        if (placeMage(type, getMageCost())) {
+            magesBought++;
+        }
     }
 
     public boolean canRecruitRandom() {
@@ -1967,6 +2029,7 @@ public class GameModel {
                 break;
         }
         ultimateCharge = 0;
+        ultimateCooldown = ULTIMATE_COOLDOWN; // une minute avant le prochain
         if (listener != null) {
             listener.onUltimateTriggered();
         }
@@ -2099,8 +2162,9 @@ public class GameModel {
     }
 
     // ---------- Partie à reprendre (sauvegarde quand l'appli est fermée en pleine partie) ----------
-    private static final int RUN_VERSION = 1;
-    private static final int RUN_HEADER = 12;
+    private static final int RUN_VERSION = 2;          // 1 : avant le prix croissant et les étoiles perdues
+    private static final int RUN_HEADER = 16;
+    private static final int RUN_HEADER_V1 = 12;
 
     // Une partie est en cours (en jeu, en pause, ou dans les options ouvertes depuis la pause)
     public boolean hasRunInProgress() {
@@ -2123,6 +2187,10 @@ public class GameModel {
         data[9] = cellsUnlocked;
         data[10] = castleMaxHp;
         data[11] = 0;
+        data[12] = magesBought;
+        data[13] = lowestStars;
+        data[14] = ultimateCooldown;
+        data[15] = 0;
         int i = RUN_HEADER;
         for (int row = 0; row < Board.ROWS; row++) {
             for (int col = 0; col < Board.COLS; col++) {
@@ -2137,7 +2205,11 @@ public class GameModel {
 
     // Reprend une partie sauvegardée : elle s'ouvre en pause, au début de la vague où l'on était
     public boolean importRun(int[] data) {
-        if (data == null || data.length < RUN_HEADER + Board.ROWS * Board.COLS * 3 || data[0] != RUN_VERSION) {
+        if (data == null || data.length < 1 || (data[0] != RUN_VERSION && data[0] != 1)) {
+            return false;
+        }
+        int header = data[0] == 1 ? RUN_HEADER_V1 : RUN_HEADER; // partie sauvegardée par l'ancienne version
+        if (data.length < header + Board.ROWS * Board.COLS * 3) {
             return false;
         }
         boolean endless = data[1] == 1;
@@ -2163,7 +2235,14 @@ public class GameModel {
         ultimateCharge = Math.max(0, data[7]);
         healsUsed = Math.max(0, Math.min(MAX_HEALS, data[8]));
         cellsUnlocked = Math.max(0, data[9]);
-        int i = RUN_HEADER;
+        if (header == RUN_HEADER) {
+            magesBought = Math.max(0, data[12]);
+            lowestStars = Math.max(1, Math.min(3, data[13]));
+            ultimateCooldown = Math.max(0, Math.min(ULTIMATE_COOLDOWN, data[14]));
+        } else {
+            lowestStars = starsForRatio(castleHp / (float) castleMaxHp);
+        }
+        int i = header;
         for (int row = 0; row < Board.ROWS; row++) {
             for (int col = 0; col < Board.COLS; col++) {
                 int type = data[i++];

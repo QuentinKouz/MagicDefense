@@ -12,7 +12,6 @@ import com.example.magicdefense.controller.TouchController;
 import com.example.magicdefense.model.Board;
 import com.example.magicdefense.model.GameModel;
 import com.example.magicdefense.model.GameState;
-import com.example.magicdefense.controller.ShakeDetector;
 import com.example.magicdefense.controller.LightSensor;
 import com.example.magicdefense.data.SaveManager;
 
@@ -23,10 +22,8 @@ public class GameView extends View {
     private final Hud hud;
     private final GameRenderer renderer;
     private final TouchController touchController;
-    private final ShakeDetector shakeDetector;
     private final LightSensor lightSensor;
     private final Haptics haptics;
-    private int shakePulseTimer = 0; // images avant la prochaine impulsion
     private final SaveManager saveManager;
     private final SoundManager sounds;
     private final MusicPlayer music;
@@ -42,8 +39,6 @@ public class GameView extends View {
         saveManager = new SaveManager(context);
         saveManager.load(model); // reprend la progression sauvegardée
         touchController = new TouchController(model, board, hud, density);
-        // Secousse détectée → on tente de lancer l'ultime (ignoré si la jauge n'est pas pleine)
-        shakeDetector = new ShakeDetector(context, () -> model.triggerUltimate());
         lightSensor = new LightSensor(context);
         haptics = new Haptics(context);
         sounds = new SoundManager(context);
@@ -194,7 +189,7 @@ public class GameView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        renderer.draw(canvas, model, touchController, shakeDetector.getProgress());
+        renderer.draw(canvas, model, touchController);
     }
 
     // ---------- Boucle ----------
@@ -206,6 +201,7 @@ public class GameView extends View {
                 model.setSoundVolume(sounds.getSystemVolume());
             }
             music.setEnabled(model.isMusicEnabled()); // option "Musique" des réglages
+            haptics.setEnabled(model.isVibrationEnabled()); // option "Vibrations"
             if (hud.isLeftHanded() != model.isLeftHanded()) {
                 relayout(getWidth(), getHeight()); // option "Mode gaucher" : interface en miroir
             }
@@ -217,17 +213,6 @@ public class GameView extends View {
             for (int i = 0; i < steps; i++) {
                 model.update();
             }
-            // Pendant une secousse (jauge pleine) : une impulsion toutes les 8 images (≈ 7 par seconde)
-            float shake = model.isUltimateReady() ? shakeDetector.getProgress() : 0;
-            if (shake > 0) {
-                shakePulseTimer--;
-                if (shakePulseTimer <= 0) {
-                    haptics.shakePulse(shake);
-                    shakePulseTimer = 8;
-                }
-            } else {
-                shakePulseTimer = 0; // la prochaine secousse vibre tout de suite
-            }
             invalidate();          // demande un nouvel appel à onDraw()
             postDelayed(this, 16); // ≈ 60 images/s
         }
@@ -236,7 +221,6 @@ public class GameView extends View {
     public void startGame() {
         removeCallbacks(gameLoop); // évite deux boucles en parallèle
         post(gameLoop);
-        shakeDetector.start();
         lightSensor.start();
         music.resume();
     }
@@ -244,7 +228,6 @@ public class GameView extends View {
     public void stopGame() {
         model.pause();
         touchController.cancel();
-        shakeDetector.stop(); // capteur coupé en arrière-plan
         lightSensor.stop();
         music.pause(); // pas de musique quand l'appli est en arrière-plan
         saveManager.save(model); // sauvegarde quand l'appli passe en arrière-plan (options comprises)

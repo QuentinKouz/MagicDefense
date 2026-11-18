@@ -30,17 +30,22 @@ public class Hud {
     public static final int GAME_AUTO = 3;
     public static final int GAME_HEAL = 4;
     public static final int GAME_RANDOM = 5;
+    public static final int GAME_ULTIMATE = 6;  // toucher la jauge lance l'ultime
+    public static final int GAME_LAUNCH = 7;    // « Lancer la vague »
+    public final RectF launchButton = new RectF();
 
     // Boutons de la fenêtre de pause
     public static final int PAUSE_QUIT = 0;
     public static final int PAUSE_RESTART = 1;
     public static final int PAUSE_RESUME = 2;
     public static final int PAUSE_OPTIONS = 3;
+    public static final int PAUSE_VIBRATION = 4;
 
     public final RectF pausePopup = new RectF();
-    public final RectF[] pauseMenuButtons = new RectF[4];
+    public final RectF[] pauseMenuButtons = new RectF[5];
+    public static final float PAUSE_VIBRATION_Y = 168; // titre du réglage, en dp depuis le haut de la fenêtre
     // Boutons de la fenêtre d'options
-    public static final int OPTIONS_NIGHT_TOGGLE = 0;
+    public static final int OPTIONS_VIBRATION = 0;
     public static final int OPTIONS_BACK = 1;
     public static final int OPTIONS_VOLUME = 2;
     public static final int OPTIONS_MUSIC_TOGGLE = 3;
@@ -50,17 +55,18 @@ public class Hud {
     public final RectF[] optionsButtons = new RectF[5];
     public final RectF volumeTrack = new RectF(); // rail du curseur (seuls left, right et centerY servent)
     // Hauteur (depuis le haut de la fenêtre) du titre de chaque réglage, en dp
-    public static final float OPT_NIGHT_Y = 95, OPT_MUSIC_Y = 185, OPT_LEFT_Y = 275, OPT_VOLUME_Y = 365;
+    public static final float OPT_VIBRATION_Y = 95, OPT_MUSIC_Y = 185, OPT_LEFT_Y = 275, OPT_VOLUME_Y = 365;
 
     // Boutons de l'écran Victoire
     public static final int VICTORY_NEXT = 0;
     public static final int VICTORY_MENU = 1;
+    public static final int VICTORY_RESTART = 2;
     // Écran Game Over : même fenêtre et mêmes boutons que la victoire
     public static final int GAMEOVER_RETRY = VICTORY_NEXT;  // bouton du haut
-    public static final int GAMEOVER_MENU = VICTORY_MENU;   // bouton du bas
+    public static final int GAMEOVER_MENU = 3;             // bouton du bas (pleine largeur)
 
     public final RectF victoryPopup = new RectF();
-    public final RectF[] victoryButtons = new RectF[2];
+    public final RectF[] victoryButtons = new RectF[4];
 
     // ---------- Accueil : pages parcourues en glissant, barre d'onglets en bas ----------
     public final RectF tabBar = new RectF();
@@ -151,15 +157,16 @@ public class Hud {
         float cx = board.centerX();
         float shift = board.topShift;
 
-        // Boutons de recrutement : 4 côte à côte en bas de la colonne (ordre inversé pour les gauchers)
+        // Barre de recrutement : les 4 mages de l'équipe, puis le mage au hasard (ordre inversé pour les gauchers)
         float margin = 6 * d;
-        int n = recruitButtons.length;
+        int n = recruitButtons.length + 1;
         float buttonWidth = cw / n;
         float buttonTop = h - board.bottomBarHeight + margin;
         float buttonBottom = buttonTop + 60 * d; // grande cible pour le doigt
         for (int i = 0; i < n; i++) {
+            RectF slotRect = i < recruitButtons.length ? recruitButtons[i] : randomButton;
             int pos = leftHanded ? n - 1 - i : i;
-            recruitButtons[i].set(left + pos * buttonWidth + margin, buttonTop,
+            slotRect.set(left + pos * buttonWidth + margin, buttonTop,
                     left + (pos + 1) * buttonWidth - margin, buttonBottom);
         }
 
@@ -183,18 +190,21 @@ public class Hud {
         float sy = homeSoundButton.bottom + 12 * d;
         speedButton.set(sx, sy, sx + small, sy + small);
         autoButton.set(sx, sy + small + 10 * d, sx + small, sy + 2 * small + 10 * d);
-        // Sous la jauge (après la consigne « Secouez ! ») : soin et mage au hasard
+        // Sous la jauge (et la consigne « Touchez ! ») : soin
         float gx = gaugeCenterX - small / 2;
         float gy = gaugeCenterY + gaugeRadius + 34 * d;
         healButton.set(gx, gy, gx + small, gy + small);
-        randomButton.set(gx, gy + small + 22 * d, gx + small, gy + 2 * small + 22 * d);
+        // « Lancer la vague » : au milieu du terrain
+        float lw2 = cw * 0.62f;
+        float ly = board.gridTop * 0.55f;
+        launchButton.set(cx - lw2 / 2, ly - 30 * d, cx + lw2 / 2, ly + 30 * d);
 
         // Fenêtres : même largeur pour toutes, centrées dans la colonne
         float pw = cw * 0.78f;
         float pLeft = cx - pw / 2;
 
-        // Fenêtre de pause : PAUSE, QUITTER, puis 3 boutons ronds
-        float ph = 240 * d;
+        // Fenêtre de pause : PAUSE, QUITTER, vibrations, puis 3 boutons ronds
+        float ph = 350 * d;
         float pTop = popupTop(h, ph);
         pausePopup.set(pLeft, pTop, pLeft + pw, pTop + ph);
 
@@ -205,7 +215,8 @@ public class Hud {
 
         // Recommencer, Reprendre, Options : ronds, côte à côte et bien espacés
         float diameter = 64 * d;
-        float rowY = pTop + 180 * d;
+        toggleRow(pauseMenuButtons[PAUSE_VIBRATION], pLeft, pw, pTop, PAUSE_VIBRATION_Y);
+        float rowY = pTop + 292 * d;
         float spacing = pw * 0.28f;
         for (int i = 0; i < 3; i++) {
             float px = cx + (i - 1) * spacing;
@@ -213,13 +224,13 @@ public class Hud {
                     px + diameter / 2, rowY + diameter / 2);
         }
 
-        // Fenêtre d'options : mode nuit, musique, mode gaucher, volume, retour
+        // Fenêtre d'options : vibrations, musique, mode gaucher, volume, retour
         float oH = 525 * d;
         float oTop = popupTop(h, oH);
         optionsPopup.set(pLeft, oTop, pLeft + pw, oTop + oH);
 
         // Interrupteurs : toute la ligne "Non [===] Oui" est touchable (grande cible)
-        toggleRow(optionsButtons[OPTIONS_NIGHT_TOGGLE], pLeft, pw, oTop, OPT_NIGHT_Y);
+        toggleRow(optionsButtons[OPTIONS_VIBRATION], pLeft, pw, oTop, OPT_VIBRATION_Y);
         toggleRow(optionsButtons[OPTIONS_MUSIC_TOGGLE], pLeft, pw, oTop, OPT_MUSIC_Y);
         toggleRow(optionsButtons[OPTIONS_LEFT_HANDED], pLeft, pw, oTop, OPT_LEFT_Y);
 
@@ -240,7 +251,11 @@ public class Hud {
 
         float vBtnW = pw * 0.75f;
         victoryButtons[VICTORY_NEXT].set(cx - vBtnW / 2, vTop + 246 * d, cx + vBtnW / 2, vTop + 298 * d);
-        victoryButtons[VICTORY_MENU].set(cx - vBtnW / 2, vTop + 312 * d, cx + vBtnW / 2, vTop + 364 * d);
+        // Victoire : REJOUER et MENU côte à côte ; game over : MENU sur toute la largeur
+        float gap = 6 * d;
+        victoryButtons[VICTORY_RESTART].set(cx - vBtnW / 2, vTop + 312 * d, cx - gap, vTop + 364 * d);
+        victoryButtons[VICTORY_MENU].set(cx + gap, vTop + 312 * d, cx + vBtnW / 2, vTop + 364 * d);
+        victoryButtons[GAMEOVER_MENU].set(cx - vBtnW / 2, vTop + 312 * d, cx + vBtnW / 2, vTop + 364 * d);
 
         // ---------- Accueil ----------
         // Barre d'onglets en bas (zone du pouce)
@@ -362,6 +377,12 @@ public class Hud {
         if (randomButton.contains(x, y)) {
             return GAME_RANDOM;
         }
+        float dx = x - gaugeCenterX;
+        float dy = y - gaugeCenterY;
+        float r = gaugeRadius + 12 * board.density; // un peu plus grand que l'anneau
+        if (dx * dx + dy * dy <= r * r) {
+            return GAME_ULTIMATE;
+        }
         return -1;
     }
 
@@ -374,7 +395,21 @@ public class Hud {
     }
 
     public int victoryButtonAt(float x, float y) {
-        return indexAt(victoryButtons, x, y);
+        for (int b : new int[]{VICTORY_NEXT, VICTORY_RESTART, VICTORY_MENU}) {
+            if (victoryButtons[b].contains(x, y)) {
+                return b;
+            }
+        }
+        return -1;
+    }
+
+    public int gameOverButtonAt(float x, float y) {
+        for (int b : new int[]{GAMEOVER_RETRY, GAMEOVER_MENU}) {
+            if (victoryButtons[b].contains(x, y)) {
+                return b;
+            }
+        }
+        return -1;
     }
 
     // Animation de coffre : OUVRIR ENCORE, ou n'importe où ailleurs pour continuer

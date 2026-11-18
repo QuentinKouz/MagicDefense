@@ -10,6 +10,11 @@ import android.os.VibratorManager;
 // Retours haptiques (vibrations) du jeu
 public class Haptics {
     private final Vibrator vibrator;
+    private boolean enabled = true; // option « Vibrations » du jeu
+
+    public void setEnabled(boolean on) {
+        enabled = on;
+    }
 
     public Haptics(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -23,7 +28,7 @@ public class Haptics {
     }
 
     private boolean canVibrate() {
-        return vibrator != null && vibrator.hasVibrator();
+        return enabled && vibrator != null && vibrator.hasVibrator();
     }
 
     // Joue une vibration en précisant à Android que c'est une vibration de jeu.
@@ -42,11 +47,6 @@ public class Haptics {
         }
     }
 
-    // Impulsion pendant la secousse : de plus en plus forte avec la progression (0 → 1)
-    public void shakePulse(float progress) {
-        int amplitude = (int) (100 + 155 * progress); // de 100 à 255
-        play(VibrationEffect.createOneShot(40, amplitude));
-    }
 
     // Fusion : double tic, le second plus fort
     public void merge() {
