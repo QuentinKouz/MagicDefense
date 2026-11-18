@@ -120,10 +120,14 @@ public class NewMagesTest {
     public void light_auraBoostsAllOtherMages() {
         GameModel m = newModel();
         m.startLevel(1);
+        int[] run = m.exportRun();
+        run[5] = 100; // assez de PO pour deux mages (le prix monte de 2 à chaque achat)
+        m.importRun(run);
+        m.resume();
         m.recruitMage(Mage.FIRE);
         int[] fire = findMage(m, Mage.FIRE);
         assertEquals(0f, m.getAuraBonus(fire[0], fire[1]), 1e-6);
-        m.recruitMage(Mage.LIGHT); // 20 PO au départ : deux mages à 10 PO
+        m.recruitMage(Mage.LIGHT);
         int[] light = findMage(m, Mage.LIGHT);
         assertTrue(light != null);
         assertEquals(0.10f, m.getAuraBonus(fire[0], fire[1]), 1e-6);   // +10 % au niveau 1
