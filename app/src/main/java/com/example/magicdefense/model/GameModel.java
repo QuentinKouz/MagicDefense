@@ -42,7 +42,9 @@ public class GameModel {
     public static final int ULTIMATE_COOLDOWN = 3600;      // ≈ 60 s entre deux ultimes, en plus de la jauge
     public static final float ARTIFACT_DROP_CHANCE = 0.10f; // niveau de boss gagné en 3 étoiles : 10 %
     public static final int GOLD_PER_KILL = 5;
-    public static final int MAX_LEVEL = 5;                 // niveau de fusion maximal d'un mage
+    public static final int MAX_LEVEL = Mage.MAX_LEVEL;    // niveau maximal d'un mage (7 : sage, avec l'orbe)
+    // Monter un mage d'un niveau avec des PO (appui long sur le mage) : 1→2, 2→3... 6→7
+    private static final int[] LEVEL_UP_COSTS = {100, 200, 400, 800, 1600, 3200};
     public static final boolean SAME_TYPE_REQUIRED = true; // fusion du même élément uniquement
     public static final int ULTIMATE_KILLS_REQUIRED = 20;  // jauge de l'ultime de départ (Onde de choc)
     public static final int STUN_DURATION = Ultimate.STUN_FRAMES;
@@ -176,6 +178,10 @@ public class GameModel {
     private int skillTextTimer = 0;
     private String skillText = "";
     private int skillTextType = 0;
+    private boolean skillTextBoost = false; // compétence BOOST d'un sage : rendu renforcé
+    // Bulle « monter de niveau » ouverte au-dessus d'un mage (appui long), -1 = fermée
+    private int levelUpRow = -1;
+    private int levelUpCol = -1;
     // Succès débloqués : affichés l'un après l'autre
     private final ArrayList<Integer> toastQueue = new ArrayList<>();
     private int toastId = -1;       // famille du succès affiché
@@ -279,6 +285,7 @@ public class GameModel {
     public float getSkillText() { return skillTextTimer / (float) SKILL_TEXT_DURATION; }
     public String getSkillTextString() { return skillText; }
     public int getSkillTextType() { return skillTextType; }
+    public boolean isSkillTextBoost() { return skillTextBoost; }
 
     // Succès affiché (−1 : aucun) et avancement du bandeau (1 → 0)
     public int getToastId() { return toastId; }
@@ -756,6 +763,7 @@ public class GameModel {
         modeBannerTimer = 0;
         announceTimer = 0;
         skillTextTimer = 0;
+        closeLevelUp();
         lastChests = new int[Chest.COUNT];
         lastBonusGems = 0;
         lastArtifact = Artifact.NONE;
@@ -1111,6 +1119,20 @@ public class GameModel {
             listener.onProgressChanged();
         }
         return true;
+    }
+
+    // Bouton ORBE de la fiche : pose une orbe de sagesse sur ce mage, ou la retire (retour en réserve)
+    public boolean toggleWisdomOrb(int type) {
+        if (!inMenu() || type < 0) {
+            return false;
+        }
+        boolean ok = progression.hasWisdomOrb(type) ? progression.removeWisdomOrb(type)
+                : progression.placeWisdomOrb(type);
+        if (ok && listener != null) {
+            listener.onMageUpgraded(); // son et vibration
+            listener.onProgressChanged();
+        }
+        return ok;
     }
 
     // ---------- Marché ----------
@@ -1641,7 +1663,11 @@ public class GameModel {
                 state = GameState.VICTORY;
                 recordVictory();
             } else {
+                int cleared = wave;
                 startNextWave();
+                if (spec.endless) {
+                    endlessWaveCleared(cleared); // après : son bandeau passe devant celui du biome
+                }
             }
         }
     }
@@ -2537,6 +2563,18 @@ public class GameModel {
         return best;
     }
 
+    // Mode infini : vague `cleared` repoussée. À la vague 1000, une orbe de sagesse (une fois par difficulté)
+    public void endlessWaveCleared(int cleared) {
+        if (!progression.claimWisdomOrb(cleared, spec.endlessDifficulty)) {
+            return;
+        }
+        announce("ORBE DE SAGESSE !", "Posez-la sur un mage (page Mages) : niveau 7", false);
+        if (listener != null) {
+            listener.onAchievement();     // fanfare
+            listener.onProgressChanged(); // sauvegardée tout de suite
+        }
+    }
+
     private void startNextWave() {
         int previousBiome = spec.biome(Math.max(1, wave));
         wave++;
@@ -2754,92 +2792,101 @@ public class GameModel {
         if (field.isEmpty() && m.type != Mage.SUMMONER && m.type != Mage.WORKER) {
             return false; // pas de cible : on garde la compétence
         }
+        // Sage (niveau 7) : version BOOST, effets environ doublés (pw) et effets visuels du niveau 7 (fx)
+        boolean boost = m.isSkillBoosted();
+        float pw = boost ? Mage.BOOST_POWER : 1f;
+        int fx = boost ? Mage.SAGE_LEVEL : Mage.SKILL_LEVEL;
         switch (m.type) {
-            case Mage.WATER:     // Raz-de-marée
+            case Mage.WATER:     // Raz-de-marée / Déluge
                 for (Enemy e : field) {
-                    hurt(e, dmg * 3);
-                    e.knockBack(90 * d);
-                    e.slow(0.4f, 180);
-                    splashes.add(new Splash(e.x, e.y, 60 * d, 5));
+                    hurt(e, dmg * 3 * pw);
+                    e.knockBack(90 * d * pw);
+                    e.slow(boost ? 0.25f : 0.4f, Math.round(180 * pw));
+                    splashes.add(new Splash(e.x, e.y, 60 * d * (boost ? 1.6f : 1f), fx));
                 }
                 break;
-            case Mage.FIRE:      // Pluie de feu
-                for (int k = 0; k < 8; k++) {
+            case Mage.FIRE:      // Pluie de feu / Envol du phénix
+                for (int k = 0; k < (boost ? 16 : 8); k++) {
                     Enemy t = field.get(k % field.size());
-                    projectiles.add(new Projectile(t.x + (random.nextFloat() - 0.5f) * 60 * d, 0, t, Mage.FIRE, 5,
-                            dmg * 4, 10, d));
+                    projectiles.add(new Projectile(t.x + (random.nextFloat() - 0.5f) * 60 * d, 0, t, Mage.FIRE, fx,
+                            dmg * 4 * (boost ? 1.5f : 1f), 10, d));
                 }
                 break;
-            case Mage.EARTH:     // Séisme
+            case Mage.EARTH:     // Séisme / Cataclysme
                 for (Enemy e : field) {
-                    hurt(e, dmg * 3);
-                    e.stun(90);
-                    hits.add(new HitEffect(e.x, e.y, Mage.EARTH, 5));
+                    hurt(e, dmg * 3 * pw);
+                    e.stun(Math.round(90 * pw));
+                    hits.add(new HitEffect(e.x, e.y, Mage.EARTH, fx));
                 }
-                castleHitTimer = 6;
+                castleHitTimer = boost ? 12 : 6;
                 break;
-            case Mage.LIGHTNING: // Tempête
-                for (int k = 0; k < 10; k++) {
+            case Mage.LIGHTNING: // Tempête / Marteau du tonnerre
+                for (int k = 0; k < (boost ? 20 : 10); k++) {
                     Enemy t = field.get(random.nextInt(field.size()));
-                    hurt(t, dmg * 3);
-                    bolts.add(new Bolt(t.x + (random.nextFloat() - 0.5f) * 40 * d, 0, t.x, t.y, 5));
-                    hits.add(new HitEffect(t.x, t.y, Mage.LIGHTNING, 5));
+                    hurt(t, dmg * 3 * (boost ? 1.5f : 1f));
+                    bolts.add(new Bolt(t.x + (random.nextFloat() - 0.5f) * 40 * d, 0, t.x, t.y, fx));
+                    hits.add(new HitEffect(t.x, t.y, Mage.LIGHTNING, fx));
                 }
                 break;
-            case Mage.POISON:    // Peste
+            case Mage.POISON:    // Peste / Pandémie
                 for (Enemy e : field) {
-                    e.poison(Math.max(m.getPoisonDps(), dmg) * 3, 300);
-                    hits.add(new HitEffect(e.x, e.y, Mage.POISON, 4));
+                    e.poison(Math.max(m.getPoisonDps(), dmg) * 3 * pw, Math.round(300 * pw));
+                    hits.add(new HitEffect(e.x, e.y, Mage.POISON, boost ? fx : 4));
                 }
                 break;
-            case Mage.AIR:       // Tornade
+            case Mage.AIR:       // Tornade / Ouragan (étourdit en plus)
                 for (Enemy e : field) {
-                    e.knockBack(160 * d);
-                    hits.add(new HitEffect(e.x, e.y, Mage.AIR, 5));
+                    e.knockBack(160 * d * (boost ? 1.6f : 1f));
+                    if (boost) {
+                        e.stun(60);
+                    }
+                    hits.add(new HitEffect(e.x, e.y, Mage.AIR, fx));
                 }
                 break;
-            case Mage.SUMMONER:  // Appel aux armes : 3 chevaliers d'élite (hors limite)
-                for (int k = 0; k < 3; k++) {
-                    spawnKnight(m, board.playLeft + board.playWidth * (k + 1) / 4f, 2f);
+            case Mage.SUMMONER:  // Appel aux armes : 3 chevaliers d'élite / Légion royale : 5 (hors limite)
+                int count = boost ? 5 : 3;
+                for (int k = 0; k < count; k++) {
+                    spawnKnight(m, board.playLeft + board.playWidth * (k + 1) / (count + 1f), boost ? 3f : 2f);
                 }
                 break;
-            case Mage.WORKER:    // Grand rempart : un mur renforcé (temporaire) devant chaque colonne
+            case Mage.WORKER:    // Grand rempart / Citadelle : un mur renforcé (temporaire) devant chaque colonne
                 for (int c = 0; c < Board.COLS; c++) {
                     walls.add(new Wall(board.cellCenterX(c), wallY(), wallHalfWidth(), wallHalfHeight(),
-                            m.getWallHp() * 2, null, 900));
-                    hits.add(new HitEffect(board.cellCenterX(c), wallY(), Mage.WORKER, 5));
+                            m.getWallHp() * 2 * pw, null, Math.round(900 * pw)));
+                    hits.add(new HitEffect(board.cellCenterX(c), wallY(), Mage.WORKER, fx));
                 }
                 break;
-            case Mage.LIGHT:     // Aube sacrée : brûle et aveugle tout le terrain, recharge les autres compétences
+            case Mage.LIGHT:     // Aube sacrée / Jugement céleste : brûle et aveugle, recharge les autres compétences
                 for (Enemy e : field) {
-                    hurt(e, dmg * 4);
-                    e.stun(60);
-                    bolts.add(new Bolt(e.x, 0, e.x, e.y, 5).as(Mage.LIGHT));
+                    hurt(e, dmg * 4 * pw);
+                    e.stun(Math.round(60 * pw));
+                    bolts.add(new Bolt(e.x, 0, e.x, e.y, fx).as(Mage.LIGHT));
                 }
                 for (int r = 0; r < Board.ROWS; r++) {
                     for (int c = 0; c < Board.COLS; c++) {
                         Mage o = grid[r][c];
                         if (o != null && o != m) {
-                            o.skillTimer /= 2;
+                            o.skillTimer /= boost ? 4 : 2;
                         }
                     }
                 }
                 break;
-            case Mage.DARK:      // Éclipse : exécute les blessés (< 25 %), ralentit et blesse les autres
+            case Mage.DARK:      // Éclipse / Nuit éternelle : exécute les blessés, ralentit et blesse les autres
                 for (Enemy e : field) {
-                    if (!tryExecute(e, 0.25f)) {
-                        hurt(e, dmg * 2);
-                        e.slow(0.4f, 240);
+                    if (!tryExecute(e, boost ? 0.4f : 0.25f)) {
+                        hurt(e, dmg * 2 * pw);
+                        e.slow(boost ? 0.25f : 0.4f, Math.round(240 * pw));
                     }
-                    hits.add(new HitEffect(e.x, e.y, Mage.DARK, 4));
+                    hits.add(new HitEffect(e.x, e.y, Mage.DARK, boost ? fx : 4));
                 }
                 break;
         }
         // Recharge raccourcie par l'aura des mages de Lumière
         m.skillTimer = Math.max(1, Math.round(m.getSkillCooldown() * (1f - getAuraBonus(row, col))));
         progression.addSkill();
-        skillText = Mage.SKILL_NAMES[m.type].toUpperCase();
+        skillText = m.getSkillName().toUpperCase();
         skillTextType = m.type;
+        skillTextBoost = boost;
         skillTextTimer = SKILL_TEXT_DURATION;
         if (listener != null) {
             listener.onSkill();
@@ -2855,7 +2902,94 @@ public class GameModel {
         if (SAME_TYPE_REQUIRED && a.type != b.type) {
             return false;
         }
-        return a.level == b.level && a.level < MAX_LEVEL;
+        return a.level == b.level && canReachLevel(a, a.level + 1);
+    }
+
+    // Ce mage peut-il atteindre ce niveau ? Le niveau 7 (sage) demande une orbe de sagesse sur son élément
+    public boolean canReachLevel(Mage m, int newLevel) {
+        if (m == null || newLevel > MAX_LEVEL) {
+            return false;
+        }
+        return newLevel < Mage.SAGE_LEVEL || progression.hasWisdomOrb(m.type);
+    }
+
+    // ---------- Monter un mage d'un niveau avec des PO (appui long sur le mage) ----------
+
+    // Prix pour passer du niveau `level` au suivant : 100, 200, 400, 800, 1600, 3200 PO (-1 : niveau max)
+    public static int levelUpCost(int level) {
+        return level >= 1 && level <= LEVEL_UP_COSTS.length ? LEVEL_UP_COSTS[level - 1] : -1;
+    }
+
+    // Pourquoi le mage de cette case ne peut pas monter : 0 = il peut
+    public static final int LEVEL_UP_OK = 0;
+    public static final int LEVEL_UP_MAX = 1;       // déjà au niveau maximal
+    public static final int LEVEL_UP_NO_ORB = 2;    // 6 → 7 sans orbe de sagesse sur son élément
+    public static final int LEVEL_UP_NO_GOLD = 3;   // pas assez de PO
+    public static final int LEVEL_UP_NONE = 4;      // pas de mage (ou pas en partie)
+
+    public int levelUpStatus(int row, int col) {
+        Mage m = grid[row][col];
+        if (state != GameState.PLAYING || m == null) {
+            return LEVEL_UP_NONE;
+        }
+        if (m.level >= MAX_LEVEL) {
+            return LEVEL_UP_MAX;
+        }
+        if (!canReachLevel(m, m.level + 1)) {
+            return LEVEL_UP_NO_ORB;
+        }
+        return gold >= levelUpCost(m.level) ? LEVEL_UP_OK : LEVEL_UP_NO_GOLD;
+    }
+
+    // Paye les PO et monte le mage d'un niveau
+    public boolean levelUpMage(int row, int col) {
+        if (levelUpStatus(row, col) != LEVEL_UP_OK) {
+            return false;
+        }
+        Mage m = grid[row][col];
+        gold -= levelUpCost(m.level);
+        m.level++;
+        onMageLevelReached(m);
+        if (m.level >= MAX_LEVEL) {
+            closeLevelUp(); // plus rien à acheter
+        }
+        return true;
+    }
+
+    // Bulle « monter de niveau » au-dessus d'un mage (ouverte par un appui long)
+    public void openLevelUp(int row, int col) {
+        if (state == GameState.PLAYING && grid[row][col] != null) {
+            levelUpRow = row;
+            levelUpCol = col;
+        }
+    }
+
+    public void closeLevelUp() {
+        levelUpRow = -1;
+        levelUpCol = -1;
+    }
+
+    // Case de la bulle ouverte, ou -1 (fermée, ou le mage n'est plus là)
+    public int getLevelUpRow() {
+        return isLevelUpOpen() ? levelUpRow : -1;
+    }
+
+    public int getLevelUpCol() {
+        return isLevelUpOpen() ? levelUpCol : -1;
+    }
+
+    private boolean isLevelUpOpen() {
+        return levelUpRow >= 0 && state == GameState.PLAYING && grid[levelUpRow][levelUpCol] != null;
+    }
+
+    // Un mage vient de gagner un niveau (fusion ou PO) : succès et retours
+    private void onMageLevelReached(Mage m) {
+        if (m.level >= Mage.SKILL_LEVEL) {
+            progression.setMaxLevelMage(); // succès « mage de niveau 5 » (valable aussi au-delà)
+        }
+        if (listener != null) {
+            listener.onMerge();
+        }
     }
 
     // Lâcher le mage de (fromRow, fromCol) sur (toRow, toCol) : déplacement ou fusion
@@ -2875,12 +3009,7 @@ public class GameModel {
             target.level++;
             grid[fromRow][fromCol] = null;
             progression.addMerge();
-            if (target.level >= MAX_LEVEL) {
-                progression.setMaxLevelMage();
-            }
-            if (listener != null) {
-                listener.onMerge();
-            }
+            onMageLevelReached(target);
         }
     }
 
@@ -2974,6 +3103,9 @@ public class GameModel {
                 if (type >= 0 && type < Mage.TYPE_COUNT) {
                     Mage m = new Mage(type, progression.getRank(type), progression.getEquippedArtifact(type));
                     m.level = Math.max(1, Math.min(MAX_LEVEL, lv));
+                    if (!canReachLevel(m, m.level)) {
+                        m.level = Mage.SAGE_LEVEL - 1; // sage sans orbe (retirée entre-temps) : archimage
+                    }
                     grid[row][col] = m;
                     locked[row][col] = false;
                 }

@@ -33,6 +33,7 @@ public class Hud {
     public static final int GAME_ULTIMATE = 6;  // toucher la jauge lance l'ultime
     public static final int GAME_LAUNCH = 7;    // « Lancer la vague »
     public final RectF launchButton = new RectF();
+    public final RectF levelUpBubble = new RectF(); // bulle « monter de niveau » (voir levelUpBubble())
 
     // Boutons de la fenêtre de pause
     public static final int PAUSE_QUIT = 0;
@@ -91,6 +92,7 @@ public class Hud {
     public static final int HOME_SHEET_USE = 151;
     public static final int HOME_SHEET_ARTIFACT = 152;
     public static final int HOME_SHEET_CLOSE = 153;
+    public static final int HOME_SHEET_ORB = 154;     // poser / retirer l'orbe de sagesse
     public static final int HOME_DIFF_0 = 130;   // page Infini : difficultés 130 à 133
     public static final int HOME_ENDLESS_PLAY = 140;
     public static final int HOME_LIST_0 = 1000;  // listes : 1000 + ligne × 4 + bouton
@@ -106,6 +108,7 @@ public class Hud {
     public final RectF mageSheet = new RectF();
     public final RectF sheetCard = new RectF();
     public final RectF sheetArtifact = new RectF();
+    public final RectF sheetOrb = new RectF();
     public final RectF sheetUpgrade = new RectF();
     public final RectF sheetUse = new RectF();
     public final RectF sheetClose = new RectF();
@@ -311,14 +314,16 @@ public class Hud {
 
         // Fiche d'un mage : grande carte à gauche, infos à droite, artefact, puis les boutons
         float sw = cw * 0.92f;
-        float sH = 470 * d;
+        float sH = 524 * d;
         float sTop = popupTop(h, sH);
         float sLeft = cx - sw / 2;
         mageSheet.set(sLeft, sTop, sLeft + sw, sTop + sH);
         float cardW = Math.min(124 * d, sw * 0.38f);
         sheetCard.set(sLeft + 16 * d, sTop + 62 * d, sLeft + 16 * d + cardW, sTop + 62 * d + cardW * 1.32f);
-        float aTop = sheetCard.bottom + 14 * d;
+        float aTop = Math.max(sheetCard.bottom, sTop + 226 * d) + 14 * d; // sous la carte et les compétences
         sheetArtifact.set(sLeft + 16 * d, aTop, sLeft + sw - 16 * d, aTop + 46 * d);
+        // Emplacement de l'orbe de sagesse (niveau 7), sous l'artefact
+        sheetOrb.set(sLeft + 16 * d, sheetArtifact.bottom + 8 * d, sLeft + sw - 16 * d, sheetArtifact.bottom + 54 * d);
         float bTop = sTop + sH - 136 * d;
         float bw = (sw - 16 * d * 2 - 10 * d) / 2;
         sheetUpgrade.set(sLeft + 16 * d, bTop, sLeft + 16 * d + bw, bTop + 58 * d);
@@ -504,7 +509,23 @@ public class Hud {
         if (sheetArtifact.contains(x, y)) {
             return HOME_SHEET_ARTIFACT;
         }
+        if (sheetOrb.contains(x, y)) {
+            return HOME_SHEET_ORB;
+        }
         return HOME_SHEET_CLOSE;
+    }
+
+    // Bulle « monter de niveau » (appui long sur un mage) : au-dessus de sa case, sans sortir de la
+    // colonne de jeu. Le damier n'est pas en miroir : la bulle reste au-dessus du mage en mode gaucher.
+    public RectF levelUpBubble(int row, int col) {
+        float d = board.density;
+        float w = Math.min(board.playWidth - 8 * d, Math.max(board.cellWidth * 1.4f, 150 * d));
+        float h = 50 * d;
+        float cx = board.cellLeft(col) + board.cellWidth / 2;
+        float left = Math.max(board.playLeft + 4 * d, Math.min(cx - w / 2, board.playRight() - 4 * d - w));
+        float top = board.cellTop(row) - h + 6 * d;
+        levelUpBubble.set(left, top, left + w, top + h);
+        return levelUpBubble;
     }
 
     // Zone de liste qui défile sur cette page (null : pas de liste)

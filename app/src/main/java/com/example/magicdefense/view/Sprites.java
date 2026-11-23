@@ -112,9 +112,230 @@ public final class Sprites {
 
     public static final int MAGE_WIDTH = 19;
     public static final int MAGE_HEIGHT = 18;
+    public static final int MAGE_LEVELS = 7; // 1 à 5, 6 = archimage, 7 = sage
+
+    // ---------- Niveau 6 (archimage) : coiffe et arme propres à chaque élément ----------
+    // Coiffe : lignes 0 à 6 (colonnes 0 à 13, remplacent le chapeau) ; lignes suivantes : seuls les
+    // pixels dessinés recouvrent le corps (cheveux, masque...). Couleurs en plus : A/a argent,
+    // y or ombré, Z/z os, H ombre, P rouge, O orange, B cuir, V runes, C cyan (voir buildMages).
+    private static final String[][] HEADS_6 = {
+            {   // Eau : couronne à trois pointes de Poséidon, cheveux ondulés
+                    ".............",
+                    "...Y..YY..Y..",
+                    "...YY.YY.YY..",
+                    "...YYYYYYYY..",
+                    "...YCYYYYCY..",
+                    "..KgGgGgGgGK.",
+                    ".KgKKKKKKKKgK",
+                    "..g........g.",
+                    "..g........g.",
+                    "..G........G.",
+            },
+            {   // Feu : couronne de flammes, cheveux de phénix
+                    "......GG.....",
+                    "...G..gg..G..",
+                    "...gG.OO.Gg..",
+                    "...gOGOOGOg..",
+                    "...YYYYYYYY..",
+                    "..KPPPPPPPPK.",
+                    ".KPKKKKKKKKPK",
+                    "..P........P.",
+                    "..O........O.",
+            },
+            {   // Terre : heaume de golem en pierre, runes qui luisent
+                    ".............",
+                    "...KKKKKKKK..",
+                    "..KaAAAAAAaK.",
+                    "..KAVAAAAVAK.",
+                    "..KaAAVVAAaK.",
+                    "..KAAAAAAAAK.",
+                    ".KaKKKKKKKKaK",
+                    "..a........a.",
+                    "..a........a.",
+            },
+            {   // Foudre : casque ailé façon Thor, cheveux roux
+                    ".............",
+                    ".W.........W.",
+                    ".WW.KKKKKK.WW",
+                    "..WKAAAAAAKW.",
+                    "..KAaAAAAaAK.",
+                    "..KAAAAAAAAK.",
+                    ".KYKKKKKKKKYK",
+                    "..O........O.",
+                    "..O........O.",
+            },
+            {   // Poison : chapeau noir et masque à bec de médecin de peste
+                    ".............",
+                    "....KKKKKK...",
+                    "....KHHHHK...",
+                    "....KHHHHK...",
+                    "...KggggggK..",
+                    ".KKHHHHHHHHKK",
+                    "KHHHHHHHHHHHK",
+                    "...KZCZZCZK..",
+                    "...KZZZZZZZZZz",
+                    "...KzZZZZZzzz.",
+            },
+            {   // Air : moine du vent, crâne rasé et flèche tatouée
+                    ".............",
+                    "......G......",
+                    "....KKKKKK...",
+                    "...KSSGGSSK..",
+                    "..KSSSGGSSSK.",
+                    "..KSSGGGGSSK.",
+                    "...KSSSSSSK..",
+            },
+            {   // Invocateur : roi nécromancien, couronne sombre, capuche, yeux qui brillent
+                    ".............",
+                    "...a..aa..a..",
+                    "...aa.aa.aa..",
+                    "...aaaaaaaa..",
+                    "...aGaaaaGa..",
+                    "..KRRRRRRRRK.",
+                    ".KRKKKKKKKKRK",
+                    "..R........R.",
+                    "..R..G..G..R.",
+            },
+            {   // Ouvrier : maître bâtisseur nain, casque à cornes et bandeau doré
+                    ".............",
+                    ".Z..KKKKKK..Z",
+                    ".Zz.KAAAAK.zZ",
+                    "..zKAAAAAAKz.",
+                    "...KAaAAaAK..",
+                    "..KYYYYYYYYK.",
+                    ".KAKKKKKKKKAK",
+                    "..O........O.",
+            },
+            {   // Lumière : séraphin, auréole dorée, cheveux d'or, ailes
+                    "....YYYYYY...",
+                    "...Y......Y..",
+                    "....YYYYYY...",
+                    ".............",
+                    "....KKKKKK...",
+                    "...KGGGGGGK..",
+                    "..KGgGGGGgGK.",
+                    "WW.........WW",
+                    "WW.........WW",
+                    "Ww.........wW",
+                    "w...........w",
+            },
+            {   // Ténèbres : faucheuse, grande capuche et crâne aux yeux brillants
+                    "......K......",
+                    ".....KRK.....",
+                    "....KRRRK....",
+                    "...KRRRRRK...",
+                    "..KRRRRRRRK..",
+                    "..KRrHHHHrRK.",
+                    ".KRrHHHHHHrRK",
+                    "..RKZZZZZZKR.",
+                    "..RKZGZZGZKR.",
+                    "..RKzZZZZzKR.",
+                    "...RRRRRRRR..",     // (archimage seulement) robe à la place de la barbe
+                    "....RRZZRR...",
+                    ".....RZZR....",
+                    ".....RRRR....",
+                    "......RR.....",
+            },
+    };
+    // Arme (lignes 0 à 5, colonnes 14 à 18) : le bâton continue colonne 17
+    private static final String[][] TIPS_6 = {
+            {"Y.Y.Y", "Y.Y.Y", "YYYYY", "..Yt.", "...T.", "...Tt"},   // Eau : trident
+            {"G...G", "gG.Gg", "OgGgO", ".OPO.", "..PT.", "...Tt"},   // Feu : phénix
+            {".aAa.", "aAVAa", "aVAVa", "aAVAa", ".aaT.", "...Tt"},   // Terre : pierre runique
+            {".G..G", "aAAAa", "AAGAA", "aAAAa", "...B.", "...Tt"},   // Foudre : marteau de Thor
+            {"..g..", ".KAK.", ".KAK.", "KGGGK", "KgGgK", ".KKTt"},   // Poison : fiole d'alchimiste
+            {"..G..", "W.G.W", "WWGWW", ".WgW.", "...T.", "...Tt"},   // Air : bâton ailé
+            {"...Y.", "RRRT.", "RGRT.", "RRRT.", "R.RT.", "...Tt"},   // Invocateur : bannière
+            {"AAAAA", "AaaaA", "AAAAA", "...B.", "...B.", "...Tt"},   // Ouvrier : marteau de forge
+            {"Y.G.Y", ".YGY.", "GGWGG", ".YGY.", "...Y.", "...Tt"},   // Lumière : soleil
+            {"AAAT.", "A..T.", "a..T.", "...T.", "...T.", "...Tt"},   // Ténèbres : faux
+    };
+    // Élément sans dessin dédié (nouveau mage) : couronne d'archimage et orbe
+    private static final String[] DEFAULT_HEAD_6 = {
+            ".............",
+            "...Y..YY..Y..",
+            "...YYYYYYYY..",
+            "...YGYYYYGY..",
+            "...KRRRRRRK..",
+            "..KRRRRRRRRK.",
+            ".KKKKKKKKKKKK",
+    };
+    private static final String[] DEFAULT_TIP_6 = {".gGg.", "gGWGg", "gGGGg", ".gGg.", "..YT.", "...Tt"};
+
+    // ---------- Niveau 7 (sage) : longue barbe jusqu'au sol, col et ourlet dorés ----------
+    // Lignes 7 à 17 (sourcils blancs, barbe, robe brodée d'or)
+    private static final String[] BODY_SAGE = {
+            "...KWWSSWWK......Tt",
+            "...KSESSESK......Tt",
+            "...KWSSSSWK......Tt",
+            "..KYWWWWWWYK.....Tt",
+            ".KRYwWWWWwYRK..KSSK",
+            ".KRRYWWWWWWYRKKSSSK",
+            "KRRRYwWWWWwYRRKKKK",
+            "KrRRYwWWWWwYRrK..Tt",
+            "KrrRYRwWWwRYRrK..Tt",
+            "KYYYYYwWWwYYYYK..Tt",
+            ".KKKKKKKKKKKKKK..Tt",
+    };
+
+    // Archimage (6) et sage (7) : partent du grand mage (5), puis coiffe et arme de l'élément ;
+    // le sage a en plus le corps de sage, l'argent devenu or et des étincelles
+    private static String[] highMageRows(int type, int level) {
+        boolean sage = level >= 7;
+        char[][] g = toGrid(mageRows(type, 5), MAGE_WIDTH);
+        if (sage) {
+            for (int i = 0; i < BODY_SAGE.length; i++) {
+                g[7 + i] = pad(BODY_SAGE[i], MAGE_WIDTH);
+            }
+        } else {
+            g[10][3] = 'Y';  // fermoirs dorés de l'archimage
+            g[10][10] = 'Y';
+        }
+        String[] head = type < HEADS_6.length ? HEADS_6[type] : DEFAULT_HEAD_6;
+        for (int y = 0; y < head.length && y < MAGE_HEIGHT; y++) {
+            if (sage && y >= 10) {
+                break; // le sage garde sa longue barbe
+            }
+            for (int x = 0; x < 14; x++) {
+                char c = x < head[y].length() ? head[y].charAt(x) : '.';
+                if (y < 7 || c != '.') {
+                    g[y][x] = c;
+                }
+            }
+        }
+        String[] tip = type < TIPS_6.length ? TIPS_6[type] : DEFAULT_TIP_6;
+        for (int y = 0; y < 6; y++) {
+            for (int x = 0; x < 5; x++) {
+                g[y][14 + x] = y < tip.length && x < tip[y].length() ? tip[y].charAt(x) : '.';
+            }
+        }
+        if (sage) {
+            // Ornements dorés : l'argent de la coiffe et de l'arme devient or
+            for (int y = 0; y < 10; y++) {
+                for (int x = 0; x < MAGE_WIDTH; x++) {
+                    if (g[y][x] == 'A') {
+                        g[y][x] = 'Y';
+                    } else if (g[y][x] == 'a') {
+                        g[y][x] = 'y';
+                    }
+                }
+            }
+            // Étincelles de sagesse autour de la tête
+            int[][] sparks = {{0, 1}, {0, 12}, {3, 0}, {2, 13}};
+            for (int[] s : sparks) {
+                if (g[s[0]][s[1]] == '.') {
+                    g[s[0]][s[1]] = 'W';
+                }
+            }
+        }
+        return fromGrid(g);
+    }
 
     // Grille du mage d'un élément et d'un niveau : le design évolue à chaque fusion
     static String[] mageRows(int type, int level) {
+        if (level >= 6) {
+            return highMageRows(type, level);
+        }
         char[][] g = toGrid(level == 1 ? BODY_APPRENTICE : BODY_MAGE, MAGE_WIDTH);
         if (type == WORKER_TYPE) {
             // Ouvrier : casque de chantier jaune à la place du chapeau pointu
@@ -469,14 +690,26 @@ public final class Sprites {
 
     // mages[type][niveau - 1]
     public static Bitmap[][] buildMages() {
-        Bitmap[][] mages = new Bitmap[ELEMENT_COLORS.length][5];
+        Bitmap[][] mages = new Bitmap[ELEMENT_COLORS.length][MAGE_LEVELS];
         for (int type = 0; type < ELEMENT_COLORS.length; type++) {
             int[] p = commonPalette();
             p['R'] = ELEMENT_COLORS[type][0];
             p['r'] = ELEMENT_COLORS[type][1];
             p['G'] = ELEMENT_COLORS[type][2];
             p['g'] = ELEMENT_COLORS[type][3];
-            for (int level = 1; level <= 5; level++) {
+            // Couleurs des niveaux 6 (archimage) et 7 (sage)
+            p['A'] = Color.rgb(205, 210, 225);   // argent / pierre claire
+            p['a'] = Color.rgb(125, 130, 150);   // argent ombré
+            p['y'] = Color.rgb(176, 128, 36);    // or ombré
+            p['Z'] = Color.rgb(236, 230, 210);   // os, masque
+            p['z'] = Color.rgb(180, 170, 145);   // os ombré
+            p['H'] = Color.rgb(30, 22, 42);      // ombre (capuche, chapeau noir)
+            p['P'] = Color.rgb(230, 55, 60);     // rouge phénix
+            p['O'] = Color.rgb(255, 160, 40);    // orange flamme
+            p['B'] = Color.rgb(120, 75, 40);     // cuir
+            p['V'] = Color.rgb(190, 110, 255);   // runes violettes
+            p['C'] = Color.rgb(130, 235, 255);   // lueur cyan
+            for (int level = 1; level <= MAGE_LEVELS; level++) {
                 mages[type][level - 1] = toBitmap(mageRows(type, level), p);
             }
         }

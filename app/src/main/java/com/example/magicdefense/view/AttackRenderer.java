@@ -24,28 +24,32 @@ import java.util.Random;
 public class AttackRenderer {
 
     // ---------- Réglages par niveau (indice = niveau - 1) ----------
-    private static final float[] ATTACK_SIZE = {0.8f, 1.0f, 1.3f, 1.6f, 2.0f};
+    // (niveaux 6 = archimage et 7 = sage en fin de tableau)
+    private static final float[] ATTACK_SIZE = {0.8f, 1.0f, 1.3f, 1.6f, 2.0f, 2.3f, 2.7f};
 
-    // Feu : braise → orange → rouge → feu bleu → soleil doré
+    // Feu : braise → orange → rouge → feu bleu → soleil doré → phénix rose → flamme blanche du sage
     private static final int[] FIRE_TAIL = {Color.rgb(255, 170, 40), Color.rgb(255, 140, 40),
-            Color.rgb(240, 70, 30), Color.rgb(60, 150, 255), Color.rgb(255, 200, 60)};
-    private static final int[] FIRE_TAIL_LENGTH = {1, 3, 5, 6, 7};
-    private static final int[] FIRE_SPARKS = {0, 2, 4, 5, 7};
+            Color.rgb(240, 70, 30), Color.rgb(60, 150, 255), Color.rgb(255, 200, 60),
+            Color.rgb(255, 90, 160), Color.rgb(255, 245, 200)};
+    private static final int[] FIRE_TAIL_LENGTH = {1, 3, 5, 6, 7, 8, 9};
+    private static final int[] FIRE_SPARKS = {0, 2, 4, 5, 7, 9, 12};
 
-    // Terre : caillou → ambre → émeraude → turquoise → or
+    // Terre : caillou → ambre → émeraude → turquoise → or → améthyste runique → diamant
     private static final int[] CRYSTAL_LIGHT = {Color.rgb(150, 140, 130), Color.rgb(214, 170, 95),
-            Color.rgb(120, 200, 110), Color.rgb(110, 220, 200), Color.rgb(255, 215, 120)};
+            Color.rgb(120, 200, 110), Color.rgb(110, 220, 200), Color.rgb(255, 215, 120),
+            Color.rgb(235, 120, 255), Color.rgb(255, 250, 225)};
     private static final int[] CRYSTAL_DARK = {Color.rgb(95, 90, 85), Color.rgb(140, 95, 50),
-            Color.rgb(60, 130, 60), Color.rgb(40, 140, 130), Color.rgb(200, 140, 40)};
+            Color.rgb(60, 130, 60), Color.rgb(40, 140, 130), Color.rgb(200, 140, 40),
+            Color.rgb(140, 50, 180), Color.rgb(220, 180, 70)};
 
-    // Foudre : blanc → violet → cyan → bleu → or (0 = pas de halo)
+    // Foudre : blanc → violet → cyan → bleu → or → cyan électrique → or éclatant (0 = pas de halo)
     private static final int[] BOLT_CORE = {Color.WHITE, Color.rgb(255, 250, 220), Color.rgb(230, 250, 255),
-            Color.rgb(220, 235, 255), Color.rgb(255, 250, 210)};
+            Color.rgb(220, 235, 255), Color.rgb(255, 250, 210), Color.WHITE, Color.WHITE};
     private static final int[] BOLT_GLOW = {0, Color.rgb(170, 90, 255), Color.rgb(90, 200, 255),
-            Color.rgb(60, 110, 255), Color.rgb(255, 200, 60)};
-    private static final float[] BOLT_CORE_WIDTH = {1.5f, 2.2f, 3.0f, 3.8f, 4.6f}; // en dp
-    private static final float[] BOLT_GLOW_WIDTH = {0f, 7f, 9f, 12f, 15f};
-    private static final int[] BOLT_BRANCHES = {0, 0, 1, 2, 3};
+            Color.rgb(60, 110, 255), Color.rgb(255, 200, 60), Color.rgb(120, 230, 255), Color.rgb(255, 225, 90)};
+    private static final float[] BOLT_CORE_WIDTH = {1.5f, 2.2f, 3.0f, 3.8f, 4.6f, 5.4f, 6.4f}; // en dp
+    private static final float[] BOLT_GLOW_WIDTH = {0f, 7f, 9f, 12f, 15f, 18f, 22f};
+    private static final int[] BOLT_BRANCHES = {0, 0, 1, 2, 3, 3, 3}; // 3 au plus (points 2, 4 et 6)
 
     // Eau (niveau 3) : position des gouttes de l'averse, en unités
     private static final float[][] DROP_POS = {{0, 0}, {-1.5f, -1.3f}, {1.3f, -2.1f}, {-0.5f, -3.0f},
@@ -73,6 +77,12 @@ public class AttackRenderer {
                     new float[]{0f, 0.3f, 0.65f, 1f}),
             gradient(new int[]{Color.WHITE, Color.rgb(255, 240, 160), Color.rgb(255, 190, 40), Color.argb(0, 255, 120, 0)},
                     new float[]{0f, 0.3f, 0.65f, 1f}),
+            // Niveau 6 : feu du phénix (rose et pourpre)
+            gradient(new int[]{Color.WHITE, Color.rgb(255, 190, 220), Color.rgb(240, 60, 140), Color.argb(0, 150, 20, 120)},
+                    new float[]{0f, 0.3f, 0.65f, 1f}),
+            // Niveau 7 (sage) : flamme blanche et dorée
+            gradient(new int[]{Color.WHITE, Color.rgb(255, 255, 230), Color.rgb(255, 215, 90), Color.argb(0, 255, 160, 30)},
+                    new float[]{0f, 0.35f, 0.7f, 1f}),
     };
     private final RadialGradient bubbleGradient = gradient(
             new int[]{Color.argb(230, 220, 245, 255), Color.argb(220, 90, 170, 245), Color.argb(240, 40, 110, 210)},
@@ -534,8 +544,8 @@ public class AttackRenderer {
             case 4:
                 drawCyclone(canvas, p, base * 1.1f);
                 break;
-            default:
-                drawTsunami(canvas, p, base * 1.2f);
+            default: // 5 ; plus grand encore pour l'archimage (6) et le sage (7)
+                drawTsunami(canvas, p, base * (p.level >= 7 ? 1.7f : p.level == 6 ? 1.45f : 1.2f));
                 break;
         }
     }
