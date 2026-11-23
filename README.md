@@ -17,7 +17,7 @@ Projet réalisé en binôme dans le cadre du TP d'IHM (M2) — application Andro
 **[⬇️ Télécharger MagicDefense.apk](https://github.com/QuentinKouz/MagicDefense/releases/latest/download/MagicDefense.apk)**  
 (toutes les versions : [page des releases](https://github.com/QuentinKouz/MagicDefense/releases))
 
-**Version 2 (branche `v2`)** : l'APK est directement dans le dépôt, [`apk/MagicDefense-v2.apk`](https://github.com/QuentinKouz/MagicDefense/raw/v2/apk/MagicDefense-v2.apk) (version 2.2).  
+**Version 2 (branche `v2`)** : l'APK est directement dans le dépôt, [`apk/MagicDefense-v2.apk`](https://github.com/QuentinKouz/MagicDefense/raw/v2/apk/MagicDefense-v2.apk) (version 2.3).  
 **Mise à jour sans perte** : installez le nouvel APK par-dessus l'ancien, sans désinstaller. Tous les APK de la branche `v2` sont signés avec la même clé (`app/signing/magicdefense.keystore`), donc Android accepte la mise à jour et garde la sauvegarde (progression, coffres, gemmes, partie en cours).  
 Seule exception : passer de la V1 (Releases GitHub) à la V2 demande encore de désinstaller la V1, signée avec une autre clé.
 
@@ -65,12 +65,13 @@ Les mages sont des **cartes** à collectionner : on les débloque et on les amé
 | **Ouvrier** | Épique | Construit un **mur** devant sa colonne (il bloque les gobelins et se reconstruit 5 s après sa destruction) et lance lentement de gros **marteaux** |
 | **Lumière** | Légendaire | **Aura sur tous les mages** : +10 à +38 % de dégâts et tirs/compétences plus rapides (2 auras cumulables, +60 % max) ; ses **rayons** touchent tous les ennemis à la fois |
 | **Ténèbres** | Légendaire | **Tue net** les gobelins sous 10 % de PV (pas le boss), dégâts de zone plus grands que l'Eau, **ralentit** les ennemis touchés |
+| **Scientifique** | Légendaire | Lance des **fioles** de potion (éclaboussure de zone) et, toutes les ≈ 25 s (jauge sur sa case), largue une **bombe nucléaire** au milieu de la carte qui frappe **tous** les gobelins visibles (énormes dégâts, ×0,35 sur le boss, court étourdissement) |
 
 Le Feu, la Terre, l'Eau et la Foudre sont possédés dès le départ ; les autres se débloquent dans les coffres.
 
 ### Archimage (niveau 6) et Sage (niveau 7)
 
-- Les niveaux 6 et 7 ont leur **propre apparence**, dans le thème de l'élément : Poséidon (couronne, trident) pour l'Eau, couronne de flammes et phénix pour le Feu, golem à runes pour la Terre, casque ailé et marteau de Thor pour la Foudre, médecin de peste pour le Poison, moine du vent pour l'Air, roi nécromancien pour l'Invocateur, forgeron nain pour l'Ouvrier, séraphin pour la Lumière, faucheuse pour les Ténèbres.
+- Les niveaux 6 et 7 ont leur **propre apparence**, dans le thème de l'élément : Poséidon (couronne, trident) pour l'Eau, couronne de flammes et phénix pour le Feu, golem à runes pour la Terre, casque ailé et marteau de Thor pour la Foudre, médecin de peste pour le Poison, moine du vent pour l'Air, roi nécromancien pour l'Invocateur, forgeron nain pour l'Ouvrier, séraphin pour la Lumière, faucheuse pour les Ténèbres, casque anti-radiations et fiole géante pour le Scientifique.
 - Niveau 6 ≈ ×1,5 les dégâts du niveau 5 (tir 8 % plus rapide) ; niveau 7 ≈ ×2,4 (tir 20 % plus rapide), zones, poison, recul et aura plus forts.
 - Le **sage** (niveau 7) a une longue barbe, des ornements dorés, une aura, et **le contour de sa case devient doré**. Sa compétence passe en version **BOOST** (voir ci-dessous).
 
@@ -96,6 +97,7 @@ Un mage de niveau 5 a une **compétence active** : touchez-le (sans le glisser) 
 | Ouvrier | **Grand rempart** : un mur renforcé devant chaque colonne pendant 15 s | **Citadelle** |
 | Lumière | **Aube sacrée** : brûle et étourdit tous les gobelins, recharge à moitié les compétences des autres mages | **Jugement céleste** (recharge les autres à 75 %) |
 | Ténèbres | **Éclipse** : exécute les gobelins sous 25 % de PV, blesse et ralentit fortement les autres | **Nuit éternelle** (exécute sous 40 %) |
+| Scientifique | **Réaction en chaîne** : la bombe se recharge 2× plus vite pendant 10 s (sirène d'alerte et compte à rebours) | **Apocalypse nucléaire** (3× plus vite pendant 15 s) |
 
 **BOOST** : au niveau 7, la compétence devient sa forme renforcée (effets ≈ ×2, recharge −40 %), avec flash doré et anneau de recharge doré.
 
@@ -112,7 +114,7 @@ La jauge se remplit en tuant des gobelins ; **toucher la jauge** (en haut à gau
 
 ### Artefacts
 
-30 artefacts, 3 par mage. Chaque victoire **en 3 étoiles sur un niveau de boss** de la campagne (10, 20, 30…) donne **10 % de chances** d'en obtenir un, à chaque fois (pas seulement la première). S'ils sont tous obtenus : 20 gemmes. Chaque mage en équipe un (fiche du mage, page Mages) : il le spécialise avec un avantage et un inconvénient. Chaque fiche donne l'effet chiffré, par exemple *Baguette de corail* (Eau) : « Tire 67 % plus vite, mais −30 % de dégâts » ; *Cœur de volcan* (Feu) : « +70 % de dégâts, mais tire 29 % moins vite » ; *Fronde de granit* (Terre) : « 1 projectile de plus par salve, mais −25 % de dégâts »…
+33 artefacts, 3 par mage. Chaque victoire **en 3 étoiles sur un niveau de boss** de la campagne (10, 20, 30…) donne **10 % de chances** d'en obtenir un, à chaque fois (pas seulement la première). S'ils sont tous obtenus : 20 gemmes. Chaque mage en équipe un (fiche du mage, page Mages) : il le spécialise avec un avantage et un inconvénient. Chaque fiche donne l'effet chiffré, par exemple *Baguette de corail* (Eau) : « Tire 67 % plus vite, mais −30 % de dégâts » ; *Cœur de volcan* (Feu) : « +70 % de dégâts, mais tire 29 % moins vite » ; *Fronde de granit* (Terre) : « 1 projectile de plus par salve, mais −25 % de dégâts »…
 
 ### Page Mages (façon jeu de cartes)
 
@@ -158,7 +160,7 @@ Des **succès à paliers sans fin** : quand un palier est atteint, le suivant ap
 
 ### Réactions élémentaires
 
-Chaque coup laisse une **marque** de son élément sur l'ennemi pendant 3 s (point de couleur à côté de sa barre de vie). **N'importe quel autre élément** déclenche alors une réaction : les 45 paires des 10 mages ont chacune la leur, **sauf Lumière + Ténèbres** (aucune réaction), soit 44 réactions.
+Chaque coup laisse une **marque** de son élément sur l'ennemi pendant 3 s (point de couleur à côté de sa barre de vie). **N'importe quel autre élément** déclenche alors une réaction : les 55 paires des 11 mages ont chacune la leur, **sauf Lumière + Ténèbres** (aucune réaction), soit 54 réactions.
 
 | Réaction | Éléments | Effet |
 |---|---|---|
@@ -206,6 +208,16 @@ Chaque coup laisse une **marque** de son élément sur l'ennemi pendant 3 s (poi
 | **Nécrose** | Ténèbres + Poison | poison violent et vulnérabilité de zone |
 | **Trou noir** | Ténèbres + Air | aspire fort et broie |
 | **Moisson** | Ténèbres + Invocateur | moisson des âmes : exécution de zone des blessés |
+| **Solution saline** | Scientifique + Eau | ralentit fortement et rend vulnérable |
+| **Combustion** | Scientifique + Feu | explosion de zone et flammes au sol |
+| **Calcination** | Scientifique + Terre | frappe de zone, étourdissement |
+| **Électrolyse** | Scientifique + Foudre | arcs vers 4 ennemis, tous vulnérables |
+| **Toxine mutante** | Scientifique + Poison | poison violent de zone |
+| **Aérosol** | Scientifique + Air | nuage qui ralentit et empoisonne |
+| **Clonage** | Scientifique + Invocateur | un chevalier clone rejoint la garde |
+| **Dynamite** | Scientifique + Ouvrier | grosse explosion qui repousse |
+| **Fission** | Scientifique + Lumière | gros coup sur la cible, puis 2 fragments |
+| **Antimatière** | Scientifique + Ténèbres | gros coup, exécute les blessés autour (sous 15 %, pas le boss) |
 
 Un ennemi **vulnérable** (liseré orange autour de sa barre de vie) subit 50 % de dégâts en plus.
 
@@ -325,17 +337,19 @@ com.example.magicdefense
 │   ├── Rarity             Rareté de chaque mage et coûts d'amélioration
 │   ├── Chest              Les 3 coffres : prix, probabilités, tirage des cartes
 │   ├── Ultimate           Les 4 ultimes (prix, jauge, effets)
-│   ├── Artifact           Les 30 artefacts (3 par mage) et leurs modificateurs
+│   ├── Artifact           Les 33 artefacts (3 par mage) et leurs modificateurs
 │   ├── Achievement        Les succès à paliers sans fin (familles, objectifs, gemmes) et uniques
 │   ├── Knight, Wall       Chevaliers de l'Invocateur, murs de l'Ouvrier
 │   ├── EnemyBolt          Projectiles des gobelins mages
-│   ├── Reaction, Zone     Les 44 réactions élémentaires et les zones au sol (lave, vapeur, béton, abysse…)
+│   ├── Reaction, Zone     Les 54 réactions élémentaires et les zones au sol (lave, vapeur, béton, abysse…)
+│   ├── Nuke               Bombe nucléaire du Scientifique (recharge, chute, impact)
 │   ├── Mage, Enemy        Unités (caractéristiques par élément, niveau, rang ; types de gobelins)
 │   └── Projectile, Bolt, Splash, HitEffect   Attaques et effets
 ├── view/                  Affichage et retours
 │   ├── GameView           Vue Android : boucle de jeu (~60 images/s), relie tout
 │   ├── GameRenderer       Dessin des écrans, du HUD et des unités
 │   ├── AttackRenderer     Dessin des attaques selon l'élément et le niveau
+│   ├── NukeRenderer       Bombe, flash, champignon atomique, onde de choc, tremblement
 │   ├── TerrainRenderer    Décor pixel art généré (forêt, prairie, rempart, cour)
 │   ├── Sprites            Mages et gobelins en pixel art
 │   ├── Hud                Position de tous les boutons et fenêtres (miroir en mode gaucher)
@@ -373,4 +387,4 @@ Permissions utilisées : `VIBRATE`, `INTERNET` (vérification des mises à jour)
 
 ## Ressources
 
-Graphismes (pixel art), bruitages et musiques créés pour le projet, générés par code : aucune ressource externe. Les musiques de nuit et de boss sont générées par `tools/generate_music.js` (Node.js, encodeur OGG `wasm-media-encoders` : `cd tools && npm install && node generate_music.js`). L'icône de l'application (chapeau de mage sur ciel de nuit) est une icône adaptative vectorielle.
+Graphismes (pixel art), bruitages et musiques créés pour le projet, générés par code : aucune ressource externe. La sirène et l'explosion du Scientifique sont générées par `tools/generate_nuke_alarm.js`, les musiques de nuit et de boss par `tools/generate_music.js` (Node.js, encodeur OGG `wasm-media-encoders` : `cd tools && npm install && node generate_music.js`). L'icône de l'application (chapeau de mage sur ciel de nuit) est une icône adaptative vectorielle.
