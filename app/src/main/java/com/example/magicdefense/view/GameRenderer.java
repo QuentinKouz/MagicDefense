@@ -75,6 +75,7 @@ public class GameRenderer {
     private final Paint[] chestPaints = new Paint[Chest.COUNT];
 
     private final AttackRenderer attacks;
+    private final NukeRenderer nukeRenderer; // Scientifique : jauge et bombe nucléaire
     private final UiKit ui;                                            // boutons, fenêtres, rubans...
     private final TerrainRenderer terrain = new TerrainRenderer(); // décor pixel art
 
@@ -108,6 +109,7 @@ public class GameRenderer {
         hitPaint.setFilterBitmap(false);
         hitPaint.setColorFilter(new LightingColorFilter(0xFF8080, 0x400000));
         attacks = new AttackRenderer(density);
+        nukeRenderer = new NukeRenderer(density);
         ui = new UiKit(density);
         menu = new MenuList(density);
     }
@@ -121,6 +123,7 @@ public class GameRenderer {
         frame++;
         attacks.setFrame(frame);
         attacks.setLowFx(!model.isAttackEffectsEnabled()); // option « Effets des attaques »
+        nukeRenderer.setFrame(frame, attacks.isLowFx());
         if (model.getState() == GameState.START) {
             java.util.Arrays.fill(coinAge, -1); // de retour à l'accueil : plus de pièce en vol
         }
@@ -487,6 +490,9 @@ public class GameRenderer {
     private void drawGame(Canvas canvas, GameModel model, TouchController touch) {
         Mage dragged = touch.getDraggedMage();
 
+        // Bombe nucléaire : léger tremblement du terrain (pas du HUD)
+        canvas.save();
+        canvas.translate(nukeRenderer.shakeX(model.getShake()), nukeRenderer.shakeY(model.getShake()));
         terrain.draw(canvas, night, model.getBiome()); // forêt, prairie, rempart, cour... teintés selon le biome
 
         // Rempart qui rougit quand un gobelin l'atteint
@@ -542,6 +548,14 @@ public class GameRenderer {
 
         // Météorite : chute puis explosion
         drawMeteor(canvas, model);
+        // Bombes du Scientifique : chute, champignon atomique, onde de choc, puis flash blanc
+        for (com.example.magicdefense.model.Nuke n : model.getNukes()) {
+            nukeRenderer.drawNuke(canvas, n, board);
+        }
+        canvas.restore();
+        for (com.example.magicdefense.model.Nuke n : model.getNukes()) {
+            nukeRenderer.drawFlash(canvas, n, board);
+        }
 
         drawRecruitButtons(canvas, model, touch.getPressedButton(),
                 touch.getPressedGameButton() == Hud.GAME_RANDOM);
@@ -602,6 +616,9 @@ public class GameRenderer {
                     drawMage(canvas, mage, left, top);
                     if (mage.hasSkill()) {
                         drawSkillRing(canvas, mage, left, top);
+                    }
+                    if (mage.type == Mage.SCIENTIST) {
+                        nukeRenderer.drawNukeGauge(canvas, mage, left, top); // recharge de la bombe
                     }
                 }
 

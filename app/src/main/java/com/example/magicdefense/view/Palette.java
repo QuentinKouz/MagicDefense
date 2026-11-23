@@ -5,7 +5,7 @@ import android.graphics.Color;
 // Couleurs et noms affichés pour chaque élément (indice = Mage.type)
 public class Palette {
     public static final String[] ELEMENT_NAMES = {"Eau", "Feu", "Terre", "Foudre", "Poison", "Air", "Invocateur",
-            "Ouvrier", "Lumière", "Ténèbres"};
+            "Ouvrier", "Lumière", "Ténèbres", "Scientifique"};
     public static final int[] ELEMENT_COLORS = {
             Color.rgb(70, 150, 255),   // Eau
             Color.rgb(255, 110, 50),   // Feu
@@ -17,6 +17,7 @@ public class Palette {
             Color.rgb(230, 160, 50),   // Ouvrier
             Color.rgb(255, 235, 140),  // Lumière
             Color.rgb(120, 70, 170),   // Ténèbres
+            Color.rgb(130, 245, 80),   // Scientifique (vert fluo des potions)
     };
     // Description courte (Marché)
     public static final String[] ELEMENT_DESCRIPTIONS = {
@@ -24,6 +25,7 @@ public class Palette {
             "Empoisonne : dégâts sur la durée", "Repousse les ennemis", "Invoque des chevaliers gardiens",
             "Construit un mur, lance des marteaux", "Renforce tous les mages, rayons sur tous",
             "Exécute les blessés, grande zone qui ralentit",
+            "Fioles de zone, bombe nucléaire sur tout le terrain",
     };
 
     // Réactions élémentaires (indice = Reaction.xxx)
@@ -72,6 +74,16 @@ public class Palette {
             Color.rgb(130, 170, 90),   // Nécrose
             Color.rgb(110, 60, 160),   // Trou noir
             Color.rgb(200, 160, 230),  // Moisson
+            Color.rgb(170, 225, 235),  // Solution saline
+            Color.rgb(255, 150, 60),   // Combustion
+            Color.rgb(230, 150, 90),   // Calcination
+            Color.rgb(150, 255, 200),  // Électrolyse
+            Color.rgb(170, 255, 60),   // Toxine mutante
+            Color.rgb(200, 240, 170),  // Aérosol
+            Color.rgb(160, 255, 150),  // Clonage
+            Color.rgb(255, 90, 60),    // Dynamite
+            Color.rgb(240, 255, 120),  // Fission
+            Color.rgb(210, 120, 255),  // Antimatière
     };
     // Murs de l'Ouvrier
     public static final int WALL_STONE = Color.rgb(150, 140, 130);

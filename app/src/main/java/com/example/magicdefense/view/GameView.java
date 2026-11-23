@@ -149,6 +149,17 @@ public class GameView extends View {
             }
 
             @Override
+            public void onNukeAlarm() {
+                sounds.nukeAlarm(); // en plus du son de la compétence
+            }
+
+            @Override
+            public void onNukeImpact() {
+                haptics.castleHit(); // grosse vibration
+                sounds.nukeBoom();
+            }
+
+            @Override
             public void onAchievement() {
                 sounds.victory();
             }

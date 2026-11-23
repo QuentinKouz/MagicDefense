@@ -157,7 +157,7 @@ public class AttackRenderer {
         if (lowFx) {
             // Effets réduits : simple petit rond de la couleur de l'élément
             paint.setColor(elementColor(p.type));
-            canvas.drawCircle(p.x, p.y, Math.max(3 * density, size * 0.45f), paint);
+            canvas.drawCircle(p.x, p.y - p.getArcOffset(), Math.max(3 * density, size * 0.45f), paint);
             return;
         }
         switch (p.type) {
@@ -184,6 +184,9 @@ public class AttackRenderer {
                 break;
             case Mage.DARK:
                 drawShadowOrb(canvas, p, size);
+                break;
+            case Mage.SCIENTIST:
+                drawVial(canvas, p, size);
                 break;
             case Mage.LIGHT:
                 // (la Lumière frappe par rayons ; une petite étoile si un projectile en hérite)
@@ -216,6 +219,92 @@ public class AttackRenderer {
         canvas.drawRect(tmpRect.left + density, tmpRect.top + density, tmpRect.right - density,
                 tmpRect.top + 2.5f * density, paint);
         canvas.restore();
+    }
+
+    // ---------- Scientifique ----------
+
+    // Couleur de la potion : vert fluo (niveaux impairs) ou violet (niveaux pairs)
+    private static int vialLiquid(int level) {
+        return level % 2 == 1 ? Color.rgb(140, 255, 70) : Color.rgb(190, 90, 255);
+    }
+
+    // Fiole / tube à essai lancé en cloche : ombre au sol, tube de verre qui tournoie, potion qui brille
+    private void drawVial(Canvas canvas, Projectile p, float size) {
+        float lift = p.getArcOffset();
+        float x = p.x;
+        float y = p.y - lift;
+        int liquid = vialLiquid(p.level);
+        // Ombre sur la trajectoire (plus petite quand la fiole est haute)
+        float sh = size * (0.9f - Math.min(0.5f, lift / (120 * density)));
+        paint.setColor(Color.argb(70, 0, 0, 0));
+        canvas.drawOval(p.x - sh, p.y - sh * 0.35f, p.x + sh, p.y + sh * 0.35f, paint);
+        // Gouttes qui s'échappent (traînée)
+        for (int k = 1; k <= 1 + p.level / 2; k++) {
+            float t = ((p.age + k * 6) % 20) / 20f;
+            paint.setColor(withAlpha(liquid, (int) (170 * (1 - t))));
+            canvas.drawCircle(x - k * size * 0.5f * (1 + t), y + size * t * 1.5f, size * 0.22f * (1 - t * 0.5f), paint);
+        }
+        if (p.level >= 4) { // potion instable : halo lumineux
+            paint.setColor(withAlpha(liquid, 70));
+            canvas.drawCircle(x, y, size * 1.8f, paint);
+        }
+        float s = size * 1.1f;
+        canvas.save();
+        canvas.rotate(p.age * 14f, x, y);
+        // Verre : contour sombre puis tube clair
+        paint.setColor(Color.rgb(26, 22, 38));
+        canvas.drawRoundRect(x - s * 0.38f - density, y - s - density, x + s * 0.38f + density,
+                y + s + density, s * 0.38f, s * 0.38f, paint);
+        paint.setColor(Color.argb(220, 225, 240, 245));
+        canvas.drawRoundRect(x - s * 0.38f, y - s, x + s * 0.38f, y + s, s * 0.38f, s * 0.38f, paint);
+        // Potion (moitié basse du tube)
+        paint.setColor(liquid);
+        canvas.drawRoundRect(x - s * 0.3f, y - s * 0.1f, x + s * 0.3f, y + s * 0.92f, s * 0.3f, s * 0.3f, paint);
+        // Bouchon de liège
+        paint.setColor(Color.rgb(170, 110, 60));
+        canvas.drawRect(x - s * 0.3f, y - s * 1.15f, x + s * 0.3f, y - s * 0.8f, paint);
+        // Reflet
+        paint.setColor(Color.argb(200, 255, 255, 255));
+        canvas.drawRect(x - s * 0.22f, y - s * 0.7f, x - s * 0.1f, y + s * 0.5f, paint);
+        canvas.restore();
+        if (p.level >= 5) { // grand chimiste : bulles qui pétillent autour
+            paint.setColor(Color.argb(200, 230, 255, 220));
+            for (int j = 0; j < 4; j++) {
+                double a = p.age * 0.2 + j * Math.PI / 2;
+                canvas.drawCircle(x + (float) Math.cos(a) * size * 1.5f, y + (float) Math.sin(a) * size * 1.5f,
+                        size * 0.16f, paint);
+            }
+        }
+    }
+
+    // Éclaboussure de la fiole : flaque de potion, bulles qui éclatent et petite fumée
+    private void drawVialSplash(Canvas canvas, Splash s, float t, float r, int alpha) {
+        int liquid = vialLiquid(s.level);
+        int other = s.level % 2 == 1 ? Color.rgb(190, 90, 255) : Color.rgb(140, 255, 70);
+        paint.setColor(withAlpha(liquid, alpha / 3));
+        canvas.drawOval(s.x - r, s.y - r * 0.6f, s.x + r, s.y + r * 0.6f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2.5f * density);
+        paint.setColor(withAlpha(liquid, alpha));
+        canvas.drawOval(s.x - r, s.y - r * 0.6f, s.x + r, s.y + r * 0.6f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        for (int j = 0; j < 7; j++) {
+            double a = j * 2 * Math.PI / 7 + s.x * 0.05;
+            float dist = s.radius * (0.2f + 0.7f * t);
+            float bx = s.x + (float) Math.cos(a) * dist;
+            float by = s.y + (float) Math.sin(a) * dist * 0.6f - 12 * density * t;
+            paint.setColor(withAlpha(j % 2 == 0 ? liquid : other, alpha));
+            canvas.drawCircle(bx, by, (2 + 0.5f * s.level) * density * (1 - t) + density, paint);
+        }
+        // Éclats de verre
+        paint.setColor(Color.argb(alpha, 230, 245, 250));
+        for (int j = 0; j < 4; j++) {
+            double a = j * Math.PI / 2 + 0.6;
+            float dist = s.radius * 0.5f * t + 4 * density;
+            float gx = s.x + (float) Math.cos(a) * dist;
+            float gy = s.y + (float) Math.sin(a) * dist * 0.6f;
+            canvas.drawRect(gx - density, gy - density, gx + density, gy + density, paint);
+        }
     }
 
     // ---------- Ténèbres ----------
@@ -1040,6 +1129,19 @@ public class AttackRenderer {
                 canvas.drawCircle(hit.x, hit.y, u * (5 - 4 * t), paint);
                 paint.setStyle(Paint.Style.FILL);
                 break;
+
+            case Mage.SCIENTIST:
+                // Bulles de potion vertes et violettes qui montent et éclatent
+                paint.setColor(Color.argb(alpha / 2, 140, 255, 70));
+                canvas.drawCircle(hit.x, hit.y, u * (1.5f + 2.5f * t), paint);
+                for (int j = 0; j < count; j++) {
+                    double a = j * 2 * Math.PI / count + hit.x * 0.1;
+                    float r = u * (1 + 3 * t);
+                    paint.setColor(j % 2 == 0 ? Color.argb(alpha, 170, 255, 110) : Color.argb(alpha, 200, 120, 255));
+                    canvas.drawCircle(hit.x + (float) Math.cos(a) * r, hit.y + (float) Math.sin(a) * r - u * 3 * t,
+                            u * 0.45f * (1 - t) + density, paint);
+                }
+                break;
         }
     }
 
@@ -1321,6 +1423,10 @@ public class AttackRenderer {
             paint.setColor(withAlpha(elementColor(s.type), alpha));
             canvas.drawCircle(s.x, s.y, r, paint);
             paint.setStyle(Paint.Style.FILL);
+            return;
+        }
+        if (s.type == Mage.SCIENTIST) {
+            drawVialSplash(canvas, s, t, r, alpha);
             return;
         }
         if (s.type == Mage.DARK) {
