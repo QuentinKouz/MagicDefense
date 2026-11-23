@@ -25,6 +25,9 @@ public final class Rarity {
     // Amélioration du rang n au rang n+1 : CARDS[r] × n cartes et GEMS[r] × n gemmes
     private static final int[] UPGRADE_CARDS = {10, 6, 3, 1};
     private static final int[] UPGRADE_GEMS = {2, 3, 5, 8};
+    // Prix d'un mage choisi en partie (PO) : prix de base + hausse × mages déjà choisis dans la partie
+    private static final int[] MAGE_PRICE = {10, 14, 18, 25};
+    private static final int[] MAGE_PRICE_STEP = {2, 3, 4, 6};
 
     private Rarity() {
     }
@@ -43,5 +46,11 @@ public final class Rarity {
 
     public static int upgradeGems(int rarity) {
         return UPGRADE_GEMS[rarity];
+    }
+
+    // Prix d'un mage de cette rareté quand `bought` mages ont déjà été choisis dans la partie
+    // (Commune 10 +2, Rare 14 +3, Épique 18 +4, Légendaire 25 +6)
+    public static int magePrice(int rarity, int bought) {
+        return MAGE_PRICE[rarity] + MAGE_PRICE_STEP[rarity] * Math.max(0, bought);
     }
 }

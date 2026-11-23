@@ -96,6 +96,10 @@ public class NewMagesTest {
     public void dark_executesWoundedGoblins_butNotTheBoss() {
         GameModel m = newModel();
         m.startLevel(1);
+        int[] run = m.exportRun();
+        run[5] = 100; // un mage légendaire coûte 25 PO (plus que l'or de départ)
+        m.importRun(run);
+        m.resume();
         m.recruitMage(Mage.DARK);
         Board b = new Board(1f);
         b.resize(400, 800);
@@ -121,7 +125,7 @@ public class NewMagesTest {
         GameModel m = newModel();
         m.startLevel(1);
         int[] run = m.exportRun();
-        run[5] = 100; // assez de PO pour deux mages (le prix monte de 2 à chaque achat)
+        run[5] = 100; // assez de PO pour deux mages (Feu 10 PO, puis Lumière légendaire 25 + 6 = 31 PO)
         m.importRun(run);
         m.resume();
         m.recruitMage(Mage.FIRE);

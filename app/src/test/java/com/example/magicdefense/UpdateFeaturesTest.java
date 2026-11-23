@@ -212,12 +212,13 @@ public class UpdateFeaturesTest {
         p.loadStats(600, 0, 0, 0, 0, 0, false, 0, new boolean[0]);
         int gems = p.getGems();
         m.checkAchievements();
-        int id = 4; // Chasseur de gobelins : 500 gobelins
+        int id = Achievement.KILLS; // Chasseur de gobelins I : 500 gobelins (le II demande 1000)
         assertEquals(Achievement.STAT_KILLS, Achievement.stat(id));
         assertTrue(p.isAchieved(id));
-        assertEquals(gems + Achievement.reward(id), p.getGems());
+        assertEquals(1, p.getAchievementTier(id));
+        assertEquals(gems + Achievement.reward(id, 0), p.getGems());
         m.checkAchievements();
-        assertEquals(gems + Achievement.reward(id), p.getGems()); // pas deux fois
+        assertEquals(gems + Achievement.reward(id, 0), p.getGems()); // pas deux fois
     }
 
     @Test

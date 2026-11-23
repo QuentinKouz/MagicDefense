@@ -30,17 +30,49 @@ public final class Artifact {
             "Faux du néant", "Grimoire interdit", "Œil du vide",                // Ténèbres
     };
 
+    // Effet concret de chaque artefact, avec les vrais chiffres des tableaux ci-dessous.
+    // Cadence : un délai ×0,6 entre deux tirs = tire 67 % plus vite ; un délai ×1,3 = tire 23 % moins vite.
     public static final String[] DESCRIPTIONS = {
-            "Cadence ++ · dégâts −30 %", "Zone +40 % · dégâts −15 %", "Dégâts +50 % · cadence −",
-            "Cadence +++ · dégâts −35 %", "Dégâts +70 % · cadence −−", "Compétence 2× plus souvent · dégâts −10 %",
-            "+1 projectile · dégâts −25 %", "Dégâts +60 % · cadence −−", "Compétence 2× plus souvent · cadence −",
-            "Cadence +++ · dégâts −40 %", "Dégâts +50 % · cadence −", "Compétence 2× plus souvent · dégâts −10 %",
-            "Poison +80 % · coup direct −50 %", "Cadence ++ · poison −25 %", "Compétence 2× plus souvent · poison −10 %",
-            "Recul +80 % · dégâts −30 %", "Cadence +++ · recul −30 %", "Dégâts +60 % · recul −40 %",
-            "+1 chevalier · chevaliers −25 % PV", "Chevaliers +80 % PV · invoque moins vite", "Chevaliers +60 % dégâts · −20 % PV",
-            "Marteaux +50 % · cadence −", "Mur +80 % PV · marteaux −20 %", "Compétence 2× plus souvent · cadence −",
-            "Aura +50 % · rayons −30 %", "Rayons +60 % · cadence −", "Compétence 2× plus souvent · rayons −10 %",
-            "Exécute sous 15 % · dégâts −20 %", "Zone +40 % · dégâts −15 %", "Compétence 2× plus souvent · dégâts −10 %",
+            // Eau
+            "Tire 67 % plus vite, mais −30 % de dégâts",
+            "Zone d'éclaboussure +40 %, mais −15 % de dégâts",
+            "+50 % de dégâts, mais tire 23 % moins vite",
+            // Feu
+            "Tire 82 % plus vite, mais −35 % de dégâts",
+            "+70 % de dégâts, mais tire 29 % moins vite",
+            "Pluie de feu 2× plus souvent, mais −10 % de dégâts",
+            // Terre
+            "1 projectile de plus par salve, mais −25 % de dégâts",
+            "+60 % de dégâts, mais tire 26 % moins vite",
+            "Séisme 2× plus souvent, mais tire 9 % moins vite",
+            // Foudre
+            "Tire 2× plus vite, mais −40 % de dégâts",
+            "+50 % de dégâts, mais tire 20 % moins vite",
+            "Tempête 2× plus souvent, mais −10 % de dégâts",
+            // Poison
+            "Poison +80 % de dégâts, mais coup direct −50 %",
+            "Tire 67 % plus vite, mais poison −25 %",
+            "Peste 2× plus souvent, mais poison −10 %",
+            // Air
+            "Recul +80 %, mais −30 % de dégâts",
+            "Tire 82 % plus vite, mais recul −30 %",
+            "+60 % de dégâts, mais recul −40 %",
+            // Invocateur (les PV des chevaliers suivent aussi les dégâts du mage)
+            "1 chevalier de plus, mais chevaliers −25 % de PV",
+            "Chevaliers +80 % de PV, mais invoque 23 % moins vite",
+            "Chevaliers +60 % de dégâts, mais PV seulement +28 %",
+            // Ouvrier (les PV du mur suivent aussi les dégâts des marteaux)
+            "Marteaux et mur +50 %, mais lance 23 % moins vite",
+            "Mur +44 % de PV, mais marteaux −20 % de dégâts",
+            "Grand rempart 2× plus souvent, mais lance 13 % moins vite",
+            // Lumière
+            "Aura 50 % plus forte, mais rayons −30 % de dégâts",
+            "Rayons +60 % de dégâts, mais tire 23 % moins vite",
+            "Aube sacrée 2× plus souvent, mais rayons −10 %",
+            // Ténèbres
+            "Exécute sous 15 % de PV (au lieu de 10 %), mais −20 % de dégâts",
+            "Zone d'ombre +40 %, mais −15 % de dégâts",
+            "Éclipse 2× plus souvent, mais −10 % de dégâts",
     };
 
     // Multiplicateurs (indice = id) : dégâts, délai entre deux tirs (< 1 = plus rapide), zone de l'Eau,
