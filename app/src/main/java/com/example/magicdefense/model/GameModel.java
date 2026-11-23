@@ -104,6 +104,7 @@ public class GameModel {
     private final ArrayList<Projectile> projectiles = new ArrayList<>();
     private final ArrayList<Knight> knights = new ArrayList<>();
     private final ArrayList<Wall> walls = new ArrayList<>();          // murs des Ouvriers
+    private final ArrayList<EnemyBolt> enemyBolts = new ArrayList<>(); // tirs des gobelins mages
     private final float[][] auras = new float[Board.ROWS][Board.COLS]; // bonus de Lumière reçu par case
     private Mage[][] grid = new Mage[Board.ROWS][Board.COLS]; // null = case vide
     private boolean[][] locked = new boolean[Board.ROWS][Board.COLS];
@@ -201,6 +202,7 @@ public class GameModel {
     public List<Projectile> getProjectiles() { return projectiles; }
     public List<Knight> getKnights() { return knights; }
     public List<Wall> getWalls() { return walls; }
+    public List<EnemyBolt> getEnemyBolts() { return enemyBolts; }
     public Mage getMage(int row, int col) { return grid[row][col]; }
     public int getGold() { return gold; }
     public int getWave() { return wave; }
@@ -697,6 +699,7 @@ public class GameModel {
         projectiles.clear();
         knights.clear();
         walls.clear();
+        enemyBolts.clear();
         splashes.clear();
         bolts.clear();
         hits.clear();
@@ -801,6 +804,7 @@ public class GameModel {
         projectiles.clear();
         knights.clear();
         walls.clear();
+        enemyBolts.clear();
         if (listener != null) {
             listener.onProgressChanged(); // la partie en cours n'est plus à reprendre
         }
@@ -1355,8 +1359,24 @@ public class GameModel {
                         blocker.hp -= enemy.maxHp * ratio / 60f;
                         blocker.hitTimer = 6;
                     }
+                } else if (enemy.kind == Enemy.MAGE && enemy.y >= mageGoblinStopY() && !enemy.isDead()) {
+                    // Gobelin mage en position (à l'orée de la forêt) : il ne bouge plus et tire de loin
+                    enemy.hold();
+                    enemy.inPosition = true;
+                    if (enemy.stunTimer == 0) {
+                        enemy.castTimer--;
+                        if (enemy.castTimer <= 0) {
+                            enemy.castTimer = Enemy.MAGE_CAST_DELAY;
+                            castEnemyBolt(enemy);
+                        }
+                    }
                 } else {
                     enemy.update(speedMult);
+                    enemy.inPosition = false;
+                    if (enemy.kind == Enemy.MAGE) {
+                        // Repoussé, il revient à sa position de tir sans la dépasser
+                        enemy.y = Math.min(enemy.y, mageGoblinStopY());
+                    }
                 }
 
                 // Chamans et boss : invoquent des diablotins à intervalle régulier
@@ -1402,9 +1422,13 @@ public class GameModel {
             }
         }
 
-        // 3. Les chevaliers se placent et frappent ; les Ouvriers (re)construisent leurs murs
+        // 3. Les chevaliers se placent et frappent ; les Ouvriers (re)construisent leurs murs ;
+        //    les projectiles des gobelins mages volent vers le rempart
         updateKnights();
         updateWalls();
+        if (updateEnemyBolts()) {
+            return; // le château est tombé
+        }
 
         // 4. Les mages attaquent, chacun à sa façon (renforcés par l'aura des mages de Lumière)
         computeAuras();
@@ -1569,6 +1593,7 @@ public class GameModel {
         if (enemiesLeftToSpawn == 0 && enemies.isEmpty()) {
             if (!spec.endless && wave >= spec.waves) {
                 projectiles.clear();
+                enemyBolts.clear();
                 zones.clear();
                 state = GameState.VICTORY;
                 recordVictory();
@@ -1588,8 +1613,25 @@ public class GameModel {
     }
 
     // ---------- Chevaliers ----------
+    // Grand chevalier : environ la largeur d'une case
+    private float knightRadius() {
+        return board.cellWidth * Knight.RADIUS_PER_CELL;
+    }
+
+    // Ligne de garde : juste devant le rempart
     private float knightGuardY() {
-        return board.gridTop - 34 * board.density;
+        return board.gridTop - knightRadius() - 4 * board.density;
+    }
+
+    // Centre de la colonne du damier sous l'abscisse x (colonne de garde d'un chevalier)
+    private float columnCenterX(float x) {
+        int col = (int) ((x - board.playLeft) / board.cellWidth);
+        return board.cellCenterX(Math.max(0, Math.min(Board.COLS - 1, col)));
+    }
+
+    // Hauteur où le gobelin mage s'arrête pour tirer : juste sorti de la forêt
+    public float mageGoblinStopY() {
+        return board.forestBottom() + 24 * board.density;
     }
 
     private int knightsOf(Mage mage) {
@@ -1604,13 +1646,9 @@ public class GameModel {
 
     // hpMult : chevaliers d'élite de la compétence « Appel aux armes »
     private void spawnKnight(Mage mage, float x, float hpMult) {
-        float d = board.density;
-        float radius = 14 * d;
-        float minX = board.playLeft + radius;
-        float maxX = board.playRight() - radius;
-        float kx = Math.max(minX, Math.min(maxX, x + (random.nextFloat() - 0.5f) * 30 * d));
-        Knight k = new Knight(kx, knightGuardY(), radius, mage.getKnightHp() * hpMult, mage.getKnightDamage(),
-                hpMult > 1f ? null : mage);
+        float kx = columnCenterX(x); // il apparaît devant sa colonne et part aussitôt à l'assaut
+        Knight k = new Knight(kx, knightGuardY(), knightRadius(), mage.getKnightHp() * hpMult,
+                mage.getKnightDamage(), hpMult > 1f ? null : mage);
         knights.add(k);
         progression.addKnight();
         hits.add(new HitEffect(kx, k.y, Mage.SUMMONER, 2));
@@ -1618,13 +1656,15 @@ public class GameModel {
 
     private Knight blockingKnight(Enemy e) {
         for (Knight k : knights) {
-            if (!k.isDead() && k.touches(e)) {
+            if (k.blocks(e)) { // les rapides et les diablotins se faufilent
                 return k;
             }
         }
         return null;
     }
 
+    // Chevaliers : combat au contact, sinon ils marchent sur le gobelin le plus proche
+    // (en priorité dans leur colonne), sinon ils reviennent en garde devant le château
     private void updateKnights() {
         float d = board.density;
         float mult = damageMult();
@@ -1639,16 +1679,19 @@ public class GameModel {
             if (k.attackTimer > 0) {
                 k.attackTimer--;
             }
-            // Au contact : coup d'épée
+            k.marching = false;
+            // Au contact : coup d'épée (de préférence sur un gobelin qu'il arrête)
             Enemy foe = null;
             for (Enemy e : enemies) {
                 if (!e.isDead() && k.touches(e)) {
-                    foe = e;
-                    break;
+                    if (foe == null || (foe.slipsPastKnights() && !e.slipsPastKnights())) {
+                        foe = e;
+                    }
                 }
             }
             if (foe != null) {
                 k.fighting = true;
+                k.target = foe;
                 if (k.attackTimer == 0) {
                     applyHit(foe, k.damage * mult, Mage.SUMMONER, 0, 0, 0);
                     hits.add(new HitEffect(foe.x, foe.y, Mage.SUMMONER, 1));
@@ -1656,27 +1699,123 @@ public class GameModel {
                 }
                 continue;
             }
-            // Sinon : il se décale pour intercepter le gobelin le plus avancé de son côté
-            Enemy target = null;
-            float best = Float.MAX_VALUE;
-            for (Enemy e : enemies) {
-                if (e.isDead() || e.y <= 0) {
-                    continue;
-                }
-                float dist = Math.abs(e.x - k.x) + (k.y - e.y) * 0.5f;
-                if (dist < best) {
-                    best = dist;
-                    target = e;
-                }
-            }
-            float step = Knight.MOVE_SPEED * d;
+            // Sinon : il marche sur le gobelin le plus proche qu'il peut arrêter
+            Enemy target = knightTarget(k);
+            k.target = target;
+            float goalX;
+            float goalY;
             if (target != null) {
-                float dx = target.x - k.x;
-                k.x += Math.max(-step, Math.min(step, dx));
+                goalX = target.x;
+                goalY = target.y + target.radius + k.radius * 0.6f; // juste devant lui, face à face
+            } else {
+                goalX = k.guardX;   // plus personne : retour en garde dans sa colonne
+                goalY = knightGuardY();
             }
-            float dy = knightGuardY() - k.y;
-            k.y += Math.max(-step, Math.min(step, dy));
+            float minY = board.forestBottom() + k.radius * 0.3f; // il ne s'enfonce pas dans la forêt
+            goalY = Math.max(minY, Math.min(knightGuardY(), goalY));
+            goalX = Math.max(board.playLeft + k.radius * 0.5f, Math.min(board.playRight() - k.radius * 0.5f, goalX));
+            float dx = goalX - k.x;
+            float dy = goalY - k.y;
+            float dist = (float) Math.sqrt(dx * dx + dy * dy);
+            float step = Knight.MOVE_SPEED * d;
+            if (dist <= step) {
+                k.x = goalX;
+                k.y = goalY;
+            } else {
+                k.x += dx / dist * step;
+                k.y += dy / dist * step;
+                k.marching = true;
+            }
         }
+    }
+
+    // Cible d'un chevalier : le gobelin visible le plus proche qu'il peut arrêter. Ceux de sa
+    // colonne comptent double, ceux déjà pris en chasse par un autre chevalier moins.
+    private Enemy knightTarget(Knight k) {
+        Enemy best = null;
+        float bestScore = Float.MAX_VALUE;
+        for (Enemy e : enemies) {
+            if (e.isDead() || e.y <= 0 || e.slipsPastKnights()) {
+                continue;
+            }
+            float dx = e.x - k.x;
+            float dy = e.y - k.y;
+            float score = (float) Math.sqrt(dx * dx + dy * dy);
+            if (Math.abs(e.x - k.guardX) < board.cellWidth / 2) {
+                score *= 0.5f; // sa colonne d'abord
+            }
+            for (Knight o : knights) {
+                if (o != k && o.target == e) {
+                    score *= 1.6f; // un autre chevalier s'en occupe déjà
+                    break;
+                }
+            }
+            if (score < bestScore) {
+                bestScore = score;
+                best = e;
+            }
+        }
+        return best;
+    }
+
+    // ---------- Gobelins mages ----------
+    // Tir d'un gobelin mage : sur le mur d'Ouvrier de sa colonne s'il y en a un, sinon sur le rempart
+    private void castEnemyBolt(Enemy mage) {
+        float d = board.density;
+        Wall target = null;
+        for (Wall w : walls) {
+            if (!w.isDead() && Math.abs(w.x - mage.x) <= w.halfWidth + mage.radius * 0.5f) {
+                target = w;
+                break;
+            }
+        }
+        float tx = target != null ? target.x + (random.nextFloat() - 0.5f) * target.halfWidth : mage.x;
+        float ty = target != null ? target.y : board.gridTop - 15 * d; // milieu du rempart
+        int dmg = Math.max(1, Math.round(enemyDamage(mage) * Enemy.MAGE_CASTLE_RATIO));
+        float wallDmg = mage.maxHp * Enemy.MAGE_WALL_RATIO;
+        // Le projectile part de l'orbe du mage (devant lui, en haut à droite)
+        enemyBolts.add(new EnemyBolt(mage.x + mage.radius * 0.6f, mage.y - mage.radius * 0.2f, tx, ty,
+                6 * d * board.fieldScale(), dmg, wallDmg, target));
+    }
+
+    // Vol des projectiles des gobelins mages ; renvoie true si le château tombe
+    private boolean updateEnemyBolts() {
+        for (int i = enemyBolts.size() - 1; i >= 0; i--) {
+            EnemyBolt b = enemyBolts.get(i);
+            if (!b.update()) {
+                continue;
+            }
+            enemyBolts.remove(i);
+            hits.add(new HitEffect(b.x, b.y, Mage.DARK, 2)); // éclat magique à l'impact
+            if (b.wall != null) {
+                if (walls.contains(b.wall) && !b.wall.isDead()) {
+                    b.wall.hp -= b.wallDamage;
+                    b.wall.hitTimer = 6;
+                }
+                continue;
+            }
+            if (shieldTimer > 0) {
+                hits.add(new HitEffect(b.x, board.gridTop, Mage.AIR, 4)); // le bouclier encaisse
+                continue;
+            }
+            castleHp -= b.damage;
+            castleHitTimer = HIT_FLASH_DURATION;
+            lowestStars = getStars();
+            if (listener != null) {
+                listener.onCastleHit();
+            }
+            if (castleHp <= 0) {
+                castleHp = 0;
+                state = GameState.GAME_OVER;
+                finishEndlessRun();
+                if (listener != null) {
+                    listener.onGameOver();
+                    listener.onProgressChanged();
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     // ---------- Murs (Ouvrier) ----------
@@ -2188,9 +2327,8 @@ public class GameModel {
                 return rad;
             }
             case Reaction.CRUSADE: {      // Invocateur : un paladin rejoint la garde
-                float radius = 14 * d;
-                float x = Math.max(board.playLeft + radius, Math.min(board.playRight() - radius, e.x));
-                knights.add(new Knight(x, knightGuardY(), radius, Math.max(1f, dmg * Reaction.CRUSADE_HP_FACTOR),
+                float x = columnCenterX(e.x);
+                knights.add(new Knight(x, knightGuardY(), knightRadius(), Math.max(1f, dmg * Reaction.CRUSADE_HP_FACTOR),
                         dmg * Reaction.CRUSADE_HIT_FACTOR, null));
                 progression.addKnight();
                 hits.add(new HitEffect(x, knightGuardY(), Mage.LIGHT, 3));

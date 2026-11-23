@@ -64,7 +64,7 @@ public class TerrainRenderer {
         float cellH = board.cellHeight / px;
         int wallH = Math.round(30 * board.density / px);               // hauteur du rempart
         // Forêt sous le HUD, mais jamais plus de 40 % du terrain (petits écrans, tablette en paysage)
-        float forestDp = Math.min(150 * board.density + board.topShift, board.gridTop * 0.4f);
+        float forestDp = board.forestBottom(); // même limite que celle des gobelins mages
         int forestH = Math.round(forestDp / px);
 
         int[] pixels = generate(w, h, gridLeft, gridTop, cellW, cellH, Board.ROWS, Board.COLS, wallH, forestH);

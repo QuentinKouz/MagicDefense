@@ -68,6 +68,12 @@ public class Board {
         return gridTop / (REFERENCE_FIELD_DP * density);
     }
 
+    // Limite entre la forêt (sous le HUD) et la prairie : jamais plus de 40 % du terrain
+    // (petits écrans, tablette en paysage). Utilisée par le décor et par les gobelins mages.
+    public float forestBottom() {
+        return Math.min(150 * density + topShift, gridTop * 0.4f);
+    }
+
     // ---------- Damier ----------
     public float cellLeft(int col) {
         return playLeft + col * cellWidth;

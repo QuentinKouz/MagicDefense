@@ -239,6 +239,107 @@ public final class Sprites {
             "......KKK....KKK...",
     };
 
+    // ---------- Chaman gobelin : 19 x 18 pixels ----------
+    // Capuche et robe bordeaux à motifs tribaux, plumes sur la capuche, collier d'os,
+    // bâton surmonté d'un crâne (à gauche) : on le distingue d'un coup d'œil.
+    private static final String[] SHAMAN_1 = {
+            ".KKK.....R.Y.C.....",
+            "KBBBK....RKYKC.....",
+            "KGBGK...KHHHHHK....",
+            ".KbK...KHHhhhHHK...",
+            "..T..KlHhLLLLLhHlK.",
+            "..T...KHLQELQELHK..",
+            "..T...KHLLLLLLLHK..",
+            "..T...KHKLFKFLKHK..",
+            "..T..KHHHKKKKKHHHK.",
+            ".KLKKHHhHHYHHhHHK..",
+            "..TKHHHhHBbBHhHHK..",
+            "..T.KHHhHHHHHhHHK..",
+            "..T.KHHhHHCHHhHKLK.",
+            "..T.KHhHHCCCHHhHK..",
+            "..T.KHhHHHCHHHhHK..",
+            "..TKHhHHHHHHHHHhHK.",
+            "..TKhhhhhhhhhhhhhK.",
+            "..t.KKK.KKK.KKK....",
+    };
+    private static final String[] SHAMAN_2 = {
+            ".KKK.....R.Y.C.....",
+            "KBBBK....RKYKC.....",
+            "KGBGK...KHHHHHK....",
+            ".KbK...KHHhhhHHK...",
+            "..T..KlHhLLLLLhHlK.",
+            "..T...KHLQELQELHK..",
+            "..T...KHLLLLLLLHK..",
+            "..T...KHKLFKFLKHK..",
+            "..T..KHHHKKKKKHHHK.",
+            ".KLKKHHhHHYHHhHHK..",
+            "..TKHHHhHBbBHhHHK..",
+            "..T.KHHhHHHHHhHHK..",
+            "..T.KHHhHHCHHhHKLK.",
+            "..T.KHhHHCCCHHhHK..",
+            "..T.KHhHHHCHHHhHK..",
+            "..TKHhHHHHHHHHHhHK.",
+            "..TKhhhhhhhhhhhhhK.",
+            "..t...KKK...KKK....",
+    };
+    public static final int SHAMAN_WIDTH = 19;
+    public static final int SHAMAN_HEIGHT = 18;
+    public static final float SHAMAN_CENTER_X = 11.5f; // centre du corps (le bâton dépasse à gauche)
+    public static final float SHAMAN_SKULL_X = 2.5f;   // yeux du crâne (lueur d'invocation)
+    public static final float SHAMAN_SKULL_Y = 2.5f;
+
+    // ---------- Gobelin mage : 19 x 20 pixels ----------
+    // Grand chapeau pointu étoilé, robe bleu nuit, orbe magique tenu à bout de bras (à droite).
+    private static final String[] GOBLIN_MAGE_1 = {
+            "..........KK.......",
+            ".........KNNK......",
+            "........KNNK.......",
+            ".......KNNnK.......",
+            ".......KNYNK.......",
+            "......KNNNnNK......",
+            ".....KNnNNNYNK.....",
+            "....KNNNnNNNNnNK...",
+            "..KKKKKKKKKKKKKKK..",
+            "..KlKLLLLLLLLLKlK..",
+            "....KLLQELQELLK.KK.",
+            "....KlLLLLLLLlKKoOK",
+            ".....KLFKKFLLK.KOOK",
+            "....KNNKKKKKNNK.KK.",
+            "...KNNNnNYNnNNKLK..",
+            "...KNNnNNYNNnNNK...",
+            "..KNNnNNNYNNNnNNK..",
+            "..KNnNNNNNNNNNnNK..",
+            "..KnnnnnnnnnnnnnK..",
+            "....KKK.....KKK....",
+    };
+    private static final String[] GOBLIN_MAGE_2 = {
+            "..........KK.......",
+            ".........KNNK......",
+            "........KNNK.......",
+            ".......KNNnK.......",
+            ".......KNYNK.......",
+            "......KNNNnNK......",
+            ".....KNnNNNYNK.....",
+            "....KNNNnNNNNnNK...",
+            "..KKKKKKKKKKKKKKK..",
+            "..KlKLLLLLLLLLKlK..",
+            "....KLLQELQELLK.KK.",
+            "....KlLLLLLLLlKKoOK",
+            ".....KLFKKFLLK.KOOK",
+            "....KNNKKKKKNNK.KK.",
+            "...KNNNnNYNnNNKLK..",
+            "...KNNnNNYNNnNNK...",
+            "..KNNnNNNYNNNnNNK..",
+            "..KNnNNNNNNNNNnNK..",
+            "..KnnnnnnnnnnnnnK..",
+            "...KKK.......KKK...",
+    };
+    public static final int GOBLIN_MAGE_WIDTH = 19;
+    public static final int GOBLIN_MAGE_HEIGHT = 20;
+    public static final float GOBLIN_MAGE_CENTER_X = 9.5f; // centre du corps (l'orbe dépasse à droite)
+    public static final float GOBLIN_MAGE_ORB_X = 17f;     // centre de l'orbe dans la grille
+    public static final float GOBLIN_MAGE_ORB_Y = 11.5f;
+
     // ---------- Coffre : 16 pixels de large, couvercle (6 lignes) et caisse (8 lignes) séparés ----------
     // Le couvercle est une image à part pour pouvoir se soulever et basculer à l'ouverture.
     private static final String[] CHEST_LID = {
@@ -389,6 +490,29 @@ public final class Sprites {
             return new Bitmap[]{toBitmap(GOBLIN_TORCH_1, p), toBitmap(GOBLIN_TORCH_2, p)};
         }
         return new Bitmap[]{toBitmap(GOBLIN_WALK_1, p), toBitmap(GOBLIN_WALK_2, p)};
+    }
+
+    // Chaman : 2 images de marche (de nuit, peau plus sombre et yeux rouges)
+    public static Bitmap[] buildShaman(boolean night) {
+        int[] p = goblinPalette(night);
+        p['H'] = night ? Color.rgb(96, 26, 40) : Color.rgb(140, 36, 52);    // robe et capuche bordeaux
+        p['h'] = night ? Color.rgb(62, 16, 28) : Color.rgb(92, 22, 36);
+        p['B'] = Color.rgb(236, 228, 200);                                   // os, crâne
+        p['b'] = Color.rgb(176, 166, 136);
+        p['G'] = Color.rgb(90, 255, 140);                                    // orbites : lueur verte
+        p['R'] = Color.rgb(230, 60, 50);                                     // plumes
+        p['C'] = Color.rgb(60, 210, 190);                                    // plume et motifs turquoise
+        return new Bitmap[]{toBitmap(SHAMAN_1, p), toBitmap(SHAMAN_2, p)};
+    }
+
+    // Gobelin mage : 2 images de marche
+    public static Bitmap[] buildGoblinMage(boolean night) {
+        int[] p = goblinPalette(night);
+        p['N'] = night ? Color.rgb(36, 44, 110) : Color.rgb(52, 64, 160);   // robe et chapeau bleu nuit
+        p['n'] = night ? Color.rgb(22, 26, 70) : Color.rgb(32, 38, 104);
+        p['O'] = Color.rgb(110, 200, 255);                                   // orbe
+        p['o'] = Color.rgb(235, 250, 255);                                   // reflet de l'orbe
+        return new Bitmap[]{toBitmap(GOBLIN_MAGE_1, p), toBitmap(GOBLIN_MAGE_2, p)};
     }
 
     private static Bitmap toBitmap(String[] rows, int[] palette) {

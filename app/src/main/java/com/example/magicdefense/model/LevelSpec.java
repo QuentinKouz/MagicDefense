@@ -200,6 +200,26 @@ public class LevelSpec {
         return clamp(shamanBase + shamanGrowth * (wave - 1), 0f, 0.12f);
     }
 
+    // Gobelins mages (tirent de loin sur le rempart) : à partir du niveau 12 en campagne
+    // et de la vague 12 en mode infini, de plus en plus fréquents (10 % au plus)
+    public static final int MAGE_FIRST_LEVEL = 12;
+    public static final int MAGE_FIRST_ENDLESS_WAVE = 12;
+    private static final float MAGE_MAX_CHANCE = 0.10f;
+
+    public float mageChance(int wave) {
+        if (endless) {
+            if (wave < MAGE_FIRST_ENDLESS_WAVE) {
+                return 0f;
+            }
+            return clamp(0.02f + 0.006f * (wave - MAGE_FIRST_ENDLESS_WAVE), 0f, MAGE_MAX_CHANCE);
+        }
+        if (level < MAGE_FIRST_LEVEL) {
+            return 0f;
+        }
+        float pressure = Math.min(1f, (level - MAGE_FIRST_LEVEL) / 24f);
+        return clamp(0.03f + 0.04f * pressure + 0.003f * (wave - 1), 0f, MAGE_MAX_CHANCE);
+    }
+
     // Nombre de gobelins d'une vague : 5, 7, 9... plafonné (les PV prennent le relais)
     public int enemiesInWave(int wave) {
         return Math.min(3 + wave * 2, MAX_ENEMIES_PER_WAVE);
@@ -234,6 +254,9 @@ public class LevelSpec {
         }
         if (roll < tank + fastChance(wave) + shamanChance(wave)) {
             return Enemy.SHAMAN;
+        }
+        if (roll < tank + fastChance(wave) + shamanChance(wave) + mageChance(wave)) {
+            return Enemy.MAGE;
         }
         return Enemy.NORMAL;
     }
