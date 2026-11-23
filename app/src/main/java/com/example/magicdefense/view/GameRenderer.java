@@ -18,6 +18,7 @@ import com.example.magicdefense.model.Knight;
 import com.example.magicdefense.model.Ultimate;
 import com.example.magicdefense.model.Bolt;
 import com.example.magicdefense.model.Enemy;
+import com.example.magicdefense.model.EnemyBolt;
 import com.example.magicdefense.model.GameModel;
 import com.example.magicdefense.model.GameState;
 import com.example.magicdefense.model.HitEffect;
@@ -40,6 +41,7 @@ public class GameRenderer {
     private final RectF gaugeOval = new RectF();
     private final Path path = new Path(); // pour dessiner les icônes (triangle, flèche)
     private final RectF tmpRect = new RectF(); // rectangle réutilisable pour le dessin
+    private final RectF auraRect = new RectF(); // cercles magiques au sol (chaman, gobelin mage)
     private final RectF spriteRect = new RectF(); // sprite de l'écran MAGES
     private int frame = 0; // compteur d'images, pour l'animation de pulsation
     private boolean night = false; // mode nuit pour l'image en cours
@@ -49,11 +51,14 @@ public class GameRenderer {
     private final Bitmap[][] mageSprites = Sprites.buildMages();       // [élément][niveau - 1]
     private final Bitmap[] goblinDay = Sprites.buildGoblins(false);    // 2 images de marche
     private final Bitmap[] goblinNight = Sprites.buildGoblins(true);   // avec la torche
+    private final Bitmap[] shamanDay = Sprites.buildShaman(false);     // chaman : capuche, crâne, plumes
+    private final Bitmap[] shamanNight = Sprites.buildShaman(true);
+    private final Bitmap[] goblinMageDay = Sprites.buildGoblinMage(false); // gobelin mage : chapeau, orbe
+    private final Bitmap[] goblinMageNight = Sprites.buildGoblinMage(true);
     private final Paint spritePaint = new Paint();                     // pixels nets
     private final Paint stunnedPaint = new Paint();                    // teinte bleu glacé
     private final Paint fastPaint = new Paint();                       // gobelin rapide : teinte orangée
     private final Paint tankPaint = new Paint();                       // gobelin costaud : rouge sombre
-    private final Paint shamanPaint = new Paint();                     // chaman : violet
     private final Paint bossPaint = new Paint();                       // chef gobelin : vert sombre
     private final Paint impPaint = new Paint();                        // diablotin : rouge vif
     private final Paint lockedPaint = new Paint();                     // unité pas encore achetée : assombrie
@@ -86,8 +91,6 @@ public class GameRenderer {
         fastPaint.setColorFilter(new LightingColorFilter(0xFFDD99, 0x302000));
         tankPaint.setFilterBitmap(false);
         tankPaint.setColorFilter(new LightingColorFilter(0xDD7777, 0x200000));
-        shamanPaint.setFilterBitmap(false);
-        shamanPaint.setColorFilter(new LightingColorFilter(0xC090FF, 0x200030));
         bossPaint.setFilterBitmap(false);
         bossPaint.setColorFilter(new LightingColorFilter(0x90B070, 0x101000));
         impPaint.setFilterBitmap(false);
@@ -509,6 +512,9 @@ public class GameRenderer {
         for (Enemy enemy : model.getEnemies()) {
             drawEnemy(canvas, enemy, model.isStunned() || enemy.stunTimer > 0);
         }
+        for (EnemyBolt b : model.getEnemyBolts()) {
+            drawEnemyBolt(canvas, b); // projectiles des gobelins mages
+        }
         // Attaques
         for (Projectile p : model.getProjectiles()) {
             attacks.drawProjectile(canvas, p);
@@ -650,26 +656,44 @@ public class GameRenderer {
     private void drawEnemy(Canvas canvas, Enemy enemy, boolean stunned) {
         // Échelle entière : le gobelin est un peu plus grand que sa zone de collision
         int scale = Math.max(1, (int) (enemy.radius * 2.4f / Sprites.GOBLIN_HEIGHT));
-        float left = enemy.x - Sprites.GOBLIN_CENTER_X * scale;
-        float top = enemy.y - Sprites.GOBLIN_HEIGHT * scale / 2f;
-        float w = Sprites.GOBLIN_WIDTH * scale;
-        float h = Sprites.GOBLIN_HEIGHT * scale;
+        // Chaman et gobelin mage : sprites à part (robe, capuche ou chapeau), sans torche
+        boolean shaman = enemy.kind == Enemy.SHAMAN;
+        boolean caster = enemy.kind == Enemy.MAGE;
+        float centerX = shaman ? Sprites.SHAMAN_CENTER_X : caster ? Sprites.GOBLIN_MAGE_CENTER_X : Sprites.GOBLIN_CENTER_X;
+        int spriteW = shaman ? Sprites.SHAMAN_WIDTH : caster ? Sprites.GOBLIN_MAGE_WIDTH : Sprites.GOBLIN_WIDTH;
+        int spriteH = shaman ? Sprites.SHAMAN_HEIGHT : caster ? Sprites.GOBLIN_MAGE_HEIGHT : Sprites.GOBLIN_HEIGHT;
+        float left = enemy.x - centerX * scale;
+        float top = enemy.y + (Sprites.GOBLIN_HEIGHT / 2f - spriteH) * scale; // pieds au même niveau
+        float w = spriteW * scale;
+        float h = spriteH * scale;
 
         // Marche : 2 images en alternance, décalées d'un gobelin à l'autre ; immobile s'il est étourdi
         int step = stunned ? 0 : ((frame / 10) + (int) enemy.x) % 2;
+        if (caster && enemy.inPosition) {
+            step = 0; // en position de tir : il ne marche plus
+        }
 
         float flameX = left + Sprites.TORCH_FLAME_X * scale;
         float flameY = top + Sprites.TORCH_FLAME_Y * scale;
-        if (night) {
+        if (night && !shaman && !caster) {
             drawTorchGlow(canvas, flameX, flameY, enemy); // halo derrière le gobelin
         }
 
         tmpRect.set(left, top, left + w, top + h);
-        Bitmap sprite = (night ? goblinNight : goblinDay)[step];
-        // Chaman : halo violet qui pulse (il invoque des diablotins)
-        if (enemy.kind == Enemy.SHAMAN || enemy.isBoss()) {
+        Bitmap sprite;
+        if (shaman) {
+            sprite = (night ? shamanNight : shamanDay)[step];
+            drawShamanAura(canvas, enemy, top + h, stunned); // cercle d'invocation au sol
+        } else if (caster) {
+            sprite = (night ? goblinMageNight : goblinMageDay)[step];
+            drawGoblinMageAura(canvas, enemy, top + h);
+        } else {
+            sprite = (night ? goblinNight : goblinDay)[step];
+        }
+        // Chef gobelin : halo rouge qui pulse (il invoque des diablotins)
+        if (enemy.isBoss()) {
             float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12 + enemy.x);
-            paint.setColor(enemy.isBoss() ? Color.argb((int) (40 + 40 * pulse), 255, 60, 60) : Palette.SHAMAN_GLOW);
+            paint.setColor(Color.argb((int) (40 + 40 * pulse), 255, 60, 60));
             canvas.drawCircle(enemy.x, enemy.y, enemy.radius * (1.1f + 0.15f * pulse), paint);
         }
 
@@ -680,14 +704,17 @@ public class GameRenderer {
             switch (enemy.kind) {
                 case Enemy.FAST:   p = fastPaint; break;   // rapide : plus petit et orangé
                 case Enemy.TANK:   p = tankPaint; break;   // costaud : plus gros et rouge sombre
-                case Enemy.SHAMAN: p = shamanPaint; break; // chaman : violet
                 case Enemy.BOSS:   p = bossPaint; break;   // chef : vert sombre, énorme
                 case Enemy.IMP:    p = impPaint; break;    // diablotin : minuscule et rouge
             }
         }
         canvas.drawBitmap(sprite, null, tmpRect, p);
 
-        if (night) {
+        if (shaman) {
+            drawShamanSkullGlow(canvas, enemy, left, top, scale, stunned);
+        } else if (caster) {
+            drawGoblinMageOrb(canvas, enemy, left, top, scale, stunned);
+        } else if (night) {
             drawTorchFlicker(canvas, left, top, scale, enemy); // flamme qui vacille
         }
 
@@ -729,6 +756,119 @@ public class GameRenderer {
         // Chef gobelin : couronne au-dessus de la barre
         if (enemy.isBoss()) {
             drawCrown(canvas, enemy.x, barTop - 12 * density, 12 * density);
+        }
+    }
+
+    // ---------- Chaman et gobelin mage ----------
+
+    // Chaman : cercle d'invocation vert au sol, runes qui tournent et âmes qui montent,
+    // de plus en plus vif à l'approche de l'invocation
+    private void drawShamanAura(Canvas canvas, Enemy e, float feetY, boolean stunned) {
+        float charge = 1f - Math.max(0, e.summonTimer) / (float) Math.max(1, Enemy.SUMMON_DELAY[e.kind]);
+        charge = Math.max(0f, Math.min(1f, charge));
+        float rx = e.radius * 1.35f;
+        float ry = rx * 0.38f;
+        float cy = feetY - ry * 0.4f;
+        auraRect.set(e.x - rx, cy - ry, e.x + rx, cy + ry);
+        paint.setColor(Color.argb((int) (35 + 75 * charge), 90, 255, 140));
+        canvas.drawOval(auraRect, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.5f * density);
+        paint.setColor(Color.argb((int) (120 + 120 * charge), 120, 255, 160));
+        canvas.drawOval(auraRect, paint);
+        paint.setStyle(Paint.Style.FILL);
+        // Runes : 6 points qui tournent sur le cercle
+        double turn = stunned ? 0 : frame * 0.05;
+        for (int i = 0; i < 6; i++) {
+            double a = turn + i * Math.PI / 3;
+            canvas.drawCircle(e.x + (float) Math.cos(a) * rx * 0.8f, cy + (float) Math.sin(a) * ry * 0.8f,
+                    1.8f * density, paint);
+        }
+        // Âmes vertes qui s'élèvent autour de lui
+        for (int i = 0; i < 4; i++) {
+            float t = ((frame + i * 13 + (int) e.x) % 50) / 50f;
+            float px = e.x + (float) Math.sin(i * 2.1 + frame * 0.05) * rx * 0.75f;
+            float py = cy - t * e.radius * 2.4f;
+            paint.setColor(Color.argb((int) (220 * (1 - t) * (0.35f + 0.65f * charge)), 140, 255, 170));
+            canvas.drawCircle(px, py, (1.5f + 1.5f * charge) * density, paint);
+        }
+    }
+
+    // Lueur verte dans les orbites du crâne du bâton
+    private void drawShamanSkullGlow(Canvas canvas, Enemy e, float left, float top, int scale, boolean stunned) {
+        if (stunned) {
+            return;
+        }
+        float charge = 1f - Math.max(0, e.summonTimer) / (float) Math.max(1, Enemy.SUMMON_DELAY[e.kind]);
+        float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.2 + e.x);
+        float sx = left + Sprites.SHAMAN_SKULL_X * scale;
+        float sy = top + Sprites.SHAMAN_SKULL_Y * scale;
+        paint.setColor(Color.argb((int) (60 + 80 * pulse * Math.max(0.3f, charge)), 90, 255, 140));
+        canvas.drawCircle(sx, sy, scale * (2.2f + 1.5f * charge), paint);
+    }
+
+    // Gobelin mage : cercle magique bleu sous ses pieds quand il est en position de tir
+    private void drawGoblinMageAura(Canvas canvas, Enemy e, float feetY) {
+        if (!e.inPosition) {
+            return;
+        }
+        float rx = e.radius * 1.2f;
+        float ry = rx * 0.36f;
+        float cy = feetY - ry * 0.4f;
+        auraRect.set(e.x - rx, cy - ry, e.x + rx, cy + ry);
+        paint.setColor(Color.argb(60, 90, 150, 255));
+        canvas.drawOval(auraRect, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.5f * density);
+        paint.setColor(Color.argb(190, 130, 190, 255));
+        canvas.drawOval(auraRect, paint);
+        auraRect.inset(rx * 0.3f, ry * 0.3f);
+        canvas.drawOval(auraRect, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    // Orbe du gobelin mage : il se charge avant chaque tir (halo qui grossit, étincelles)
+    private void drawGoblinMageOrb(Canvas canvas, Enemy e, float left, float top, int scale, boolean stunned) {
+        float ox = left + Sprites.GOBLIN_MAGE_ORB_X * scale;
+        float oy = top + Sprites.GOBLIN_MAGE_ORB_Y * scale;
+        float charge = e.inPosition && !stunned
+                ? 1f - Math.max(0, e.castTimer) / (float) Enemy.MAGE_CAST_DELAY : 0f;
+        float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.18 + e.x);
+        paint.setColor(Color.argb((int) (50 + 40 * pulse + 100 * charge), 110, 200, 255));
+        canvas.drawCircle(ox, oy, scale * (2.2f + 3f * charge), paint);
+        if (charge > 0.6f) {
+            // Étincelles qui tournent autour de l'orbe juste avant le tir
+            paint.setColor(Color.argb(230, 235, 250, 255));
+            for (int i = 0; i < 3; i++) {
+                double a = frame * 0.3 + i * 2 * Math.PI / 3;
+                float r = scale * (3.5f - 1.5f * charge);
+                canvas.drawCircle(ox + (float) Math.cos(a) * r, oy + (float) Math.sin(a) * r, 1.4f * density, paint);
+            }
+        }
+    }
+
+    // Projectile magique d'un gobelin mage : boule bleue avec une traînée et des étincelles
+    private void drawEnemyBolt(Canvas canvas, EnemyBolt b) {
+        float dx = b.dirX();
+        float dy = b.dirY();
+        // Traînée : des cercles de plus en plus petits et transparents derrière lui
+        for (int i = 5; i >= 1; i--) {
+            float back = i * 5 * density;
+            paint.setColor(Color.argb(150 - i * 25, 90, 150, 255));
+            canvas.drawCircle(b.x - dx * back, b.y - dy * back, (6 - i * 0.8f) * density, paint);
+        }
+        float pulse = 0.5f + 0.5f * (float) Math.sin(b.age * 0.5);
+        paint.setColor(Color.argb(90, 110, 180, 255));
+        canvas.drawCircle(b.x, b.y, (9 + 2 * pulse) * density, paint);
+        paint.setColor(Color.argb(220, 140, 210, 255));
+        canvas.drawCircle(b.x, b.y, 5.5f * density, paint);
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(b.x, b.y, 2.8f * density, paint);
+        // Deux étincelles en orbite
+        for (int i = 0; i < 2; i++) {
+            double a = b.age * 0.35 + i * Math.PI;
+            canvas.drawCircle(b.x + (float) Math.cos(a) * 8 * density, b.y + (float) Math.sin(a) * 8 * density,
+                    1.3f * density, paint);
         }
     }
 
@@ -985,23 +1125,36 @@ public class GameRenderer {
 
     // Chevalier : sprite, coup d'épée en alternance quand il se bat, barre de vie
     private void drawKnight(Canvas canvas, Knight k) {
-        int scale = Math.max(1, (int) (k.radius * 2.4f / Sprites.KNIGHT_HEIGHT));
+        // Grand chevalier : environ la largeur d'une case, agrandi d'un nombre entier (pixels nets)
+        int scale = Math.max(1, (int) (k.radius * 2.4f / Sprites.KNIGHT_WIDTH));
         float w = Sprites.KNIGHT_WIDTH * scale;
         float h = Sprites.KNIGHT_HEIGHT * scale;
         // Apparition : il grandit en sortant d'un cercle magique
         float grow = Math.min(1f, k.age / 12f);
         if (k.age < 20) {
             paint.setColor(Color.argb((int) (160 * (1 - k.age / 20f)), 230, 110, 200));
-            canvas.drawCircle(k.x, k.y + h * 0.4f, k.radius * 1.6f, paint);
+            canvas.drawCircle(k.x, k.y + h * 0.4f, k.radius * 1.3f, paint);
         }
-        float bob = k.fighting ? 0 : (float) Math.sin(frame * 0.15 + k.x) * density;
+        // Ombre au sol
+        paint.setColor(Color.argb(70, 0, 0, 0));
+        auraRect.set(k.x - w * 0.4f * grow, k.y + h * 0.42f, k.x + w * 0.4f * grow, k.y + h * 0.52f);
+        canvas.drawOval(auraRect, paint);
+        // Marche : petits sauts à chaque pas ; en garde : respiration lente
+        float bob;
+        if (k.fighting) {
+            bob = 0;
+        } else if (k.marching) {
+            bob = -Math.abs((float) Math.sin(frame * 0.3 + k.x)) * scale;
+        } else {
+            bob = (float) Math.sin(frame * 0.15 + k.x) * density;
+        }
         tmpRect.set(k.x - w / 2 * grow, k.y - h / 2 * grow + bob, k.x + w / 2 * grow, k.y + h / 2 * grow + bob);
         boolean strike = k.fighting && k.attackTimer > Knight.ATTACK_DELAY - 8;
         canvas.drawBitmap(knightSprites[strike ? 1 : 0], null, tmpRect, k.hitTimer > 0 ? hitPaint : spritePaint);
         // Barre de vie
-        float bw = k.radius * 2;
-        float bh = 3 * density;
-        float bl = k.x - k.radius;
+        float bw = k.radius * 1.6f;
+        float bh = 4 * density;
+        float bl = k.x - bw / 2;
         float bt = tmpRect.top - bh - 3 * density;
         paint.setColor(Color.DKGRAY);
         canvas.drawRect(bl, bt, bl + bw, bt + bh, paint);

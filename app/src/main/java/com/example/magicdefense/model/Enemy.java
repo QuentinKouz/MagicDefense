@@ -9,17 +9,26 @@ public class Enemy {
     public static final int BOSS = 3;    // chef gobelin : énorme, invoque des diablotins
     public static final int SHAMAN = 4;  // chaman (invocateur ennemi) : invoque des diablotins
     public static final int IMP = 5;     // diablotin invoqué : minuscule, rapide, très fragile
-    public static final int KIND_COUNT = 6;
+    public static final int MAGE = 6;    // gobelin mage : s'arrête à l'orée de la forêt et tire de loin
+    public static final int KIND_COUNT = 7;
 
     // Caractéristiques relatives à un gobelin normal (indice = kind)
-    public static final float[] SPEED_MULT = {1f, 1.5f, 0.7f, 0.45f, 0.8f, 1.6f};
-    public static final float[] HP_MULT = {1f, 0.6f, 2.5f, 12f, 1.6f, 0.35f};
-    public static final float[] RADIUS_MULT = {1f, 0.75f, 1.35f, 2.0f, 1.05f, 0.6f};
-    public static final float[] CASTLE_DAMAGE_MULT = {1f, 1f, 1.5f, 3f, 1f, 0.4f};
-    public static final float[] GOLD_MULT = {1f, 1f, 1.6f, 10f, 1.6f, 0.2f};
+    public static final float[] SPEED_MULT = {1f, 1.5f, 0.7f, 0.45f, 0.8f, 1.6f, 0.9f};
+    public static final float[] HP_MULT = {1f, 0.6f, 2.5f, 12f, 1.6f, 0.35f, 1.3f};
+    public static final float[] RADIUS_MULT = {1f, 0.75f, 1.35f, 2.0f, 1.05f, 0.6f, 1f};
+    public static final float[] CASTLE_DAMAGE_MULT = {1f, 1f, 1.5f, 3f, 1f, 0.4f, 1f};
+    public static final float[] GOLD_MULT = {1f, 1f, 1.6f, 10f, 1.6f, 0.2f, 1.8f};
     // Invocation : délai entre deux invocations (0 = n'invoque pas) et nombre de diablotins
-    public static final int[] SUMMON_DELAY = {0, 0, 0, 240, 200, 0};
-    public static final int[] SUMMON_COUNT = {0, 0, 0, 3, 2, 0};
+    public static final int[] SUMMON_DELAY = {0, 0, 0, 240, 200, 0, 0};
+    public static final int[] SUMMON_COUNT = {0, 0, 0, 3, 2, 0, 0};
+
+    // Gobelin mage : un projectile toutes les 2,5 s, le premier peu après son arrivée en position
+    public static final int MAGE_CAST_DELAY = 150;
+    public static final int MAGE_FIRST_CAST = 45;
+    // Dégâts d'un projectile : part des dégâts qu'il ferait en atteignant le château...
+    public static final float MAGE_CASTLE_RATIO = 0.25f;
+    // ... ou, sur un mur d'Ouvrier, part de SES PV max
+    public static final float MAGE_WALL_RATIO = 0.6f;
 
     public static final int MARK_DURATION = 180; // ≈ 3 s pour déclencher une réaction
     public static final int NO_MARK = -1;
@@ -42,6 +51,8 @@ public class Enemy {
     public int mark = NO_MARK;    // dernier élément reçu (pour les réactions)
     public int markTimer = 0;
     public int summonTimer;       // compte à rebours avant la prochaine invocation
+    public int castTimer = MAGE_FIRST_CAST; // gobelin mage : compte à rebours avant le prochain tir
+    public boolean inPosition = false;      // gobelin mage arrêté à sa position de tir
 
     public Enemy(float x, float radius, float speed, float hp) {
         this(x, radius, speed, hp, NORMAL);
@@ -60,6 +71,11 @@ public class Enemy {
 
     public boolean isBoss() {
         return kind == BOSS;
+    }
+
+    // Petits et rapides (rapide, diablotin) : ils se faufilent entre les chevaliers
+    public boolean slipsPastKnights() {
+        return kind == FAST || kind == IMP;
     }
 
     // L'ennemi descend vers le château (speedMult : plus rapide la nuit)
