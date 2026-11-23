@@ -34,7 +34,8 @@ public class TouchController {
     private float dragVolume = 0; // position du curseur pendant le glissement
     private Runnable onToggleMute; // couper / remettre le son (géré par GameView)
     private Runnable onEnterCode;  // fenêtre de saisie du code (gérée par GameView)
-    private boolean draggingVolume = false; // doigt en train de régler le volume
+    private boolean draggingVolume = false; // doigt en train de régler un volume
+    private int draggedSlider = -1;         // curseur réglé : Hud.OPTIONS_VOLUME (bruitages) ou OPTIONS_MUSIC_VOLUME
 
     // Accueil : glissement entre les pages et défilement des listes
     private static final int GESTURE_NONE = 0;
@@ -70,6 +71,8 @@ public class TouchController {
     public float getDragX() { return dragX; }
     public float getDragY() { return dragY - dragOffset; } // position affichée, au-dessus du doigt
     public boolean isDraggingVolume() { return draggingVolume; }
+    public boolean isDraggingSoundVolume() { return draggingVolume && draggedSlider == Hud.OPTIONS_VOLUME; }
+    public boolean isDraggingMusicVolume() { return draggingVolume && draggedSlider == Hud.OPTIONS_MUSIC_VOLUME; }
     public float getDragVolume() { return dragVolume; }
     public boolean isMutePressed() { return pressedGameButton == Hud.GAME_SOUND; }
     public int getPressedLockedRow() { return lockedRow; }
@@ -145,8 +148,10 @@ public class TouchController {
                 } else {
                     pressedMenuButton = menuButtonAt(tx, ty);
                     // Curseur de volume : on commence à le régler dès l'appui
-                    if (model.getState() == GameState.OPTIONS && pressedMenuButton == Hud.OPTIONS_VOLUME) {
+                    if (model.getState() == GameState.OPTIONS && (pressedMenuButton == Hud.OPTIONS_VOLUME
+                            || pressedMenuButton == Hud.OPTIONS_MUSIC_VOLUME)) {
                         draggingVolume = true;
+                        draggedSlider = pressedMenuButton;
                         dragVolume = hud.volumeAt(tx);
                     }
                 }
@@ -194,8 +199,12 @@ public class TouchController {
                 if (draggingVolume) {
                     draggingVolume = false;
                     pressedMenuButton = -1;
-                    model.setSoundVolume(dragVolume);
-                    click(); // applique au téléphone et joue le clic
+                    if (draggedSlider == Hud.OPTIONS_MUSIC_VOLUME) {
+                        model.setMusicVolume(dragVolume);
+                    } else {
+                        model.setSoundVolume(dragVolume);
+                    }
+                    click(); // clic d'aperçu, au volume des bruitages du jeu
                     return true;
                 }
                 if (gesture == GESTURE_SWIPE) {
@@ -390,6 +399,8 @@ public class TouchController {
                         model.toggleVibration();
                     } else if (pressedMenuButton == Hud.OPTIONS_MUSIC_TOGGLE) {
                         model.toggleMusic();
+                    } else if (pressedMenuButton == Hud.OPTIONS_EFFECTS) {
+                        model.toggleAttackEffects(); // dessin minimal des attaques (téléphones modestes)
                     } else if (pressedMenuButton == Hud.OPTIONS_LEFT_HANDED) {
                         model.toggleLeftHanded(); // l'interface passe en miroir (GameView refait la mise en page)
                     } else if (pressedMenuButton == Hud.OPTIONS_CODE) {

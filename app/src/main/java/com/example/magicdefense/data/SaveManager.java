@@ -58,6 +58,9 @@ public class SaveManager {
     private static final String KEY_AUTO = "auto_mode";
     private static final String KEY_AUTO_OWNED = "auto_owned";
     private static final String KEY_VIBRATION = "vibration";
+    private static final String KEY_ATTACK_FX = "attack_effects";   // effets des attaques (Non = minimal)
+    private static final String KEY_SOUND_VOLUME = "sound_volume";  // volume interne des bruitages
+    private static final String KEY_MUSIC_VOLUME = "music_volume";  // volume interne de la musique
     private static final String KEY_CHESTS_BIG = "chests_big";        // (KEY_CHESTS = petits coffres)
     private static final String KEY_CHESTS_MYSTERY = "chests_mystery";
     private static final String KEY_DAILY_DAY = "daily_day";
@@ -80,6 +83,9 @@ public class SaveManager {
         model.setVibrationEnabled(prefs.getBoolean(KEY_VIBRATION, true));
         model.loadProgress(unlocked, stars);
         model.setMusicEnabled(prefs.getBoolean(KEY_MUSIC, true)); // musique activée la 1re fois
+        model.setAttackEffectsEnabled(prefs.getBoolean(KEY_ATTACK_FX, true));
+        model.setSoundVolume(prefs.getFloat(KEY_SOUND_VOLUME, 1f));
+        model.setMusicVolume(prefs.getFloat(KEY_MUSIC_VOLUME, 1f));
 
         model.setLeftHanded(prefs.getBoolean(KEY_LEFT_HANDED, false));
 
@@ -153,6 +159,9 @@ public class SaveManager {
         editor.putBoolean(KEY_VIBRATION, model.isVibrationEnabled());
         editor.remove(KEY_NIGHT_DISABLED); // option retirée
         editor.putBoolean(KEY_MUSIC, model.isMusicEnabled());
+        editor.putBoolean(KEY_ATTACK_FX, model.isAttackEffectsEnabled());
+        editor.putFloat(KEY_SOUND_VOLUME, model.getSoundVolume());
+        editor.putFloat(KEY_MUSIC_VOLUME, model.getMusicVolume());
 
         Progression p = model.getProgression();
         editor.putInt(KEY_CHESTS, p.getChests(Chest.SMALL));

@@ -1,0 +1,11 @@
+{
+  "name": "magic-defense-tools",
+  "private": true,
+  "description": "Génération par code des musiques du jeu (voir generate_music.js)",
+  "scripts": {
+    "music": "node generate_music.js"
+  },
+  "dependencies": {
+    "wasm-media-encoders": "0.7.0"
+  }
+}

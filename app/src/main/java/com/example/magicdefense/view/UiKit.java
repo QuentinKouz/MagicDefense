@@ -1,5 +1,6 @@
 package com.example.magicdefense.view;
 
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -333,14 +334,68 @@ public class UiKit {
 
     // ---------- Pièce d'or ----------
 
+    // Pièce d'or en pixel art (12 × 12 pixels, agrandie sans lissage) : contour sombre, tranche
+    // éclairée en haut à gauche et ombrée en bas à droite, gravure en creux, symbole au centre, reflet.
+    // s : rayon de la pièce à l'écran
+    private static final int COIN_PIXELS = 12;
+    private static Bitmap coinBitmap;
+    private final Paint coinPaint = new Paint();
+    private final RectF coinRect = new RectF();
+
     public void coin(Canvas c, float cx, float cy, float s) {
-        paint.setColor(OUTLINE);
-        c.drawCircle(cx, cy, s, paint);
-        paint.setColor(GOLD_DARK);
-        c.drawCircle(cx, cy, s - 1.2f * d, paint);
-        paint.setColor(GOLD);
-        c.drawCircle(cx - 0.4f * d, cy - 0.4f * d, s - 2.2f * d, paint);
-        paint.setColor(Color.argb(200, 255, 245, 200));
-        c.drawCircle(cx - s * 0.3f, cy - s * 0.3f, s * 0.22f, paint);
+        coin(c, cx, cy, s, 255);
+    }
+
+    public void coin(Canvas c, float cx, float cy, float s, int alpha) {
+        if (coinBitmap == null) {
+            coinBitmap = buildCoin();
+        }
+        coinPaint.setFilterBitmap(false); // gros pixels nets
+        coinPaint.setAlpha(alpha);
+        coinRect.set(cx - s, cy - s, cx + s, cy + s);
+        c.drawBitmap(coinBitmap, null, coinRect, coinPaint);
+    }
+
+    private static Bitmap buildCoin() {
+        int n = COIN_PIXELS;
+        int light = Color.rgb(255, 226, 120);
+        int shine = Color.rgb(255, 250, 225);
+        int deep = Color.rgb(196, 138, 34);
+        Bitmap b = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888);
+        float center = n / 2f;
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                float dx = x + 0.5f - center;
+                float dy = y + 0.5f - center;
+                float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                // > 0 : face tournée vers la lumière (en haut à gauche)
+                float lit = dist > 0 ? (-dx - dy) / (dist * 1.414f) : 0;
+                int col;
+                if (dist > center) {
+                    col = Color.TRANSPARENT;
+                } else if (dist > center - 1) {
+                    col = OUTLINE;                                       // contour
+                } else if (dist > center - 2.1f) {
+                    col = lit > 0.3f ? light : lit < -0.3f ? GOLD_DARK : GOLD; // tranche en relief
+                } else if (dist > center - 3) {
+                    col = lit > 0 ? deep : light;                        // anneau gravé (en creux)
+                } else {
+                    col = lit < -0.5f ? deep : GOLD;                     // face
+                }
+                b.setPixel(x, y, col);
+            }
+        }
+        // Symbole gravé au centre : une barre verticale en creux (ombre à gauche, lumière à droite)
+        for (int y = n / 2 - 2; y <= n / 2 + 1; y++) {
+            b.setPixel(n / 2 - 1, y, GOLD_DARK);
+            b.setPixel(n / 2, y, light);
+        }
+        b.setPixel(n / 2 - 2, n / 2 - 2, GOLD_DARK); // petit empattement en haut
+        b.setPixel(n / 2 + 1, n / 2 + 1, light);     // et en bas
+        // Reflet sur la tranche, en haut à gauche
+        b.setPixel(3, 2, shine);
+        b.setPixel(2, 3, shine);
+        b.setPixel(4, 2, light);
+        return b;
     }
 }

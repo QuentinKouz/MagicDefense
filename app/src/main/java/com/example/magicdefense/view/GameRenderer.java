@@ -7,6 +7,7 @@ import android.graphics.LightingColorFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 
 import com.example.magicdefense.controller.TouchController;
 import com.example.magicdefense.model.Achievement;
@@ -116,6 +117,10 @@ public class GameRenderer {
     public void draw(Canvas canvas, GameModel model, TouchController touch) {
         frame++;
         attacks.setFrame(frame);
+        attacks.setLowFx(!model.isAttackEffectsEnabled()); // option « Effets des attaques »
+        if (model.getState() == GameState.START) {
+            java.util.Arrays.fill(coinAge, -1); // de retour à l'accueil : plus de pièce en vol
+        }
         if (model.getState() != lastState) {
             lastState = model.getState();
             stateFrames = 0;  // on vient de changer d'écran
@@ -535,6 +540,7 @@ public class GameRenderer {
         drawRecruitButtons(canvas, model, touch.getPressedButton(),
                 touch.getPressedGameButton() == Hud.GAME_RANDOM);
         drawTopInfo(canvas, model);
+        drawFlyingCoins(canvas, model.getState() == GameState.PLAYING);
         drawBossBar(canvas, model);
         drawAnnounce(canvas, model);
         drawSkillText(canvas, model);
@@ -818,6 +824,78 @@ public class GameRenderer {
                 Paint.Align.LEFT);
     }
 
+    // ---------- Pièces d'or ----------
+    private static final int MAX_FLYING_COINS = 24;
+    private static final int COIN_FLIGHT_FRAMES = 32; // ≈ 0,5 s
+    private final float[] coinStartX = new float[MAX_FLYING_COINS];
+    private final float[] coinStartY = new float[MAX_FLYING_COINS];
+    private final int[] coinAge = new int[MAX_FLYING_COINS]; // -1 : emplacement libre
+    private float goldCoinX, goldCoinY; // pièce du compteur de PO (cible des pièces qui s'envolent)
+    private int goldPulse = 0;          // > 0 : le compteur grossit un instant (pièce arrivée)
+
+    {
+        java.util.Arrays.fill(coinAge, -1);
+    }
+
+    // Un gobelin meurt : une pièce s'envole de sa position vers le compteur de PO
+    // (rien si l'option « Effets des attaques » est sur Non)
+    public void spawnCoin(float x, float y) {
+        if (attacks.isLowFx()) {
+            return;
+        }
+        for (int i = 0; i < MAX_FLYING_COINS; i++) {
+            if (coinAge[i] < 0) {
+                coinStartX[i] = x;
+                coinStartY[i] = y;
+                coinAge[i] = 0;
+                return;
+            }
+        }
+        // Trop de pièces en vol : on n'en ajoute pas (le compteur, lui, est déjà à jour)
+    }
+
+    // Pièces en vol : elles montent un peu, puis filent vers le compteur en accélérant
+    private void drawFlyingCoins(Canvas canvas, boolean advance) {
+        for (int i = 0; i < MAX_FLYING_COINS; i++) {
+            if (coinAge[i] < 0) {
+                continue;
+            }
+            if (attacks.isLowFx()) {
+                coinAge[i] = -1; // option désactivée pendant le vol
+                continue;
+            }
+            float t = coinAge[i] / (float) COIN_FLIGHT_FRAMES;
+            float e = t * t; // accélère vers la cible
+            float x = coinStartX[i] + (goldCoinX - coinStartX[i]) * e;
+            float y = coinStartY[i] + (goldCoinY - coinStartY[i]) * e - (float) Math.sin(t * Math.PI) * 30 * density;
+            ui.coin(canvas, x, y, (7 - 2 * t) * density);
+            if (advance && ++coinAge[i] > COIN_FLIGHT_FRAMES) {
+                coinAge[i] = -1;
+                goldPulse = 8;
+            }
+        }
+    }
+
+    // Compteur de PO : pièce d'or en pixel art suivie du nombre, l'ensemble centré en cx
+    private void drawGoldCounter(Canvas canvas, int gold, float cx, float y) {
+        String text = String.valueOf(gold);
+        float scale = 1f + 0.03f * goldPulse; // petit rebond quand une pièce arrive
+        if (goldPulse > 0) {
+            goldPulse--;
+        }
+        paint.setTypeface(Typeface.DEFAULT_BOLD);
+        paint.setTextSize(20 * density * scale);
+        float textW = paint.measureText(text);
+        paint.setTypeface(Typeface.DEFAULT);
+        float coinR = 10 * density * scale;
+        float gap = 6 * density;
+        float left = cx - (2 * coinR + gap + textW) / 2;
+        goldCoinX = left + coinR;
+        goldCoinY = y - 7 * density;
+        ui.coin(canvas, goldCoinX, goldCoinY, coinR);
+        ui.text(canvas, text, left + 2 * coinR + gap, y, 20 * scale, Palette.GOLD, Paint.Align.LEFT);
+    }
+
     private void drawTopInfo(Canvas canvas, GameModel model) {
         float shift = board.topShift; // évite la caméra / l'encoche
         float cx = board.centerX();
@@ -830,9 +908,8 @@ public class GameRenderer {
                         : "VAGUE " + model.getWave() + "/" + model.getWavesInLevel(),
                 64 * density + shift, 24);
 
-        // PO sous la vague (le coin haut-gauche est pris par la jauge)
-        paint.setColor(Palette.GOLD);
-        drawCenteredText(canvas, model.getGold() + " PO", 92 * density + shift, 20);
+        // PO sous la vague (le coin haut-gauche est pris par la jauge) : pièce d'or + nombre
+        drawGoldCounter(canvas, model.getGold(), cx, 92 * density + shift);
 
         if (endless) {
             // Pas d'étoiles en mode infini : on rappelle le record à battre
@@ -1383,12 +1460,27 @@ public class GameRenderer {
         }
         drawToggle(canvas, leftRow, model.isLeftHanded());
 
-        // Volume
+        // Effets des attaques : Non = dessin minimal (téléphones modestes)
         paint.setColor(Color.WHITE);
-        drawCenteredText(canvas, "Volume", p.top + Hud.OPT_VOLUME_Y * density, 18);
+        drawCenteredText(canvas, "Effets des attaques", p.top + Hud.OPT_EFFECTS_Y * density, 18);
+        RectF fxRow = hud.optionsButtons[Hud.OPTIONS_EFFECTS];
+        if (pressed == Hud.OPTIONS_EFFECTS) {
+            drawPressedOverlay(canvas, fxRow, 12 * density);
+        }
+        drawToggle(canvas, fxRow, model.isAttackEffectsEnabled());
+
+        // Volumes internes du jeu (indépendants du volume du téléphone)
         // Pendant le glissement, on affiche la position du doigt ; sinon, le volume réel
-        float shownVolume = touch.isDraggingVolume() ? touch.getDragVolume() : model.getSoundVolume();
-        drawVolumeSlider(canvas, shownVolume, touch.isDraggingVolume());
+        paint.setColor(Color.WHITE);
+        drawCenteredText(canvas, "Volume de la musique", p.top + Hud.OPT_MUSIC_VOLUME_Y * density, 18);
+        boolean dragMusic = touch.isDraggingMusicVolume();
+        drawVolumeSlider(canvas, hud.musicVolumeTrack, dragMusic ? touch.getDragVolume() : model.getMusicVolume(),
+                dragMusic);
+        paint.setColor(Color.WHITE);
+        drawCenteredText(canvas, "Volume des bruitages", p.top + Hud.OPT_VOLUME_Y * density, 18);
+        boolean dragSound = touch.isDraggingSoundVolume();
+        drawVolumeSlider(canvas, hud.volumeTrack, dragSound ? touch.getDragVolume() : model.getSoundVolume(),
+                dragSound);
 
         // CODE (seulement depuis l'accueil)
         if (model.getOptionsReturnState() == GameState.START) {
@@ -1518,8 +1610,7 @@ public class GameRenderer {
     }
 
     // Curseur de volume : haut-parleurs aux deux bouts, rail rempli jusqu'au bouton
-    private void drawVolumeSlider(Canvas canvas, float volume, boolean dragging) {
-        RectF t = hud.volumeTrack;
+    private void drawVolumeSlider(Canvas canvas, RectF t, float volume, boolean dragging) {
         float cy = t.centerY();
         float knobX = t.left + (t.right - t.left) * volume;
 
@@ -1598,7 +1689,7 @@ public class GameRenderer {
                 overGame ? 215 : 255);
         float dy = sink(pressed);
 
-        boolean muted = model.getSoundVolume() <= 0;
+        boolean muted = model.getSoundVolume() <= 0 && model.getMusicVolume() <= 0;
         drawSpeaker(canvas, s.centerX() - 3 * density, s.centerY() + dy, 10 * density, muted ? 0 : 2);
         if (muted) {
             paint.setColor(Palette.QUIT);
