@@ -36,7 +36,15 @@ public class SoundManager {
         victory = pool.load(context, R.raw.victory, 1);
         defeat = pool.load(context, R.raw.defeat, 1);
         click = pool.load(context, R.raw.click, 1);
+        nukeAlarm = pool.load(context, R.raw.nuke_alarm, 1);
+        nukeBoom = pool.load(context, R.raw.nuke_boom, 1);
     }
+
+    // Scientifique : sirène + compte à rebours (« Réaction en chaîne »), explosion de la bombe
+    private final int nukeAlarm, nukeBoom;
+
+    public void nukeAlarm() { play(nukeAlarm, 0.9f, 1f); }
+    public void nukeBoom()  { play(nukeBoom, 1f, 1f); }
 
     // Volume interne des bruitages (curseur des options), entre 0 et 1
     public void setVolume(float v) {

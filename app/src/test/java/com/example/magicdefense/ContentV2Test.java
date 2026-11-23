@@ -96,7 +96,7 @@ public class ContentV2Test {
                 pairs++;
             }
         }
-        assertEquals(44, pairs);
+        assertEquals(54, pairs);
         assertEquals(Reaction.COUNT, pairs);
         assertEquals(Reaction.WISPS, Reaction.between(Mage.FIRE, Mage.SUMMONER));
         assertEquals(Reaction.VORTEX, Reaction.between(Mage.SUMMONER, Mage.AIR));

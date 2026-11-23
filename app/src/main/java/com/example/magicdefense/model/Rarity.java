@@ -4,7 +4,7 @@ package com.example.magicdefense.model;
 //  - Commune    : Feu, Terre
 //  - Rare       : Eau, Poison
 //  - Épique     : Foudre, Air, Invocateur, Ouvrier
-//  - Légendaire : Lumière, Ténèbres
+//  - Légendaire : Lumière, Ténèbres, Scientifique
 // Plus une carte est rare, moins on en trouve dans les coffres, et moins il en faut pour l'améliorer.
 public final class Rarity {
     public static final int COMMON = 0;
@@ -17,8 +17,9 @@ public final class Rarity {
     public static final String[] SHORT = {"C", "R", "É", "L"};
 
     // Rareté de chaque type de mage (indice = type : Eau, Feu, Terre, Foudre, Poison, Air, Invocateur,
-    // Ouvrier, Lumière, Ténèbres)
-    private static final int[] OF_TYPE = {RARE, COMMON, COMMON, EPIC, RARE, EPIC, EPIC, EPIC, LEGENDARY, LEGENDARY};
+    // Ouvrier, Lumière, Ténèbres, Scientifique)
+    private static final int[] OF_TYPE = {RARE, COMMON, COMMON, EPIC, RARE, EPIC, EPIC, EPIC, LEGENDARY, LEGENDARY,
+            LEGENDARY};
 
     // Part des cartes d'un coffre selon la rareté (les communes sont les plus nombreuses)
     private static final float[] CARD_WEIGHT = {1f, 0.45f, 0.15f, 0.05f};

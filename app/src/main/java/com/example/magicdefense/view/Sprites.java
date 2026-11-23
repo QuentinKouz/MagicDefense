@@ -69,6 +69,7 @@ public final class Sprites {
             {"gggg", "gGGg", "gggg", "..T.", "..T.", "..T."},   // Ouvrier : tête de marteau
             {"g.g.", ".GG.", "gGGg", ".GG.", "g.g.", "..T."},   // Lumière : soleil rayonnant
             {".gg.", "gKKg", "gKGg", "gKKg", ".gg.", "..T."},   // Ténèbres : orbe d'ombre
+            {".KK.", ".WW.", "KWGK", "KGgK", ".KK.", "..T."},   // Scientifique : fiole de potion
     };
     private static final String[] SMALL_TIP = {"....", "....", "..g.", ".gGg", "..g.", "..T."};
 
@@ -84,6 +85,7 @@ public final class Sprites {
             "rGGrrYYrrGGrr",   // Ouvrier : briques
             "GrGrGYYGrGrGr",   // Lumière : rayons
             "rKrrKYYKrrKrr",   // Ténèbres : ombres
+            "rrgGrYYrrGgrr",   // Scientifique : poches et stylos
     };
 
     // Couleurs propres à chaque élément : robe, robe ombrée, embout clair, embout foncé
@@ -98,6 +100,8 @@ public final class Sprites {
             {Color.rgb(215, 140, 40), Color.rgb(150, 90, 25), Color.rgb(200, 200, 210), Color.rgb(120, 120, 135)},
             {Color.rgb(245, 240, 225), Color.rgb(205, 190, 150), Color.rgb(255, 250, 200), Color.rgb(255, 210, 70)},
             {Color.rgb(75, 45, 110), Color.rgb(45, 25, 70), Color.rgb(200, 140, 255), Color.rgb(130, 70, 200)},
+            // Scientifique : blouse blanche, potion vert fluo et violette
+            {Color.rgb(238, 242, 240), Color.rgb(180, 195, 195), Color.rgb(150, 255, 80), Color.rgb(165, 80, 230)},
     };
 
     private static final int WORKER_TYPE = 7; // Mage.WORKER
@@ -236,6 +240,18 @@ public final class Sprites {
                     ".....RRRR....",
                     "......RR.....",
             },
+            {   // Scientifique : casque anti-radiations jaune, visière et masque à gaz
+                    ".............",
+                    "....KKKKKK...",
+                    "...KYYYYYYK..",
+                    "..KYYYYYYYYK.",
+                    "..KYYyYYyYYK.",
+                    "..KYYYYYYYYK.",
+                    ".KYYYYYYYYYYK",
+                    "..YKCCCCCCKY.",
+                    "..YKCWCCCCKY.",
+                    "..YKKaAAaKKY.",
+            },
     };
     // Arme (lignes 0 à 5, colonnes 14 à 18) : le bâton continue colonne 17
     private static final String[][] TIPS_6 = {
@@ -249,6 +265,7 @@ public final class Sprites {
             {"AAAAA", "AaaaA", "AAAAA", "...B.", "...B.", "...Tt"},   // Ouvrier : marteau de forge
             {"Y.G.Y", ".YGY.", "GGWGG", ".YGY.", "...Y.", "...Tt"},   // Lumière : soleil
             {"AAAT.", "A..T.", "a..T.", "...T.", "...T.", "...Tt"},   // Ténèbres : faux
+            {".KWK.", ".KWK.", "KGGGK", "KGWGK", "KgGgK", "..KTt"},   // Scientifique : fiole géante
     };
     // Élément sans dessin dédié (nouveau mage) : couronne d'archimage et orbe
     private static final String[] DEFAULT_HEAD_6 = {
@@ -381,7 +398,60 @@ public final class Sprites {
             }
             g[5][6] = 'G';
         }
+        if (type == SCIENTIST_TYPE) {
+            scientistLook(g, level); // cheveux fous et lunettes à la place du chapeau
+        }
         return fromGrid(g);
+    }
+
+    // ---------- Scientifique : blouse blanche, cheveux en bataille, lunettes de protection ----------
+    private static final int SCIENTIST_TYPE = 10; // Mage.SCIENTIST
+    // Lignes 0 à 8 (colonnes 0 à 13) : lignes 0 à 6 remplacées (plus de chapeau), puis seuls les pixels
+    // dessinés recouvrent le visage (favoris, lunettes)
+    private static final String[] SCIENTIST_HAIR = {
+            "..............",
+            "....A..a..A...",
+            "..A.AaAAaA.A..",
+            "...aAAAAAAAa..",
+            "..AAaAAAAaAAA.",
+            ".aAAAAAAAAAAa.",
+            "..aKKKKKKKKa..",
+            "..A........A..",
+            "...KCCAACCK...",
+    };
+
+    private static void scientistLook(char[][] g, int level) {
+        for (int y = 0; y < SCIENTIST_HAIR.length; y++) {
+            for (int x = 0; x < 14; x++) {
+                char c = SCIENTIST_HAIR[y].charAt(x);
+                if (y < 7 || c != '.') {
+                    g[y][x] = c;
+                }
+            }
+        }
+        // Barbe grise en bataille (la blouse est blanche)
+        for (int y = 9; y < MAGE_HEIGHT; y++) {
+            for (int x = 0; x < 14; x++) {
+                if (g[y][x] == 'W') {
+                    g[y][x] = 'A';
+                } else if (g[y][x] == 'w') {
+                    g[y][x] = 'a';
+                }
+            }
+        }
+        if (level >= 4) {                       // lunettes cerclées d'or
+            g[8][3] = 'Y';
+            g[8][6] = 'Y';
+            g[8][7] = 'Y';
+            g[8][10] = 'Y';
+        }
+        if (level >= 5) {                       // mèches irradiées vert fluo
+            g[1][4] = 'G';
+            g[2][8] = 'G';
+            g[3][5] = 'G';
+            g[4][10] = 'G';
+            g[5][3] = 'G';
+        }
     }
 
     // ---------- Gobelins : 19 x 16 pixels, 2 images de marche ----------

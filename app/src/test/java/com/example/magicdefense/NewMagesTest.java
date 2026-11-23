@@ -43,8 +43,8 @@ public class NewMagesTest {
 
     @Test
     public void reactions_lightAndDarkCancel_otherPairsAreDistinct() {
-        assertEquals(10, Mage.TYPE_COUNT);
-        assertEquals(44, Reaction.COUNT);
+        assertEquals(11, Mage.TYPE_COUNT); // avec le Scientifique
+        assertEquals(54, Reaction.COUNT);
         assertEquals(Reaction.COUNT, Reaction.NAMES.length);
         assertEquals(Reaction.NONE, Reaction.between(Mage.LIGHT, Mage.DARK));
         assertEquals(Reaction.NONE, Reaction.between(Mage.DARK, Mage.LIGHT));
@@ -62,7 +62,7 @@ public class NewMagesTest {
                 pairs++;
             }
         }
-        assertEquals(44, pairs);
+        assertEquals(54, pairs);
         assertEquals(Reaction.CONCRETE, Reaction.between(Mage.WATER, Mage.WORKER));
         assertEquals(Reaction.SANCTUARY, Reaction.between(Mage.LIGHT, Mage.WORKER));
         assertEquals(Reaction.REAPING, Reaction.between(Mage.SUMMONER, Mage.DARK));
@@ -71,7 +71,7 @@ public class NewMagesTest {
 
     @Test
     public void artifacts_newMagesHaveThreeEach() {
-        assertEquals(30, Artifact.COUNT);
+        assertEquals(33, Artifact.COUNT);
         assertEquals(Artifact.COUNT, Artifact.NAMES.length);
         assertEquals(Artifact.COUNT, Artifact.DESCRIPTIONS.length);
         assertEquals(Mage.WORKER, Artifact.typeOf(21));

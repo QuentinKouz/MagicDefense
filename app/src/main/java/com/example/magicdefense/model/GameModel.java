@@ -26,6 +26,8 @@ public class GameModel {
         void onSkill();           // compétence de mage lancée
         void onAchievement();     // succès débloqué
         void onProgressChanged(); // progression permanente modifiée : à sauvegarder
+        default void onNukeAlarm() { }  // Scientifique : « Réaction en chaîne » (sirène et compte à rebours)
+        default void onNukeImpact() { } // Scientifique : la bombe nucléaire explose
     }
 
     private GameListener listener;
@@ -199,6 +201,8 @@ public class GameModel {
 
     private final ArrayList<Bolt> bolts = new ArrayList<>();
     private final ArrayList<HitEffect> hits = new ArrayList<>();
+    private final ArrayList<Nuke> nukes = new ArrayList<>(); // bombes du Scientifique (chute et explosion)
+    private int shakeTimer = 0;                              // > 0 : l'écran tremble (bombe nucléaire)
 
 
     public GameModel(Board board) {
@@ -710,6 +714,9 @@ public class GameModel {
 
     public List<Bolt> getBolts() { return bolts; }
     public List<HitEffect> getHits() { return hits; }
+    public List<Nuke> getNukes() { return nukes; }
+    // Tremblement de l'écran : 1 juste après l'explosion, 0 au repos
+    public float getShake() { return shakeTimer / (float) Nuke.SHAKE_FRAMES; }
 
     // ---------- Transitions d'état ----------
     public void startLevel(int newLevel) {
@@ -743,6 +750,8 @@ public class GameModel {
         hits.clear();
         zones.clear();
         reactions.clear();
+        nukes.clear();
+        shakeTimer = 0;
         grid = new Mage[Board.ROWS][Board.COLS];
         lockBackRow();
         healsUsed = 0;
@@ -1326,6 +1335,7 @@ public class GameModel {
                 reactions.remove(i);
             }
         }
+        updateNukes(); // bombes du Scientifique : chute, explosion
 
         // Zones au sol : la lave et les flammes brûlent, la vapeur et la boue ralentissent,
         // le marécage empoisonne
@@ -1508,6 +1518,9 @@ public class GameModel {
                 if (mage.skillTimer > 0) {
                     mage.skillTimer--;
                 }
+                if (mage.type == Mage.SCIENTIST) {
+                    updateScientist(mage, mult); // la bombe se recharge et part toute seule
+                }
                 if (mage.cooldown > 0) {
                     mage.cooldown--;
                     continue;
@@ -1558,6 +1571,11 @@ public class GameModel {
                             projectiles.add(new Projectile(target.x, target.y - 160 * board.density,
                                     target, mage, board.density).boost(mult));
                         }
+                        break;
+
+                    case Mage.SCIENTIST:
+                        // Scientifique : fiole lancée en cloche, qui éclabousse autour de l'impact
+                        projectiles.add(scientistVial(mage, tipX, tipY, target, mult));
                         break;
 
                     default:
@@ -1658,6 +1676,7 @@ public class GameModel {
         if (enemiesLeftToSpawn == 0 && enemies.isEmpty()) {
             if (!spec.endless && wave >= spec.waves) {
                 projectiles.clear();
+                nukes.clear();
                 enemyBolts.clear();
                 zones.clear();
                 state = GameState.VICTORY;
@@ -2471,6 +2490,160 @@ public class GameModel {
                 return rad;
             }
             default:
+                return triggerScientistReaction(r, e, dmg, ringRadius);
+        }
+    }
+
+    // ---------- Scientifique ----------
+
+    // Fiole de potion lancée en cloche depuis l'embout du bâton
+    private Projectile scientistVial(Mage mage, float tipX, float tipY, Enemy target, float mult) {
+        Projectile p = new Projectile(tipX, tipY, target, mage, board.density).boost(mult);
+        p.arc = (50 + 4 * mage.level) * board.density;
+        return p;
+    }
+
+    // Recharge de la bombe (2× plus vite pendant « Réaction en chaîne ») et largage automatique
+    // dès qu'elle est prête et qu'il y a un ennemi à l'écran
+    private void updateScientist(Mage mage, float mult) {
+        if (waitingForWave) {
+            return; // préparation : la bombe attend le lancement de la vague
+        }
+        int speed = mage.getNukeSpeed();
+        if (mage.chainTimer > 0) {
+            mage.chainTimer--;
+        }
+        if (mage.nukeTimer > 0) {
+            mage.nukeTimer = Math.max(0, mage.nukeTimer - speed);
+        }
+        if (mage.nukeTimer == 0 && hasVisibleEnemy()) {
+            nukes.add(new Nuke(board.centerX(), board.gridTop * 0.45f, mage.getNukeDamage() * mult, mage.level));
+            mage.nukeTimer = mage.getNukeCooldown();
+        }
+    }
+
+    // Bombes en vol : à l'impact, elles frappent TOUS les ennemis vivants à l'écran
+    private void updateNukes() {
+        if (shakeTimer > 0) {
+            shakeTimer--;
+        }
+        for (int i = nukes.size() - 1; i >= 0; i--) {
+            Nuke n = nukes.get(i);
+            if (n.update()) {
+                nukeImpact(n);
+            }
+            if (n.isOver()) {
+                nukes.remove(i);
+            }
+        }
+    }
+
+    private void nukeImpact(Nuke n) {
+        for (Enemy e : enemies) {
+            if (e.isDead() || e.y < 0) {
+                continue;
+            }
+            hurt(e, Nuke.damageOn(e, n.damage));
+            e.stun(Nuke.STUN);
+            hits.add(new HitEffect(e.x, e.y, Mage.SCIENTIST, Math.min(5, n.level)));
+        }
+        shakeTimer = Nuke.SHAKE_FRAMES;
+        if (listener != null) {
+            listener.onNukeImpact();
+        }
+    }
+
+    // Réactions du Scientifique. Retourne le rayon de l'anneau affiché.
+    private float triggerScientistReaction(int r, Enemy e, float dmg, float ringRadius) {
+        float d = board.density;
+        switch (r) {
+            case Reaction.SALINE: {       // Eau : solution saline, ralentit et ronge l'armure
+                float rad = Reaction.SALINE_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.slow(Reaction.SALINE_SLOW, Reaction.SALINE_DURATION);
+                    o.makeVulnerable(Reaction.SALINE_DURATION);
+                }
+                return rad;
+            }
+            case Reaction.COMBUSTION: {   // Feu : explosion chimique, puis flammes au sol
+                float rad = Reaction.COMBUSTION_RADIUS * d;
+                damageAround(e.x, e.y, rad, dmg * Reaction.COMBUSTION_DAMAGE);
+                zones.add(new Zone(e.x, e.y, rad * 0.6f, Zone.FIRE, dmg * Reaction.COMBUSTION_DPS_FACTOR,
+                        Reaction.COMBUSTION_DURATION));
+                hits.add(new HitEffect(e.x, e.y, Mage.FIRE, 5));
+                return rad;
+            }
+            case Reaction.CALCINATION: {  // Terre : la roche cuit et éclate
+                float rad = Reaction.CALCINATION_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    hurt(o, dmg * Reaction.CALCINATION_DAMAGE);
+                    o.stun(Reaction.CALCINATION_STUN);
+                }
+                return rad;
+            }
+            case Reaction.ELECTROLYSIS: { // Foudre : arcs vers les ennemis proches, tous vulnérables
+                e.makeVulnerable(Reaction.ELECTROLYSIS_VULNERABLE);
+                ArrayList<Enemy> near = enemiesNear(e.x, e.y, Reaction.ELECTROLYSIS_RANGE * d, e);
+                for (int k = 0; k < Math.min(Reaction.ELECTROLYSIS_TARGETS, near.size()); k++) {
+                    Enemy o = near.get(k);
+                    hurt(o, dmg * Reaction.ELECTROLYSIS_DAMAGE);
+                    o.makeVulnerable(Reaction.ELECTROLYSIS_VULNERABLE);
+                    bolts.add(new Bolt(e.x, e.y, o.x, o.y, 3).as(Mage.SCIENTIST));
+                }
+                return ringRadius;
+            }
+            case Reaction.MUTANT_TOXIN: { // Poison : toxine mutante, poison violent qui se propage
+                float rad = Reaction.MUTANT_TOXIN_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.poison(Math.max(1f, dmg * Reaction.MUTANT_TOXIN_DPS_FACTOR), Reaction.MUTANT_TOXIN_DURATION);
+                }
+                return rad;
+            }
+            case Reaction.AEROSOL: {      // Air : grand nuage chimique qui ralentit et empoisonne
+                float rad = Reaction.AEROSOL_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    o.slow(Reaction.AEROSOL_SLOW, Reaction.AEROSOL_DURATION);
+                    o.poison(Math.max(1f, dmg * Reaction.AEROSOL_DPS_FACTOR), Reaction.AEROSOL_DURATION);
+                }
+                return rad;
+            }
+            case Reaction.CLONING: {      // Invocateur : un clone de chevalier rejoint la garde
+                float x = columnCenterX(e.x);
+                knights.add(new Knight(x, knightGuardY(), knightRadius(), Math.max(1f, dmg * Reaction.CLONING_HP_FACTOR),
+                        dmg * Reaction.CLONING_HIT_FACTOR, null));
+                progression.addKnight();
+                hits.add(new HitEffect(x, knightGuardY(), Mage.SCIENTIST, 3));
+                return ringRadius;
+            }
+            case Reaction.DYNAMITE: {     // Ouvrier : bâton de dynamite, grosse explosion qui repousse
+                float rad = Reaction.DYNAMITE_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    hurt(o, dmg * Reaction.DYNAMITE_DAMAGE);
+                    o.knockBack(Reaction.DYNAMITE_KNOCKBACK * d);
+                }
+                hits.add(new HitEffect(e.x, e.y, Mage.FIRE, 5));
+                return rad;
+            }
+            case Reaction.FISSION: {      // Lumière : l'atome se scinde, deux fragments rebondissent
+                hurt(e, dmg * Reaction.FISSION_DAMAGE);
+                ArrayList<Enemy> near = enemiesNear(e.x, e.y, Reaction.FISSION_RANGE * d, e);
+                for (int k = 0; k < Math.min(Reaction.FISSION_SPLITS, near.size()); k++) {
+                    Enemy o = near.get(k);
+                    hurt(o, dmg * Reaction.FISSION_SPLIT_DAMAGE);
+                    bolts.add(new Bolt(e.x, e.y, o.x, o.y, 4).as(Mage.LIGHT));
+                }
+                hits.add(new HitEffect(e.x, e.y, Mage.LIGHT, 5));
+                return ringRadius;
+            }
+            case Reaction.ANTIMATTER: {   // Ténèbres : annihilation, les blessés autour disparaissent
+                hurt(e, dmg * Reaction.ANTIMATTER_DAMAGE);
+                float rad = Reaction.ANTIMATTER_RADIUS * d;
+                for (Enemy o : enemiesNear(e.x, e.y, rad, null)) {
+                    tryExecute(o, Reaction.ANTIMATTER_RATIO);
+                }
+                return rad;
+            }
+            default:
                 return ringRadius;
         }
     }
@@ -2789,7 +2962,7 @@ public class GameModel {
         float d = board.density;
         float dmg = m.getDamage() * damageMult();
         ArrayList<Enemy> field = visibleEnemies();
-        if (field.isEmpty() && m.type != Mage.SUMMONER && m.type != Mage.WORKER) {
+        if (field.isEmpty() && m.type != Mage.SUMMONER && m.type != Mage.WORKER && m.type != Mage.SCIENTIST) {
             return false; // pas de cible : on garde la compétence
         }
         // Sage (niveau 7) : version BOOST, effets environ doublés (pw) et effets visuels du niveau 7 (fx)
@@ -2878,6 +3051,12 @@ public class GameModel {
                         e.slow(boost ? 0.25f : 0.4f, Math.round(240 * pw));
                     }
                     hits.add(new HitEffect(e.x, e.y, Mage.DARK, boost ? fx : 4));
+                }
+                break;
+            case Mage.SCIENTIST: // Réaction en chaîne / Apocalypse nucléaire : la bombe se recharge 2× (3×) plus vite
+                m.chainTimer = boost ? Nuke.BOOST_DURATION : Nuke.CHAIN_DURATION;
+                if (listener != null) {
+                    listener.onNukeAlarm(); // sirène d'alerte et compte à rebours
                 }
                 break;
         }

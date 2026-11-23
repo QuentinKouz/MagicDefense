@@ -1,9 +1,9 @@
 package com.example.magicdefense.model;
 
 // Réactions élémentaires : un ennemi marqué par un élément, touché par un second élément
-// différent, déclenche une réaction. Chaque paire des 10 éléments a sa réaction (44 au total),
+// différent, déclenche une réaction. Chaque paire des 11 éléments a sa réaction (54 au total),
 // sauf Lumière + Ténèbres qui s'annulent (l'Invocateur laisse une marque « arcanique »,
-// l'Ouvrier une marque « chantier »). Un objet Reaction est aussi l'effet visuel affiché.
+// l'Ouvrier une marque « chantier », le Scientifique une marque « laboratoire »). Un objet Reaction est aussi l'effet visuel affiché.
 public class Reaction {
     public static final int NONE = -1;
     // Réactions d'origine
@@ -55,7 +55,18 @@ public class Reaction {
     public static final int NECROSIS = 41;      // Ténèbres + Poison : poison violent et vulnérabilité de zone
     public static final int BLACK_HOLE = 42;    // Ténèbres + Air : aspire fort et broie
     public static final int REAPING = 43;       // Ténèbres + Invocateur : moisson des âmes (exécution de zone)
-    public static final int COUNT = 44;
+    // Scientifique (marque « laboratoire »)
+    public static final int SALINE = 44;        // Scientifique + Eau : solution saline, ralentit et ronge l'armure
+    public static final int COMBUSTION = 45;    // Scientifique + Feu : explosion chimique et flammes au sol
+    public static final int CALCINATION = 46;   // Scientifique + Terre : la roche cuit, dégâts et étourdissement
+    public static final int ELECTROLYSIS = 47;  // Scientifique + Foudre : arcs vers 4 ennemis, cibles vulnérables
+    public static final int MUTANT_TOXIN = 48;  // Scientifique + Poison : poison très violent qui se propage
+    public static final int AEROSOL = 49;       // Scientifique + Air : grand nuage qui ralentit et empoisonne
+    public static final int CLONING = 50;       // Scientifique + Invocateur : un clone du chevalier rejoint la garde
+    public static final int DYNAMITE = 51;      // Scientifique + Ouvrier : grosse explosion qui repousse
+    public static final int FISSION = 52;       // Scientifique + Lumière : l'atome se scinde, rebonds sur 2 ennemis
+    public static final int ANTIMATTER = 53;    // Scientifique + Ténèbres : annihilation, exécute les blessés autour
+    public static final int COUNT = 54;
 
     public static final String[] NAMES = {"ÉLECTROCUTION", "LAVE", "VAPEUR",
             "EXPLOSION TOXIQUE", "NUAGE TOXIQUE", "TEMPÊTE DE SABLE",
@@ -65,7 +76,9 @@ public class Reaction {
             "BÉTON", "FORGE", "FONDATIONS", "MARTEAU-PILON", "GOUDRON", "CATAPULTE", "BARRICADE",
             "SANCTUAIRE", "DÉMOLITION",
             "ARC-EN-CIEL", "SUPERNOVA", "PRISME", "JUGEMENT", "PURIFICATION", "AURORE", "CROISADE",
-            "ABYSSES", "FLAMMES NOIRES", "TOMBEAU", "ÉCLAIR NOIR", "NÉCROSE", "TROU NOIR", "MOISSON"};
+            "ABYSSES", "FLAMMES NOIRES", "TOMBEAU", "ÉCLAIR NOIR", "NÉCROSE", "TROU NOIR", "MOISSON",
+            "SOLUTION SALINE", "COMBUSTION", "CALCINATION", "ÉLECTROLYSE", "TOXINE MUTANTE", "AÉROSOL",
+            "CLONAGE", "DYNAMITE", "FISSION", "ANTIMATIÈRE"};
 
     // Les deux éléments de chaque réaction (l'ordre n'a pas d'importance)
     private static final int[][] PAIRS = {
@@ -113,6 +126,16 @@ public class Reaction {
             {Mage.DARK, Mage.POISON},
             {Mage.DARK, Mage.AIR},
             {Mage.DARK, Mage.SUMMONER},
+            {Mage.SCIENTIST, Mage.WATER},
+            {Mage.SCIENTIST, Mage.FIRE},
+            {Mage.SCIENTIST, Mage.EARTH},
+            {Mage.SCIENTIST, Mage.LIGHTNING},
+            {Mage.SCIENTIST, Mage.POISON},
+            {Mage.SCIENTIST, Mage.AIR},
+            {Mage.SCIENTIST, Mage.SUMMONER},
+            {Mage.SCIENTIST, Mage.WORKER},
+            {Mage.SCIENTIST, Mage.LIGHT},
+            {Mage.SCIENTIST, Mage.DARK},
     };
 
     // ---------- Réglages (rayons en dp, durées en images) ----------
@@ -235,6 +258,40 @@ public class Reaction {
     public static final float BLACK_HOLE_DAMAGE = 1.5f;
     public static final float REAPING_RADIUS = 120;
     public static final float REAPING_RATIO = 0.20f;     // exécute sous 20 % de PV (jamais le boss)
+    // Scientifique
+    public static final float SALINE_RADIUS = 100;
+    public static final float SALINE_SLOW = 0.5f;
+    public static final int SALINE_DURATION = 180;       // ralenti et vulnérable ≈ 3 s
+    public static final float COMBUSTION_RADIUS = 110;
+    public static final float COMBUSTION_DAMAGE = 2.5f;
+    public static final float COMBUSTION_DPS_FACTOR = 1.0f; // flammes au sol
+    public static final int COMBUSTION_DURATION = 120;
+    public static final float CALCINATION_RADIUS = 80;
+    public static final float CALCINATION_DAMAGE = 1.5f;
+    public static final int CALCINATION_STUN = 60;
+    public static final int ELECTROLYSIS_TARGETS = 4;
+    public static final float ELECTROLYSIS_RANGE = 150;
+    public static final float ELECTROLYSIS_DAMAGE = 1.2f;
+    public static final int ELECTROLYSIS_VULNERABLE = 120; // ≈ 2 s
+    public static final float MUTANT_TOXIN_RADIUS = 110;
+    public static final float MUTANT_TOXIN_DPS_FACTOR = 2.0f;
+    public static final int MUTANT_TOXIN_DURATION = 240;
+    public static final float AEROSOL_RADIUS = 140;
+    public static final float AEROSOL_SLOW = 0.6f;
+    public static final int AEROSOL_DURATION = 150;
+    public static final float AEROSOL_DPS_FACTOR = 0.8f;
+    public static final float CLONING_HP_FACTOR = 5f;    // PV du clone = 5 × le coup
+    public static final float CLONING_HIT_FACTOR = 1f;
+    public static final float DYNAMITE_RADIUS = 110;
+    public static final float DYNAMITE_DAMAGE = 3f;
+    public static final float DYNAMITE_KNOCKBACK = 35;
+    public static final float FISSION_DAMAGE = 3f;       // sur la cible
+    public static final int FISSION_SPLITS = 2;
+    public static final float FISSION_RANGE = 160;
+    public static final float FISSION_SPLIT_DAMAGE = 1.5f; // sur chaque fragment
+    public static final float ANTIMATTER_DAMAGE = 3f;
+    public static final float ANTIMATTER_RADIUS = 90;
+    public static final float ANTIMATTER_RATIO = 0.15f;  // annihile sous 15 % de PV (jamais le boss)
 
     // Réaction déclenchée par la marque `mark` puis l'élément `element`, ou NONE
     public static int between(int mark, int element) {

@@ -18,6 +18,8 @@ public class Projectile {
     public int stunFrames;        // Invocateur : étourdissement
     public float slow = 1f;       // Ténèbres : vitesse des ennemis touchés (1 = pas de ralenti)
     public float executeRatio;    // Ténèbres : exécute sous cette part des PV max (0 = jamais)
+    public float arc = 0;         // Scientifique : hauteur de la parabole de la fiole, en pixels (0 = tir droit)
+    private float startDistance = 0; // distance à la cible au premier déplacement (pour la parabole)
     public Enemy target;
 
     // Le projectile reprend les caractéristiques du mage qui l'a tiré
@@ -61,12 +63,27 @@ public class Projectile {
         this.fromReaction = true;
     }
 
+    private float lastDistance = 0;
+
+    // Scientifique : hauteur de la fiole au-dessus de sa trajectoire (parabole : 0 au départ et à l'impact)
+    public float getArcOffset() {
+        if (arc <= 0 || startDistance <= 0) {
+            return 0;
+        }
+        float t = Math.max(0f, Math.min(1f, 1f - lastDistance / startDistance));
+        return arc * 4 * t * (1 - t);
+    }
+
     // Avance vers la cible. Retourne true si elle est atteinte.
     public boolean update() {
         age++;
         float dx = target.x - x;
         float dy = target.y - y;
         float distance = (float) Math.sqrt(dx * dx + dy * dy);
+        if (startDistance <= 0) {
+            startDistance = Math.max(1f, distance);
+        }
+        lastDistance = distance;
         if (distance > 0) {
             dirX = dx / distance;
             dirY = dy / distance;
