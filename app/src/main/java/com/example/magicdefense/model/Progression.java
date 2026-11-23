@@ -42,6 +42,9 @@ public class Progression {
     public static final int CASTLE_GOLD_MAX_LEVEL = 10;
     public static final int CASTLE_GOLD_PER_LEVEL = 5;
 
+    // Orbe de sagesse : une par difficulté du mode infini, en repoussant la vague 1000 (une seule fois)
+    public static final int WISDOM_ORB_WAVE = 1000;
+
     // ---------- État ----------
     private final int[] chests = new int[Chest.COUNT]; // coffres en réserve, par sorte
     private int gems = 0;
@@ -69,6 +72,8 @@ public class Progression {
     private int castleGoldLevel = 0;  // trésor de départ
     private final boolean[] artifacts = new boolean[Artifact.COUNT];
     private final int[] equippedArtifact = new int[Mage.TYPE_COUNT];
+    private final boolean[] wisdomOrbOn = new boolean[Mage.TYPE_COUNT]; // orbe posée sur ce type de mage
+    private final boolean[] wisdomOrbEarned = new boolean[LevelSpec.DIFFICULTY_COUNT]; // vague 1000 réussie
 
     // Statistiques (succès)
     private long kills = 0;
@@ -573,6 +578,75 @@ public class Progression {
         }
         equippedArtifact[type] = Artifact.NONE;
         return true;
+    }
+
+    // ---------- Orbes de sagesse (niveau 7 : sage) ----------
+    // (réserve : wisdomOrbs, getWisdomOrbs, addWisdomOrbs, loadWisdomOrbs plus haut)
+
+    // Une orbe est-elle posée sur ce type de mage ? (ses mages peuvent alors atteindre le niveau 7)
+    public boolean hasWisdomOrb(int type) {
+        return type >= 0 && type < Mage.TYPE_COUNT && wisdomOrbOn[type];
+    }
+
+    // Nombre d'orbes posées sur des mages
+    public int placedWisdomOrbs() {
+        int n = 0;
+        for (boolean on : wisdomOrbOn) {
+            if (on) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    public boolean canPlaceWisdomOrb(int type) {
+        return type >= 0 && type < Mage.TYPE_COUNT && owned[type] && !wisdomOrbOn[type] && wisdomOrbs > 0;
+    }
+
+    // Pose une orbe de la réserve sur ce type de mage (de façon permanente)
+    public boolean placeWisdomOrb(int type) {
+        if (!canPlaceWisdomOrb(type)) {
+            return false;
+        }
+        wisdomOrbs--;
+        wisdomOrbOn[type] = true;
+        return true;
+    }
+
+    // Retire l'orbe de ce type de mage : elle revient dans la réserve
+    public boolean removeWisdomOrb(int type) {
+        if (!hasWisdomOrb(type)) {
+            return false;
+        }
+        wisdomOrbOn[type] = false;
+        wisdomOrbs++;
+        return true;
+    }
+
+    public boolean isWisdomOrbEarned(int difficulty) {
+        return wisdomOrbEarned[LevelSpec.clampDifficulty(difficulty)];
+    }
+
+    // Vague `wave` repoussée en mode infini : à la vague 1000, une orbe (une seule fois par difficulté).
+    // Retourne true si une orbe vient d'être gagnée.
+    public boolean claimWisdomOrb(int wave, int difficulty) {
+        int d = LevelSpec.clampDifficulty(difficulty);
+        if (wave < WISDOM_ORB_WAVE || wisdomOrbEarned[d]) {
+            return false;
+        }
+        wisdomOrbEarned[d] = true;
+        addWisdomOrbs(1);
+        return true;
+    }
+
+    // Chargement : orbes posées et difficultés déjà récompensées (la réserve : loadWisdomOrbs(int))
+    public void loadWisdomOrbs(boolean[] placed, boolean[] earned) {
+        for (int t = 0; t < Mage.TYPE_COUNT && t < placed.length; t++) {
+            wisdomOrbOn[t] = placed[t];
+        }
+        for (int d = 0; d < LevelSpec.DIFFICULTY_COUNT && d < earned.length; d++) {
+            wisdomOrbEarned[d] = earned[d];
+        }
     }
 
     // ---------- Statistiques ----------

@@ -71,6 +71,8 @@ public class SaveManager {
     private static final String KEY_ACHIEVEMENT_TIER = "achievement_tier_"; // paliers par famille de succès
     private static final String KEY_DIFFICULTY = "endless_difficulty";
     private static final String KEY_RUN = "run_in_progress";      // partie à reprendre (vide = aucune)
+    private static final String KEY_WISDOM_ORB_ON = "wisdom_orb_on_";         // par type de mage
+    private static final String KEY_WISDOM_ORB_EARNED = "wisdom_orb_earned_"; // par difficulté (vague 1000)
 
     private final SharedPreferences prefs;
 
@@ -162,7 +164,19 @@ public class SaveManager {
         model.setAutoMode(prefs.getBoolean(KEY_AUTO, false));
         model.setEndlessDifficulty(prefs.getInt(KEY_DIFFICULTY, LevelSpec.NORMAL));
 
+        // Orbes de sagesse posées sur les mages, difficultés déjà récompensées (réserve : plus haut)
+        boolean[] orbOn = new boolean[Mage.TYPE_COUNT];
+        for (int t = 0; t < orbOn.length; t++) {
+            orbOn[t] = prefs.getBoolean(KEY_WISDOM_ORB_ON + t, false);
+        }
+        boolean[] orbEarned = new boolean[LevelSpec.DIFFICULTY_COUNT];
+        for (int d = 0; d < orbEarned.length; d++) {
+            orbEarned[d] = prefs.getBoolean(KEY_WISDOM_ORB_EARNED + d, false);
+        }
+        p.loadWisdomOrbs(orbOn, orbEarned);
+
         // Partie interrompue (appli fermée en plein niveau) : elle reprend en pause
+        // (chargée après les orbes : un mage de niveau 7 demande une orbe sur son élément)
         model.importRun(parse(prefs.getString(KEY_RUN, "")));
     }
 
@@ -235,6 +249,12 @@ public class SaveManager {
         editor.putBoolean(KEY_AUTO, model.isAutoMode());
         editor.putBoolean(KEY_AUTO_OWNED, p.hasAuto());
         editor.putInt(KEY_DIFFICULTY, model.getEndlessDifficulty());
+        for (int t = 0; t < Mage.TYPE_COUNT; t++) {
+            editor.putBoolean(KEY_WISDOM_ORB_ON + t, p.hasWisdomOrb(t));
+        }
+        for (int d = 0; d < LevelSpec.DIFFICULTY_COUNT; d++) {
+            editor.putBoolean(KEY_WISDOM_ORB_EARNED + d, p.isWisdomOrbEarned(d));
+        }
 
         if (model.hasRunInProgress()) {
             editor.putString(KEY_RUN, join(model.exportRun()));

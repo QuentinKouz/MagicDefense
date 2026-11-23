@@ -36,6 +36,10 @@ public class TouchController {
     private Runnable onEnterCode;  // fenêtre de saisie du code (gérée par GameView)
     private boolean draggingVolume = false; // doigt en train de régler un volume
     private int draggedSlider = -1;         // curseur réglé : Hud.OPTIONS_VOLUME (bruitages) ou OPTIONS_MUSIC_VOLUME
+    // Appui long sur un mage (sans bouger) : bulle « monter de niveau » avec des PO
+    private static final long LONG_PRESS_MS = 400;
+    private long downTime = 0;               // instant de l'appui (horloge de MotionEvent)
+    private boolean pressedLevelUp = false;  // doigt posé sur la bulle
 
     // Accueil : glissement entre les pages et défilement des listes
     private static final int GESTURE_NONE = 0;
@@ -77,6 +81,7 @@ public class TouchController {
     public boolean isMutePressed() { return pressedGameButton == Hud.GAME_SOUND; }
     public int getPressedLockedRow() { return lockedRow; }
     public int getPressedLockedCol() { return lockedCol; }
+    public boolean isLevelUpPressed() { return pressedLevelUp; }
     public float getPageOffset() { return pageOffset; }
     public float getScroll(int page) { return scroll[page]; }
 
@@ -100,6 +105,13 @@ public class TouchController {
 
     // Une fois par image : animation du glissement entre pages et inertie du défilement
     public void tick() {
+        // Appui long sur un mage, sans bouger : la bulle « monter de niveau » s'ouvre au-dessus de lui
+        if (draggedMage != null && !moved && model.getState() == GameState.PLAYING
+                && android.os.SystemClock.uptimeMillis() - downTime >= LONG_PRESS_MS) {
+            model.openLevelUp(dragRow, dragCol);
+            draggedMage = null; // le relâchement ne lancera pas la compétence
+            click();
+        }
         if (gesture != GESTURE_SWIPE) {
             pageOffset *= 0.72f;
             if (Math.abs(pageOffset) < 1) {
@@ -134,6 +146,16 @@ public class TouchController {
                 moved = false;
                 gesture = GESTURE_NONE;
                 scrollVelocity = 0;
+                downTime = event.getEventTime();
+                pressedLevelUp = false;
+                if (model.getState() == GameState.PLAYING && model.getLevelUpRow() >= 0) {
+                    // Bulle « monter de niveau » ouverte : la toucher achète, toucher ailleurs la ferme
+                    if (levelUpBubbleContains(tx, ty)) {
+                        pressedLevelUp = true;
+                        return false;
+                    }
+                    model.closeLevelUp(); // puis le toucher agit normalement
+                }
                 if (model.getState() == GameState.PLAYING) {
                     pressedGameButton = gameButtonAt(tx, ty);
                     if (pressedGameButton == -1) {
@@ -167,6 +189,9 @@ public class TouchController {
                 float dy = ty - downY;
                 if (!moved && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
                     moved = true;
+                }
+                if (pressedLevelUp && !levelUpBubbleContains(tx, ty)) {
+                    pressedLevelUp = false; // le doigt sort de la bulle : on annule
                 }
                 if (model.getState() == GameState.START) {
                     handleHomeMove(dx, dy, ty, event.getEventTime());
@@ -205,6 +230,14 @@ public class TouchController {
                         model.setSoundVolume(dragVolume);
                     }
                     click(); // clic d'aperçu, au volume des bruitages du jeu
+                    return true;
+                }
+                if (pressedLevelUp) {
+                    pressedLevelUp = false;
+                    if (levelUpBubbleContains(tx, ty)) {
+                        click();
+                        model.levelUpMage(model.getLevelUpRow(), model.getLevelUpCol());
+                    }
                     return true;
                 }
                 if (gesture == GESTURE_SWIPE) {
@@ -294,9 +327,16 @@ public class TouchController {
         pressedGameButton = -1;
         pressedMenuButton = -1;
         draggingVolume = false;
+        pressedLevelUp = false;
         lockedRow = -1;
         lockedCol = -1;
         gesture = GESTURE_NONE;
+    }
+
+    // Le point (x, y) est-il sur la bulle « monter de niveau » ouverte ?
+    private boolean levelUpBubbleContains(float x, float y) {
+        int row = model.getLevelUpRow();
+        return row >= 0 && hud.levelUpBubble(row, model.getLevelUpCol()).contains(x, y);
     }
 
     // Toutes les actions se déclenchent au relâchement (choix du dossier de design)
@@ -432,7 +472,7 @@ public class TouchController {
         if (b != Hud.HOME_SHEET_USE && !(b >= Hud.HOME_LIST_0 && model.getHomePage() == GameModel.PAGE_MAGES)) {
             model.cancelSwap(); // un autre bouton annule le choix de l'emplacement
         }
-        if (b >= Hud.HOME_SHEET_UPGRADE && b <= Hud.HOME_SHEET_CLOSE) {
+        if ((b >= Hud.HOME_SHEET_UPGRADE && b <= Hud.HOME_SHEET_CLOSE) || b == Hud.HOME_SHEET_ORB) {
             handleSheetButton(b);
         } else if (b >= Hud.HOME_LIST_0) {
             handleListButton((b - Hud.HOME_LIST_0) / 4, (b - Hud.HOME_LIST_0) % 4);
@@ -480,6 +520,9 @@ public class TouchController {
                 break;
             case Hud.HOME_SHEET_ARTIFACT:
                 model.cycleArtifact(type);
+                break;
+            case Hud.HOME_SHEET_ORB:
+                model.toggleWisdomOrb(type); // poser l'orbe de sagesse, ou la retirer
                 break;
             default:
                 model.closeMageSheet();

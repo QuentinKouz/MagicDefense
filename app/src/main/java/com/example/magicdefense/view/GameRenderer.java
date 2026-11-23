@@ -561,6 +561,7 @@ public class GameRenderer {
         drawModeBanner(canvas, model);
         drawPauseButton(canvas, touch.isPausePressed());
         drawSoundButton(canvas, model, touch.isMutePressed(), true);
+        drawLevelUpBubble(canvas, model, touch.isLevelUpPressed());
 
         // Mage déplacé : dessiné en dernier (par-dessus tout), au-dessus du doigt
         if (dragged != null) {
@@ -595,6 +596,9 @@ public class GameRenderer {
                         canvas.drawCircle(left + board.cellWidth / 2, top + board.cellHeight / 2,
                                 board.cellHeight * 0.45f, paint);
                     }
+                    if (mage.isSage()) {
+                        drawSageCell(canvas, left, top, row * Board.COLS + col); // contour doré qui brille
+                    }
                     drawMage(canvas, mage, left, top);
                     if (mage.hasSkill()) {
                         drawSkillRing(canvas, mage, left, top);
@@ -611,6 +615,103 @@ public class GameRenderer {
                 }
             }
         }
+    }
+
+    // Bulle « monter de niveau » au-dessus d'un mage (appui long) : « ↑ NIV. n+1 · prix », grisée si
+    // pas assez de PO ou s'il manque l'orbe de sagesse (6 → 7)
+    private void drawLevelUpBubble(Canvas canvas, GameModel model, boolean pressed) {
+        int row = model.getLevelUpRow();
+        if (row < 0) {
+            return;
+        }
+        int col = model.getLevelUpCol();
+        Mage m = model.getMage(row, col);
+        int status = model.levelUpStatus(row, col);
+        boolean can = status == GameModel.LEVEL_UP_OK;
+        RectF b = hud.levelUpBubble(row, col);
+        // Case du mage surlignée, et petite pointe de la bulle vers lui
+        drawCellOutline(canvas, board.cellLeft(col), board.cellTop(row), Color.argb(200, 255, 215, 90));
+        float tipX = board.cellLeft(col) + board.cellWidth / 2;
+        path.reset();
+        path.moveTo(tipX - 8 * density, b.bottom - 2 * density);
+        path.lineTo(tipX + 8 * density, b.bottom - 2 * density);
+        path.lineTo(tipX, b.bottom + 8 * density);
+        path.close();
+        paint.setColor(UiKit.OUTLINE);
+        canvas.drawPath(path, paint);
+        int color = can ? (m.level + 1 >= Mage.SAGE_LEVEL ? UiKit.shade(Palette.GOLD, 0.7f) : Palette.RESUME)
+                : Palette.DISABLED;
+        RectF f = ui.button(canvas, b, color, can && pressed, can);
+        String title;
+        String sub;
+        if (status == GameModel.LEVEL_UP_MAX) {
+            title = "NIVEAU MAX";
+            sub = "Sage : niveau 7 atteint";
+        } else {
+            int next = m.level + 1;
+            title = "↑ NIV. " + next + " · " + GameModel.levelUpCost(m.level);
+            sub = status == GameModel.LEVEL_UP_NO_ORB ? "Orbe de sagesse requise (page Mages)"
+                    : status == GameModel.LEVEL_UP_NO_GOLD ? "Pas assez de PO"
+                    : next >= Mage.SAGE_LEVEL ? "Devenir SAGE" : "Toucher pour payer";
+        }
+        if (status != GameModel.LEVEL_UP_MAX) {
+            ui.coin(canvas, f.left + 14 * density, f.centerY() - 6 * density, 6 * density);
+        }
+        ui.textPx(canvas, title, f.centerX() + 6 * density, f.centerY() - 1 * density, 14 * density,
+                can ? Color.WHITE : Color.rgb(200, 198, 210), Paint.Align.CENTER, f.width() - 34 * density);
+        ui.textPx(canvas, sub, f.centerX() + 6 * density, f.centerY() + 13 * density, 9.5f * density,
+                can ? Color.argb(230, 255, 245, 210) : Color.rgb(255, 190, 150), Paint.Align.CENTER,
+                f.width() - 34 * density);
+    }
+
+    // Case d'un sage (niveau 7) : contour doré qui pulse, et un éclat de lumière qui en fait le tour
+    private void drawSageCell(Canvas canvas, float left, float top, int seed) {
+        float m = 3 * density;
+        float l = left + m;
+        float t = top + m;
+        float r = left + board.cellWidth - m;
+        float b = top + board.cellHeight - m;
+        float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12 + seed);
+        tmpRect.set(l, t, r, b);
+        paint.setStyle(Paint.Style.STROKE);
+        // Halo doré, puis liseré or vif
+        paint.setStrokeWidth((6 + 3 * pulse) * density);
+        paint.setColor(Color.argb((int) (60 + 60 * pulse), 255, 200, 60));
+        canvas.drawRoundRect(tmpRect, 6 * density, 6 * density, paint);
+        paint.setStrokeWidth(3 * density);
+        paint.setColor(Color.rgb(255, 205 + (int) (40 * pulse), 70 + (int) (100 * pulse)));
+        canvas.drawRoundRect(tmpRect, 6 * density, 6 * density, paint);
+        paint.setStyle(Paint.Style.FILL);
+        // Éclat qui parcourt le contour (un tour ≈ 2 s)
+        float w = r - l;
+        float h = b - t;
+        float per = 2 * (w + h);
+        float pos = ((frame * 2.2f * density + seed * per / 5f) % per + per) % per;
+        float sx, sy;
+        if (pos < w) {
+            sx = l + pos;
+            sy = t;
+        } else if (pos < w + h) {
+            sx = r;
+            sy = t + pos - w;
+        } else if (pos < 2 * w + h) {
+            sx = r - (pos - w - h);
+            sy = b;
+        } else {
+            sx = l;
+            sy = b - (pos - 2 * w - h);
+        }
+        paint.setColor(Color.argb(150, 255, 240, 170));
+        canvas.drawCircle(sx, sy, 5 * density, paint);
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(sx, sy, 2.5f * density, paint);
+        // Petits coins dorés (comme une couronne autour de la case)
+        paint.setColor(Palette.GOLD);
+        float c = 5 * density;
+        canvas.drawRect(l - 1 * density, t - 1 * density, l + c, t + 2 * density, paint);
+        canvas.drawRect(r - c, t - 1 * density, r + 1 * density, t + 2 * density, paint);
+        canvas.drawRect(l - 1 * density, b - 2 * density, l + c, b + 1 * density, paint);
+        canvas.drawRect(r - c, b - 2 * density, r + 1 * density, b + 1 * density, paint);
     }
 
     private void drawCellOutline(Canvas canvas, float left, float top, int color) {
@@ -633,10 +734,18 @@ public class GameRenderer {
         float h = Sprites.MAGE_HEIGHT * scale;
         int c = Palette.ELEMENT_COLORS[mage.type];
 
-        if (mage.level >= 5) {
-            // Grand mage : aura qui pulse, de jour comme de nuit
+        if (mage.isSage()) {
+            // Sage : grande aura dorée et anneau de l'élément qui pulsent
             float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.1);
-            paint.setColor(Color.argb((int) (50 + 50 * pulse), Color.red(c), Color.green(c), Color.blue(c)));
+            paint.setColor(Color.argb((int) (55 + 45 * pulse), 255, 210, 90));
+            canvas.drawCircle(cx, cy, Math.max(w, h) * (0.62f + 0.06f * pulse), paint);
+            paint.setColor(Color.argb((int) (60 + 50 * pulse), Color.red(c), Color.green(c), Color.blue(c)));
+            canvas.drawCircle(cx, cy, Math.max(w, h) * 0.5f, paint);
+        } else if (mage.level >= 5) {
+            // Grand mage (et archimage, plus intense) : aura qui pulse, de jour comme de nuit
+            float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.1);
+            int base = mage.level >= Mage.ARCHMAGE_LEVEL ? 80 : 50;
+            paint.setColor(Color.argb((int) (base + 50 * pulse), Color.red(c), Color.green(c), Color.blue(c)));
             canvas.drawCircle(cx, cy, Math.max(w, h) * (0.55f + 0.05f * pulse), paint);
         } else if (night) {
             // Nuit : halo de la couleur de l'élément
@@ -650,9 +759,9 @@ public class GameRenderer {
         // Badge du niveau en bas à gauche : on voit d'un coup d'œil quoi fusionner
         float bx = tmpRect.left + 9 * density;
         float by = tmpRect.bottom - 9 * density;
-        paint.setColor(Color.argb(220, 26, 22, 38));
+        paint.setColor(mage.isSage() ? Palette.GOLD : Color.argb(220, 26, 22, 38)); // badge doré du sage
         canvas.drawCircle(bx, by, 9 * density, paint);
-        paint.setColor(Color.WHITE);
+        paint.setColor(mage.isSage() ? Color.rgb(26, 22, 38) : Color.WHITE);
         paint.setTextSize(12 * density);
         paint.setTextAlign(Paint.Align.CENTER);
         canvas.drawText(String.valueOf(mage.level), bx, by + 4 * density, paint);
@@ -1194,7 +1303,8 @@ public class GameRenderer {
             paint.setStrokeWidth(3 * density);
             paint.setColor(Palette.GAUGE_EMPTY);
             canvas.drawArc(gaugeOval, 0, 360, false, paint);
-            paint.setColor(Palette.ELEMENT_COLORS[mage.type]);
+            // Compétence BOOST du sage : anneau doré
+            paint.setColor(mage.isSkillBoosted() ? Palette.GOLD : Palette.ELEMENT_COLORS[mage.type]);
             canvas.drawArc(gaugeOval, -90, 360 * mage.getSkillProgress(), false, paint);
             paint.setStyle(Paint.Style.FILL);
         }
@@ -1301,7 +1411,22 @@ public class GameRenderer {
         int alpha = (int) (255 * Math.min(1f, t * 3));
         int c = Palette.ELEMENT_COLORS[model.getSkillTextType()];
         float grow = t > 0.85f ? 1 + (t - 0.85f) * 2 : 1;
-        ui.text(canvas, model.getSkillTextString(), board.centerX(), 205 * density + board.topShift, 22 * grow,
+        float y = 205 * density + board.topShift;
+        if (model.isSkillTextBoost()) {
+            // Compétence BOOST du sage : éclair doré sur tout l'écran, rayons et nom en or plus grand
+            if (t > 0.7f) {
+                paint.setColor(Color.argb((int) (150 * (t - 0.7f) / 0.3f), 255, 225, 120));
+                canvas.drawRect(0, 0, board.width, board.height, paint);
+            }
+            drawLightRays(canvas, board.centerX(), y - 8 * density, board.playWidth * 0.45f, frame,
+                    Color.argb(alpha / 2, 255, 215, 90));
+            ui.text(canvas, "BOOST DU SAGE", board.centerX(), y - 30 * density, 13,
+                    Color.argb(alpha, 255, 240, 190), Paint.Align.CENTER);
+            ui.text(canvas, model.getSkillTextString(), board.centerX(), y, 27 * grow,
+                    Color.argb(alpha, 255, 210, 70), Paint.Align.CENTER);
+            return;
+        }
+        ui.text(canvas, model.getSkillTextString(), board.centerX(), y, 22 * grow,
                 Color.argb(alpha, Color.red(c), Color.green(c), Color.blue(c)), Paint.Align.CENTER);
     }
 
@@ -2093,6 +2218,13 @@ public class GameRenderer {
     // Page Mages : équipe en 2 × 2, collection, cartes à débloquer (la fiche s'ouvre au toucher)
     private void drawMagesPage(Canvas canvas, GameModel model, float scroll, int pressed) {
         drawPageHeader(canvas, model, "MAGES", UiKit.RIBBON);
+        // Orbes de sagesse en réserve (à poser sur un mage depuis sa fiche)
+        float cx = board.centerX();
+        float y = board.topShift + 96 * density;
+        int orbs = model.getProgression().getWisdomOrbs();
+        drawWisdomOrb(canvas, cx + 92 * density, y - 6 * density, 7 * density, orbs == 0);
+        ui.text(canvas, String.valueOf(orbs), cx + 103 * density, y, 16,
+                orbs > 0 ? Palette.GOLD : Palette.TEXT_INACTIVE, Paint.Align.LEFT);
         drawList(canvas, model, GameModel.PAGE_MAGES, hud.magesViewport, scroll, pressed);
     }
 
@@ -2454,10 +2586,43 @@ public class GameRenderer {
         // Compétence de niveau 5
         ui.textPx(canvas, "Niv. 5 : " + Mage.SKILL_NAMES[type], tx, y + 92 * density, 12 * density,
                 UiKit.tint(ec, 0.35f), Paint.Align.LEFT, maxW);
-        ui.textPx(canvas, Mage.SKILL_DESCRIPTIONS[type], tx, y + 108 * density, 10 * density, Palette.TEXT_INACTIVE,
+        ui.textPx(canvas, Mage.SKILL_DESCRIPTIONS[type], tx, y + 106 * density, 10 * density, Palette.TEXT_INACTIVE,
                 Paint.Align.LEFT, maxW);
-        ui.textPx(canvas, "(toucher le mage en partie)", tx, y + 122 * density, 10 * density, Palette.TEXT_INACTIVE,
-                Paint.Align.LEFT, maxW);
+        // Version BOOST du sage (niveau 7, avec l'orbe de sagesse)
+        ui.textPx(canvas, "Niv. 7 BOOST : " + Mage.BOOST_SKILL_NAMES[type], tx, y + 124 * density, 12 * density,
+                Palette.GOLD, Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, Mage.BOOST_SKILL_DESCRIPTIONS[type], tx, y + 138 * density, 10 * density,
+                Color.argb(230, 255, 230, 170), Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, "(toucher le mage en partie ; appui long : niveau avec des PO)", tx, y + 152 * density,
+                9.5f * density, Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
+
+        // Orbe de sagesse : toucher pour la poser sur ce mage (ou la retirer)
+        RectF o = hud.sheetOrb;
+        boolean orbOn = prog.hasWisdomOrb(type);
+        int orbs = prog.getWisdomOrbs();
+        boolean orbActive = owned && (orbOn || orbs > 0);
+        RectF of;
+        if (orbActive) {
+            of = ui.button(canvas, o, orbOn ? UiKit.shade(Palette.GOLD, 0.55f) : UiKit.shade(Palette.GOLD, 0.4f),
+                    pressed == Hud.HOME_SHEET_ORB, true);
+        } else {
+            paint.setColor(Color.argb(90, 0, 0, 0));
+            canvas.drawRoundRect(o, 8 * density, 8 * density, paint);
+            of = o;
+        }
+        float orbS = Math.min(12 * density, of.height() * 0.32f);
+        drawWisdomOrb(canvas, of.left + 10 * density + orbS, of.centerY(), orbS, !orbOn && orbs == 0);
+        float otx = of.left + 18 * density + 2 * orbS;
+        float otw = of.right - 8 * density - otx;
+        String orbTitle = orbOn ? "ORBE DE SAGESSE posée · niveau 7 débloqué"
+                : orbs > 0 ? "ORBE : poser une orbe (" + orbs + " en réserve)" : "ORBE DE SAGESSE : aucune";
+        String orbSub = orbOn ? "Toucher pour la retirer (retour en réserve)"
+                : orbs > 0 ? "Permet à ce mage d'atteindre le niveau 7 (sage)"
+                : "1 par difficulté : vague " + Progression.WISDOM_ORB_WAVE + " du mode infini";
+        ui.textPx(canvas, orbTitle, otx, of.centerY() - 2 * density, 11.5f * density,
+                orbOn ? Color.WHITE : orbActive ? Palette.GOLD : Palette.TEXT_INACTIVE, Paint.Align.LEFT, otw);
+        ui.textPx(canvas, orbSub, otx, of.centerY() + 13 * density, 9.5f * density,
+                orbActive ? Color.argb(230, 255, 240, 210) : Palette.TEXT_INACTIVE, Paint.Align.LEFT, otw);
 
         // Artefact : toucher pour changer
         RectF a = hud.sheetArtifact;
@@ -2667,6 +2832,9 @@ public class GameRenderer {
             ui.textPx(canvas, best > 0 ? "Record : vague " + best : "Aucun record", f.centerX(),
                     f.centerY() + 16 * density, 10.5f * density, Color.argb(230, 255, 240, 200), Paint.Align.CENTER,
                     f.width() - 8 * density);
+            // Orbe de sagesse de cette difficulté (vague 1000) : brillante si obtenue, grisée sinon
+            drawWisdomOrb(canvas, f.right - 11 * density, f.top + 12 * density, 7 * density,
+                    !prog.isWisdomOrbEarned(d));
         }
 
         // Ce que change la difficulté choisie
@@ -2682,6 +2850,14 @@ public class GameRenderer {
                 p.width() - 16 * density);
         ui.textPx(canvas, "Les coffres sont gagnés même en abandonnant", cx, y + 42 * density, 11 * density,
                 Palette.TEXT_INACTIVE, Paint.Align.CENTER, p.width() - 16 * density);
+        // Orbe de sagesse de la difficulté choisie
+        if (y + 64 * density < p.bottom - 4 * density) {
+            boolean earned = prog.isWisdomOrbEarned(sel);
+            ui.textPx(canvas, earned ? "Orbe de sagesse obtenue (vague " + Progression.WISDOM_ORB_WAVE + ")"
+                            : "Vague " + Progression.WISDOM_ORB_WAVE + " : une orbe de sagesse (une seule fois)",
+                    cx, y + 62 * density, 11.5f * density, earned ? Palette.GOLD : Color.argb(230, 255, 230, 170),
+                    Paint.Align.CENTER, p.width() - 16 * density);
+        }
 
         drawPillButton(canvas, hud.endlessPlayButton, "JOUER · " + LevelSpec.DIFFICULTY_NAMES[sel].toUpperCase(),
                 Palette.ENDLESS, pressed == Hud.HOME_ENDLESS_PLAY);
@@ -3046,6 +3222,60 @@ public class GameRenderer {
         canvas.drawPath(path, paint);
         paint.setColor(Color.argb(220, 255, 255, 255));
         canvas.drawCircle(cx + s * 0.2f, cy - s * 0.55f, s * 0.15f, paint);
+    }
+
+    // Orbe de sagesse en pixel art : sphère dorée aux reflets irisés qui tournent, sur un socle d'or.
+    // Chaque caractère est un pixel : O contour, G or, g or sombre, I reflet irisé, W éclat, '.' vide.
+    private static final String[] WISDOM_ORB = {
+            "...OOOOO...",
+            "..OGGIIGO..",
+            ".OGWWIIIGO.",
+            "OGWWGIIIIgO",
+            "OGWGGGIIIgO",
+            "OGGGGGGIIgO",
+            "OgGGGGGGIgO",
+            ".OgGGGGGgO.",
+            "..OgggggO..",
+            "...OOOOO...",
+            "..OYYYYYO..",
+            ".OOOOOOOOO.",
+    };
+
+    // s = demi-largeur de l'orbe ; dim : orbe pas encore obtenue (grisée)
+    private void drawWisdomOrb(Canvas canvas, float cx, float cy, float s, boolean dim) {
+        int cols = WISDOM_ORB[0].length();
+        float px = 2 * s / cols;
+        float left = cx - s;
+        float top = cy - WISDOM_ORB.length * px / 2;
+        if (!dim) {
+            float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12);
+            paint.setColor(Color.argb((int) (50 + 50 * pulse), 255, 215, 120));
+            canvas.drawCircle(cx, top + 5 * px, s * (1.15f + 0.1f * pulse), paint);
+        }
+        // Couleur irisée : la teinte tourne lentement (cyan → violet → rose → vert)
+        float[] hsv = {(frame * 2f) % 360, 0.45f, 1f};
+        int iris = Color.HSVToColor(hsv);
+        for (int y = 0; y < WISDOM_ORB.length; y++) {
+            String row = WISDOM_ORB[y];
+            for (int x = 0; x < row.length(); x++) {
+                int c;
+                switch (row.charAt(x)) {
+                    case 'O': c = Color.rgb(70, 45, 20); break;
+                    case 'G': c = Color.rgb(255, 205, 70); break;
+                    case 'g': c = Color.rgb(200, 135, 35); break;
+                    case 'Y': c = Color.rgb(240, 192, 64); break;
+                    case 'I': c = iris; break;
+                    case 'W': c = Color.WHITE; break;
+                    default: continue;
+                }
+                if (dim) {
+                    int gray = (Color.red(c) + Color.green(c) + Color.blue(c)) / 3;
+                    c = Color.argb(150, gray / 2, gray / 2, gray / 2 + 10);
+                }
+                paint.setColor(c);
+                canvas.drawRect(left + x * px, top + y * px, left + (x + 1) * px + 0.5f, top + (y + 1) * px + 0.5f, paint);
+            }
+        }
     }
 
     // Bouton de prix : gemme + nombre
