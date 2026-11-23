@@ -29,6 +29,8 @@ public class MenuList {
     public static final int CARD_ROW = 13;     // Mages : 3 cartes de la collection
     public static final int LOCKED_ROW = 14;   // Mages : 3 cartes à débloquer
 
+    public static final int CASTLE_GOLD = 16;  // Château : trésor de départ (PO en début de partie)
+
     public static final int CARDS_PER_ROW = 3;
     public static final int EMPTY = 15;
     public static final float TEAM_ROW_H = 196;
@@ -114,13 +116,15 @@ public class MenuList {
                 add(HEADER, 0, "Défenses", 34);
                 add(CASTLE_HP, 0, null, 84);
                 add(CASTLE_RES, 0, null, 84);
+                add(CASTLE_GOLD, 0, null, 84);
                 add(HEADER, 0, "Ultime équipé (toucher la jauge en partie)", 34);
                 for (int u = 0; u < Ultimate.COUNT; u++) {
                     add(ULTIMATE, u, null, 76);
                 }
-                add(HEADER, 0, "Succès " + model.getProgression().achievedCount() + " / " + Achievement.COUNT, 34);
+                // Succès à paliers sans fin : on compte les paliers obtenus
+                add(HEADER, 0, "Succès · " + model.getProgression().achievedCount() + " paliers obtenus", 34);
                 for (int a = 0; a < Achievement.COUNT; a++) {
-                    add(ACHIEVEMENT, a, null, 56);
+                    add(ACHIEVEMENT, a, null, 58);
                 }
                 break;
             default:

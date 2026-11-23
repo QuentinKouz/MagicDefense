@@ -36,8 +36,8 @@ public class GameModel {
 
     // ---------- Réglages (équilibrage) ----------
     public static final int START_GOLD = 20;
-    public static final int MAGE_COST = 10;
-    public static final int MAGE_COST_STEP = 2;            // chaque mage choisi coûte 2 PO de plus (dans la partie)
+    public static final int MAGE_COST = 10;                // prix d'un mage commun (voir Rarity.magePrice)
+    public static final int MAGE_COST_STEP = 2;            // chaque mage choisi fait monter les prix (dans la partie)
     public static final int RANDOM_MAGE_COST = 7;          // mage au hasard (parmi l'équipe) : prix fixe
     public static final int ULTIMATE_COOLDOWN = 3600;      // ≈ 60 s entre deux ultimes, en plus de la jauge
     public static final float ARTIFACT_DROP_CHANCE = 0.10f; // niveau de boss gagné en 3 étoiles : 10 %
@@ -177,8 +177,10 @@ public class GameModel {
     private int skillTextType = 0;
     // Succès débloqués : affichés l'un après l'autre
     private final ArrayList<Integer> toastQueue = new ArrayList<>();
-    private int toastId = -1;
+    private int toastId = -1;       // famille du succès affiché
+    private int toastTier = 0;      // palier obtenu (0 = premier)
     private int toastTimer = 0;
+    private static final int TOAST_TIER_BASE = 100000; // file : famille × base + palier
     private int uiFrame = 0;
 
     private float soundVolume = 1f; // position du curseur, de 0 à 1
@@ -206,6 +208,9 @@ public class GameModel {
     public int getWave() { return wave; }
     public boolean canAffordMage() { return gold >= getMageCost(); }
     public int getMageCost() { return MAGE_COST + MAGE_COST_STEP * magesBought; }
+    // Prix d'un mage choisi : de base et hausse selon sa rareté (compteur d'achats commun à tous les mages)
+    public boolean canAffordMage(int type) { return gold >= getMageCost(type); }
+    public int getMageCost(int type) { return Rarity.magePrice(Rarity.of(type), magesBought); }
     public boolean isWaitingForWave() { return waitingForWave; }
     public Progression getProgression() { return progression; }
     public boolean isEndless() { return spec.endless; }
@@ -273,6 +278,7 @@ public class GameModel {
 
     // Succès affiché (−1 : aucun) et avancement du bandeau (1 → 0)
     public int getToastId() { return toastId; }
+    public int getToastTier() { return toastTier; }
     public float getToast() { return toastTimer / (float) TOAST_DURATION; }
 
     // ---------- Ultime ----------
@@ -554,6 +560,11 @@ public class GameModel {
         return LevelSpec.biomeForLevel(levelAtSlot(1));
     }
 
+    // Nom du biome de la page affichée, avec son cycle : « Volcan I », « Volcan II »...
+    public String getMapBiomeTitle() {
+        return LevelSpec.biomeTitleForLevel(levelAtSlot(1));
+    }
+
     // Numéro du niveau affiché dans la case `slot` (1 à 6) de la page en cours
     public int levelAtSlot(int slot) {
         return mapPage * LEVELS_PER_PAGE + slot;
@@ -707,7 +718,7 @@ public class GameModel {
         healsUsed = 0;
         magesBought = 0;
         lowestStars = 3;
-        gold = START_GOLD;
+        gold = START_GOLD + progression.startGoldBonus(); // trésor de départ (page Château)
         wave = 0;
         ultimateCharge = 0;
         ultimateCooldown = 0;
@@ -1116,6 +1127,10 @@ public class GameModel {
         return afterPurchase(inMenu() && progression.upgradeCastleRes());
     }
 
+    public boolean upgradeCastleGold() {
+        return afterPurchase(inMenu() && progression.upgradeCastleGold());
+    }
+
     public boolean equipUltimate(int id) {
         if (!inMenu() || !progression.equipUltimate(id)) {
             return false;
@@ -1163,13 +1178,17 @@ public class GameModel {
         }
     }
 
-    // Débloque les succès atteints : gemmes données tout de suite, bandeau affiché
+    // Débloque les paliers de succès atteints (plusieurs d'un coup si besoin) :
+    // gemmes données tout de suite, un bandeau par palier
     public void checkAchievements() {
         boolean changed = false;
-        for (int id = 0; id < Achievement.COUNT; id++) {
-            if (!progression.isAchieved(id) && statValue(Achievement.stat(id)) >= Achievement.target(id)) {
-                progression.achieve(id);
-                toastQueue.add(id);
+        for (int f = 0; f < Achievement.COUNT; f++) {
+            long value = statValue(Achievement.stat(f));
+            while (!progression.isAchievementMaxed(f)
+                    && value >= Achievement.target(f, progression.getAchievementTier(f))) {
+                int tier = progression.getAchievementTier(f);
+                progression.achieve(f);
+                toastQueue.add(f * TOAST_TIER_BASE + Math.min(tier, TOAST_TIER_BASE - 1));
                 changed = true;
             }
         }
@@ -1192,7 +1211,9 @@ public class GameModel {
                 toastId = -1;
             }
         } else if (!toastQueue.isEmpty()) {
-            toastId = toastQueue.remove(0);
+            int code = toastQueue.remove(0);
+            toastId = code / TOAST_TIER_BASE;
+            toastTier = code % TOAST_TIER_BASE;
             toastTimer = TOAST_DURATION;
         }
         if (state == GameState.PLAYING && uiFrame % 30 == 0) {
@@ -2364,7 +2385,7 @@ public class GameModel {
         spawnTimer = 0;
         // Mode infini : nouveau décor toutes les 10 vagues
         if (spec.endless && wave > 1 && spec.biome(wave) != previousBiome) {
-            announce(LevelSpec.BIOME_NAMES[spec.biome(wave)].toUpperCase(), "Nouveau territoire", false);
+            announce(LevelSpec.biomeTitleForEndlessWave(wave).toUpperCase(), "Nouveau territoire", false);
         }
     }
 
@@ -2417,7 +2438,8 @@ public class GameModel {
     }
 
     public boolean canRecruitSlot(int slot) {
-        return canAffordMage() && teamTypeAt(slot) != Progression.NO_UNIT;
+        int type = teamTypeAt(slot);
+        return type != Progression.NO_UNIT && canAffordMage(type);
     }
 
     // Recrute le mage de l'emplacement d'équipe `slot`
@@ -2472,9 +2494,9 @@ public class GameModel {
     }
 
     // Place un mage du type donné sur une case libre au hasard
-    // (chaque mage choisi fait monter le prix du suivant de 2 PO ; le mage au hasard n'en tient pas compte)
+    // (chaque mage choisi fait monter le prix des suivants, selon leur rareté ; le mage au hasard n'en tient pas compte)
     public void recruitMage(int type) {
-        if (placeMage(type, getMageCost())) {
+        if (placeMage(type, getMageCost(type))) {
             magesBought++;
         }
     }

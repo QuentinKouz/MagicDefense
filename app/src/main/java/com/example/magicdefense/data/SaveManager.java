@@ -61,7 +61,11 @@ public class SaveManager {
     private static final String KEY_CHESTS_BIG = "chests_big";        // (KEY_CHESTS = petits coffres)
     private static final String KEY_CHESTS_MYSTERY = "chests_mystery";
     private static final String KEY_DAILY_DAY = "daily_day";
-    private static final String KEY_CODE_USED = "code_used";
+    private static final String KEY_CODE_USED = "code_used";          // 1er code (thomasleboss)
+    private static final String KEY_CODE_USED_N = "code_used_";       // code_used_1, code_used_2... (autres codes)
+    private static final String KEY_WISDOM_ORBS = "wisdomOrbs";
+    private static final String KEY_CASTLE_GOLD = "castle_gold_level"; // trésor de départ
+    private static final String KEY_ACHIEVEMENT_TIER = "achievement_tier_"; // paliers par famille de succès
     private static final String KEY_DIFFICULTY = "endless_difficulty";
     private static final String KEY_RUN = "run_in_progress";      // partie à reprendre (vide = aucune)
 
@@ -123,19 +127,32 @@ public class SaveManager {
         }
         p.loadArtifacts(artifacts, equipped);
 
-        boolean[] done = new boolean[Achievement.COUNT];
-        for (int i = 0; i < Achievement.COUNT; i++) {
+        // Anciens succès (22 booléens) : convertis en paliers, puis remplacés par les paliers sauvegardés s'il y en a
+        boolean[] done = new boolean[Achievement.LEGACY_COUNT];
+        for (int i = 0; i < Achievement.LEGACY_COUNT; i++) {
             done[i] = prefs.getBoolean(KEY_ACHIEVEMENT + i, false);
         }
         p.loadStats(prefs.getLong(KEY_STAT_KILLS, 0), prefs.getInt(KEY_STAT_MERGES, 0),
                 prefs.getInt(KEY_STAT_REACTIONS, 0), prefs.getInt(KEY_STAT_BOSSES, 0),
                 prefs.getInt(KEY_STAT_SKILLS, 0), prefs.getInt(KEY_STAT_KNIGHTS, 0),
                 prefs.getBoolean(KEY_STAT_MAX_MAGE, false), prefs.getInt(KEY_STAT_CHESTS, 0), done);
+        int[] tiers = new int[Achievement.COUNT];
+        for (int f = 0; f < Achievement.COUNT; f++) {
+            tiers[f] = prefs.getInt(KEY_ACHIEVEMENT_TIER + f, -1); // -1 : pas encore sauvegardé en paliers
+        }
+        p.loadAchievementTiers(tiers);
+        p.loadCastleGold(prefs.getInt(KEY_CASTLE_GOLD, 0));
+        p.loadWisdomOrbs(prefs.getInt(KEY_WISDOM_ORBS, 0));
 
         model.setGameSpeed(prefs.getInt(KEY_SPEED, 1));
         p.loadAuto(prefs.getBoolean(KEY_AUTO_OWNED, false));
         p.loadChests(-1, prefs.getInt(KEY_CHESTS_BIG, 0), prefs.getInt(KEY_CHESTS_MYSTERY, 0),
                 prefs.getLong(KEY_DAILY_DAY, -1), prefs.getBoolean(KEY_CODE_USED, false));
+        boolean[] codes = new boolean[Progression.GIFT_CODES.length];
+        for (int i = 1; i < codes.length; i++) {
+            codes[i] = prefs.getBoolean(KEY_CODE_USED_N + i, false);
+        }
+        p.loadCodesUsed(codes);
         model.setAutoMode(prefs.getBoolean(KEY_AUTO, false));
         model.setEndlessDifficulty(prefs.getInt(KEY_DIFFICULTY, LevelSpec.NORMAL));
 
@@ -160,6 +177,11 @@ public class SaveManager {
         editor.putInt(KEY_CHESTS_MYSTERY, p.getChests(Chest.MYSTERY));
         editor.putLong(KEY_DAILY_DAY, p.getLastDailyDay());
         editor.putBoolean(KEY_CODE_USED, p.isCodeUsed());
+        for (int i = 1; i < Progression.GIFT_CODES.length; i++) {
+            editor.putBoolean(KEY_CODE_USED_N + i, p.isCodeUsed(i));
+        }
+        editor.putInt(KEY_WISDOM_ORBS, p.getWisdomOrbs());
+        editor.putInt(KEY_CASTLE_GOLD, p.getCastleGoldLevel());
         for (int t = 0; t < Mage.TYPE_COUNT; t++) {
             editor.putInt(KEY_FRAGMENTS + t, p.getFragments(t));
             editor.putInt(KEY_RANK + t, p.getRank(t));
@@ -187,9 +209,11 @@ public class SaveManager {
         for (int i = 0; i < Artifact.COUNT; i++) {
             editor.putBoolean(KEY_ARTIFACT + i, p.ownsArtifact(i));
         }
-        for (int i = 0; i < Achievement.COUNT; i++) {
-            editor.putBoolean(KEY_ACHIEVEMENT + i, p.isAchieved(i));
+        for (int f = 0; f < Achievement.COUNT; f++) {
+            editor.putInt(KEY_ACHIEVEMENT_TIER + f, p.getAchievementTier(f));
         }
+        // (les anciennes clés achievement_0 à 21 restent telles quelles : elles ne servent plus
+        // qu'à convertir une sauvegarde qui n'a pas encore de paliers)
         editor.putLong(KEY_STAT_KILLS, p.getKills());
         editor.putInt(KEY_STAT_MERGES, p.getMerges());
         editor.putInt(KEY_STAT_REACTIONS, p.getReactions());

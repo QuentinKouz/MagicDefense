@@ -108,6 +108,24 @@ public class LevelSpec {
         return ((Math.max(1, wave) - 1) / ENDLESS_WAVES_PER_BIOME) % BIOME_COUNT;
     }
 
+    // Passage dans le cycle des biomes (1 = premier tour, 2 = deuxième...)
+    public static int biomeCycleForLevel(int lv) {
+        return (Math.max(1, lv) - 1) / (6 * BIOME_COUNT) + 1;
+    }
+
+    public static int biomeCycleForEndlessWave(int wave) {
+        return (Math.max(1, wave) - 1) / (ENDLESS_WAVES_PER_BIOME * BIOME_COUNT) + 1;
+    }
+
+    // Nom du biome avec son cycle en chiffres romains : « Volcan I », puis « Volcan II » au tour suivant
+    public static String biomeTitleForLevel(int lv) {
+        return BIOME_NAMES[biomeForLevel(lv)] + " " + Roman.of(biomeCycleForLevel(lv));
+    }
+
+    public static String biomeTitleForEndlessWave(int wave) {
+        return BIOME_NAMES[biomeForEndlessWave(wave)] + " " + Roman.of(biomeCycleForEndlessWave(wave));
+    }
+
     public int biome(int wave) {
         return endless ? biomeForEndlessWave(wave) : biomeForLevel(level);
     }

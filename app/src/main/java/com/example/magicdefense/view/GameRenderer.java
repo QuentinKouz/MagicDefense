@@ -206,7 +206,7 @@ public class GameRenderer {
 
         // Biome et page de la carte (les niveaux sont sans fin, 6 par page)
         int first = model.levelAtSlot(1);
-        ui.text(canvas, LevelSpec.BIOME_NAMES[biome] + " · Niveaux " + first + " – "
+        ui.text(canvas, model.getMapBiomeTitle() + " · Niveaux " + first + " – "
                         + (first + GameModel.LEVELS_PER_PAGE - 1), board.centerX(), 96 * density + board.topShift,
                 13, Palette.BIOME_COLORS[biome][5], Paint.Align.CENTER);
 
@@ -776,8 +776,6 @@ public class GameRenderer {
     }
 
     private void drawRecruitButtons(Canvas canvas, GameModel model, int pressedButton, boolean pressedRandom) {
-        boolean canAfford = model.canAffordMage();
-
         for (int i = 0; i < hud.recruitButtons.length; i++) {
             RectF b = hud.recruitButtons[i];
             int type = model.teamTypeAt(i); // mage de cet emplacement d'équipe
@@ -788,6 +786,7 @@ public class GameRenderer {
                         Paint.Align.CENTER);
                 continue;
             }
+            boolean canAfford = model.canAffordMage(type); // le prix dépend de la rareté du mage
 
             // Tuile de la couleur de l'élément : grisée si pas assez d'or, enfoncée si appuyée
             RectF f = ui.button(canvas, b, Palette.ELEMENT_COLORS[type], canAfford && i == pressedButton, canAfford);
@@ -795,8 +794,8 @@ public class GameRenderer {
             ui.textPx(canvas, Palette.ELEMENT_NAMES[type], f.centerX(), f.centerY() - 1 * density, 14 * density,
                     textColor, Paint.Align.CENTER, f.width() - 8 * density); // « Invocateur » tient dans la tuile
 
-            // Prix : pièce d'or + prix (il monte de 2 à chaque mage choisi)
-            drawBarPrice(canvas, f, model.getMageCost(), canAfford, textColor);
+            // Prix : pièce d'or + prix (selon la rareté ; il monte à chaque mage choisi)
+            drawBarPrice(canvas, f, model.getMageCost(type), canAfford, textColor);
         }
 
         // Dernière case : mage au hasard parmi l'équipe, prix fixe
@@ -1185,13 +1184,38 @@ public class GameRenderer {
         drawStar(canvas, tmpRect.left + 22 * density, tmpRect.centerY(), 13 * density, true);
         float tx = tmpRect.left + 44 * density;
         float maxW = tmpRect.right - tx - 64 * density;
-        ui.textPx(canvas, "Succès : " + Achievement.NAMES[id], tx, tmpRect.centerY() - 3 * density, 15 * density,
+        int tier = model.getToastTier();
+        ui.textPx(canvas, "Succès : " + Achievement.name(id, tier), tx, tmpRect.centerY() - 3 * density, 15 * density,
                 Palette.ACHIEVEMENT, Paint.Align.LEFT, maxW);
-        ui.textPx(canvas, Achievement.description(id), tx, tmpRect.centerY() + 14 * density, 11 * density,
+        ui.textPx(canvas, Achievement.description(id, tier), tx, tmpRect.centerY() + 14 * density, 11 * density,
                 Color.WHITE, Paint.Align.LEFT, maxW);
         drawGem(canvas, tmpRect.right - 46 * density, tmpRect.centerY() - 1 * density, 8 * density);
-        ui.text(canvas, "+" + Achievement.reward(id), tmpRect.right - 34 * density, tmpRect.centerY() + 6 * density,
+        ui.text(canvas, "+" + Achievement.reward(id, tier), tmpRect.right - 34 * density, tmpRect.centerY() + 6 * density,
                 16, Palette.GEM, Paint.Align.LEFT);
+    }
+
+    // Coupe un texte en 2 lignes s'il dépasse maxW (au mot le plus proche du milieu, jamais juste avant
+    // un « % »). Retourne 1 ligne s'il tient, sinon 2 (chacune est ensuite réduite si besoin par textPx).
+    private String[] splitTwoLines(String s, float sizePx, float maxW) {
+        paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); // même police que UiKit.textPx
+        paint.setTextSize(sizePx);
+        float w = paint.measureText(s);
+        paint.setTypeface(android.graphics.Typeface.DEFAULT);
+        if (w <= maxW) {
+            return new String[]{s};
+        }
+        int mid = s.length() / 2;
+        int best = -1;
+        for (int i = 0; i < s.length(); i++) {
+            boolean breakable = s.charAt(i) == ' ' && i + 1 < s.length() && s.charAt(i + 1) != '%';
+            if (breakable && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) {
+                best = i;
+            }
+        }
+        if (best < 0) {
+            return new String[]{s};
+        }
+        return new String[]{s.substring(0, best), s.substring(best + 1)};
     }
 
     // Halo de la torche : deux cercles transparents qui respirent (le jeu de lumière d'avant)
@@ -1463,12 +1487,17 @@ public class GameRenderer {
             int art = model.getLastArtifact();
             if (art != Artifact.NONE) {
                 float pulse = 0.5f + 0.5f * (float) Math.sin(frame * 0.12);
-                ui.textPx(canvas, "Artefact : " + Artifact.NAMES[art], board.centerX(), p.top + 214 * density,
+                String effect = Palette.ELEMENT_NAMES[Artifact.typeOf(art)] + " · " + Artifact.DESCRIPTIONS[art];
+                String[] lines = splitTwoLines(effect, 11 * density, p.width() - 24 * density);
+                float nameY = lines.length > 1 ? 210 : 214; // remonte un peu si l'effet tient sur 2 lignes
+                ui.textPx(canvas, "Artefact : " + Artifact.NAMES[art], board.centerX(), p.top + nameY * density,
                         15 * density, UiKit.tint(Palette.ARTIFACT, 0.3f * pulse), Paint.Align.CENTER,
                         p.width() - 24 * density);
-                ui.textPx(canvas, Palette.ELEMENT_NAMES[Artifact.typeOf(art)] + " · " + Artifact.DESCRIPTIONS[art],
-                        board.centerX(), p.top + 232 * density, 11 * density, Color.WHITE, Paint.Align.CENTER,
-                        p.width() - 24 * density);
+                for (int li = 0; li < lines.length; li++) {
+                    ui.textPx(canvas, lines[li], board.centerX(), p.top + (nameY + 16 + li * 13) * density,
+                            (lines.length > 1 ? 10.5f : 11) * density, Color.WHITE, Paint.Align.CENTER,
+                            p.width() - 24 * density);
+                }
             } else if (model.getLastArtifactGems() > 0) {
                 ui.text(canvas, "Tous les artefacts : +" + model.getLastArtifactGems() + " gemmes", board.centerX(),
                         p.top + 222 * density, 14, Palette.GEM, Paint.Align.CENTER);
@@ -1998,6 +2027,25 @@ public class GameRenderer {
                 }
                 break;
             }
+            case MenuList.CASTLE_GOLD: {
+                // Trésor de départ : pièces d'or en plus au début de chaque partie
+                ui.medallion(canvas, iconCx, iconCy, 22 * density, UiKit.shade(Palette.GOLD, 0.55f), false, 255);
+                ui.coin(canvas, iconCx, iconCy, 11 * density);
+                int lv = prog.getCastleGoldLevel();
+                boolean max = lv >= Progression.CASTLE_GOLD_MAX_LEVEL;
+                int now = prog.startGoldBonus();
+                title = "Trésor de départ";
+                titleColor = Palette.GOLD;
+                desc = max ? "+" + now + " PO en début de partie"
+                        : "+" + now + " → +" + (now + Progression.CASTLE_GOLD_PER_LEVEL) + " PO en début de partie";
+                status = "Niveau " + lv + " / " + Progression.CASTLE_GOLD_MAX_LEVEL + " · campagne et infini";
+                if (max) {
+                    drawSmallButton(canvas, btnRect, "MAX", Palette.TEAM, false, 14);
+                } else {
+                    drawPriceButton(canvas, btnRect, prog.castleGoldCost(), prog.canUpgradeCastleGold(), mainPressed);
+                }
+                break;
+            }
             case MenuList.ULTIMATE: {
                 boolean owned = prog.ownsUltimate(a);
                 boolean equipped = prog.getEquippedUltimate() == a;
@@ -2175,8 +2223,20 @@ public class GameRenderer {
             RectF f = ui.button(canvas, a, UiKit.shade(Palette.ARTIFACT, 0.6f), pressed == Hud.HOME_SHEET_ARTIFACT, true);
             String label = art == Artifact.NONE ? "Aucun artefact (" + ownedArt + "/3) · toucher pour changer"
                     : Artifact.NAMES[art] + " · " + Artifact.DESCRIPTIONS[art];
-            ui.textPx(canvas, label, f.centerX(), f.centerY() + 4 * density, 11.5f * density,
-                    art == Artifact.NONE ? Palette.TEXT_INACTIVE : Color.WHITE, Paint.Align.CENTER, f.width() - 10 * density);
+            // Nom + effet : sur 2 lignes si la phrase est trop longue pour une seule
+            float size = 11.5f * density;
+            String[] lines = splitTwoLines(label, size, f.width() - 10 * density);
+            if (lines.length > 1) {
+                size = 10.5f * density;
+                lines = splitTwoLines(label, size, f.width() - 10 * density);
+            }
+            float lineH = size * 1.2f;
+            float y0 = f.centerY() + 4 * density - (lines.length - 1) * lineH / 2;
+            for (int li = 0; li < lines.length; li++) {
+                ui.textPx(canvas, lines[li], f.centerX(), y0 + li * lineH, size,
+                        art == Artifact.NONE ? Palette.TEXT_INACTIVE : Color.WHITE, Paint.Align.CENTER,
+                        f.width() - 10 * density);
+            }
         } else {
             paint.setColor(Color.argb(90, 0, 0, 0));
             canvas.drawRoundRect(a, 8 * density, 8 * density, paint);
@@ -2253,22 +2313,32 @@ public class GameRenderer {
         }
     }
 
-    // Ligne d'un succès : étoile (pleine si obtenu), nom, description, progression, récompense
+    // Ligne d'un succès : étoile (pleine si au moins un palier obtenu), palier en cours, description,
+    // barre de progression, récompense. Succès unique obtenu / dernier palier atteint : « Obtenu ».
     private void drawAchievementRow(Canvas canvas, GameModel model, int id, RectF r) {
-        boolean done = model.getProgression().isAchieved(id);
+        Progression prog = model.getProgression();
+        boolean maxed = prog.isAchievementMaxed(id);
+        int tier = prog.getAchievementTier(id);
+        int shown = maxed ? Math.max(0, tier - 1) : tier; // palier affiché : le prochain à obtenir
         ui.inset(canvas, r);
-        drawStar(canvas, r.left + 26 * density, r.centerY(), 14 * density, done);
+        drawStar(canvas, r.left + 26 * density, r.centerY(), 14 * density, tier > 0);
         float tx = r.left + 50 * density;
         float maxW = r.width() - 50 * density - 80 * density;
-        ui.textPx(canvas, Achievement.NAMES[id], tx, r.top + 22 * density, 14 * density,
-                done ? Palette.ACHIEVEMENT : Color.WHITE, Paint.Align.LEFT, maxW);
-        long value = Math.min(model.statValue(Achievement.stat(id)), Achievement.target(id));
-        String progress = done ? "Obtenu" : value + " / " + Achievement.target(id);
-        ui.textPx(canvas, Achievement.description(id) + " · " + progress, tx, r.top + 40 * density, 10.5f * density,
-                done ? Palette.TEAM : Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
+        ui.textPx(canvas, Achievement.name(id, shown), tx, r.top + 20 * density, 14 * density,
+                maxed ? Palette.ACHIEVEMENT : Color.WHITE, Paint.Align.LEFT, maxW);
+        long target = Achievement.target(id, shown);
+        long value = Math.min(model.statValue(Achievement.stat(id)), target);
+        String progress = maxed ? "Obtenu"
+                : Achievement.format(value) + " / " + Achievement.format(target);
+        ui.textPx(canvas, Achievement.description(id, shown) + " · " + progress, tx, r.top + 36 * density,
+                10.5f * density, maxed ? Palette.TEAM : Palette.TEXT_INACTIVE, Paint.Align.LEFT, maxW);
+        if (!maxed) {
+            tmpRect.set(tx, r.top + 42 * density, tx + maxW, r.top + 49 * density);
+            ui.bar(canvas, tmpRect, target > 0 ? value / (float) target : 0, Palette.ACHIEVEMENT);
+        }
         drawGem(canvas, r.right - 52 * density, r.centerY() - 1 * density, 7 * density);
-        ui.text(canvas, "+" + Achievement.reward(id), r.right - 40 * density, r.centerY() + 5 * density, 15,
-                done ? Palette.TEXT_INACTIVE : Palette.GEM, Paint.Align.LEFT);
+        ui.text(canvas, "+" + Achievement.reward(id, shown), r.right - 40 * density, r.centerY() + 5 * density, 15,
+                maxed ? Palette.TEXT_INACTIVE : Palette.GEM, Paint.Align.LEFT);
     }
 
     // Icône d'un ultime : médaillon de sa couleur et symbole

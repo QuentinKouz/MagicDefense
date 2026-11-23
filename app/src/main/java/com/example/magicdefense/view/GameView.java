@@ -168,9 +168,10 @@ public class GameView extends View {
                 .setTitle("Entrer un code")
                 .setView(box)
                 .setPositiveButton("Valider", (dialog, which) -> {
-                    int result = model.redeemCode(input.getText().toString());
+                    String code = input.getText().toString();
+                    int result = model.redeemCode(code);
                     String message = result == com.example.magicdefense.model.Progression.CODE_OK
-                            ? "Code accepté : +" + com.example.magicdefense.model.Progression.GIFT_CODE_GEMS + " gemmes !"
+                            ? "Code accepté : " + com.example.magicdefense.model.Progression.giftCodeReward(code) + " !"
                             : result == com.example.magicdefense.model.Progression.CODE_ALREADY_USED
                             ? "Ce code a déjà été utilisé" : "Code invalide";
                     android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show();

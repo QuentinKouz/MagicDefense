@@ -17,6 +17,10 @@ public class Progression {
     public static final int DAILY_FREE_CHESTS = 2;        // petits coffres gratuits chaque jour
     public static final String GIFT_CODE = "thomasleboss"; // code des options : une seule fois par sauvegarde
     public static final int GIFT_CODE_GEMS = 9999;
+    // Codes cadeaux des options : chacun une seule fois par sauvegarde (le 1er est l'ancien code)
+    public static final String[] GIFT_CODES = {GIFT_CODE, "thomasleboss2", "jeveuxlesgrossesboulesdesagesse"};
+    private static final int[] GIFT_CODE_GEM_REWARDS = {GIFT_CODE_GEMS, 99999, 0};
+    private static final int[] GIFT_CODE_ORB_REWARDS = {0, 0, 4};
     public static final int CODE_OK = 1;
     public static final int CODE_WRONG = 0;
     public static final int CODE_ALREADY_USED = -1;
@@ -34,6 +38,9 @@ public class Progression {
     public static final float CASTLE_HP_PER_LEVEL = 0.10f;    // +10 % de PV max par niveau
     public static final int CASTLE_RES_MAX_LEVEL = 15;
     public static final float CASTLE_RES_PER_LEVEL = 0.03f;   // −3 % de dégâts subis par niveau
+    // Trésor de départ : +5 PO au début de chaque partie (campagne et infini) par niveau
+    public static final int CASTLE_GOLD_MAX_LEVEL = 10;
+    public static final int CASTLE_GOLD_PER_LEVEL = 5;
 
     // ---------- État ----------
     private final int[] chests = new int[Chest.COUNT]; // coffres en réserve, par sorte
@@ -49,7 +56,8 @@ public class Progression {
     private int lastChestType = Chest.SMALL;
     private final boolean[] lastChestNew = new boolean[Mage.TYPE_COUNT]; // mage débloqué par ce coffre
     private long lastDailyDay = -1;  // jour (depuis 1970) des derniers coffres gratuits
-    private boolean codeUsed = false;
+    private final boolean[] codesUsed = new boolean[GIFT_CODES.length]; // [0] = ancien « codeUsed »
+    private int wisdomOrbs = 0;      // orbes de sagesse
 
     private final boolean[] ultimates = new boolean[Ultimate.COUNT];
     private int equippedUltimate = Ultimate.STUN;
@@ -58,6 +66,7 @@ public class Progression {
     private boolean auto = false;          // mode automatique acheté
     private int castleHpLevel = 0;
     private int castleResLevel = 0;
+    private int castleGoldLevel = 0;  // trésor de départ
     private final boolean[] artifacts = new boolean[Artifact.COUNT];
     private final int[] equippedArtifact = new int[Mage.TYPE_COUNT];
 
@@ -70,7 +79,7 @@ public class Progression {
     private int knights = 0;
     private boolean maxLevelMage = false;
     private int chestsOpened = 0;
-    private final boolean[] achievements = new boolean[Achievement.COUNT];
+    private final int[] achievementTiers = new int[Achievement.COUNT]; // paliers obtenus par famille
 
     public Progression() {
         for (int t = 0; t < Mage.TYPE_COUNT; t++) {
@@ -89,7 +98,17 @@ public class Progression {
     public int getChests(int chest) { return chests[chest]; }
     public int getLastChestType() { return lastChestType; }
     public boolean isLastChestNew(int type) { return lastChestNew[type]; }
-    public boolean isCodeUsed() { return codeUsed; }
+    public boolean isCodeUsed() { return codesUsed[0]; }
+    public boolean isCodeUsed(int index) { return codesUsed[index]; }
+    public int getWisdomOrbs() { return wisdomOrbs; }
+
+    public void addWisdomOrbs(int count) {
+        wisdomOrbs += Math.max(0, count);
+    }
+
+    public void loadWisdomOrbs(int count) {
+        wisdomOrbs = Math.max(0, count);
+    }
     public long getLastDailyDay() { return lastDailyDay; }
     public int getGems() { return gems; }
     public int getFragments(int type) { return fragments[type]; }
@@ -322,7 +341,14 @@ public class Progression {
         chests[Chest.BIG] = Math.max(0, big);
         chests[Chest.MYSTERY] = Math.max(0, mystery);
         lastDailyDay = dailyDay;
-        this.codeUsed = codeUsed;
+        this.codesUsed[0] = codeUsed;
+    }
+
+    // Codes cadeaux déjà utilisés (indice = GIFT_CODES ; l'indice 0 vient de loadChests)
+    public void loadCodesUsed(boolean[] used) {
+        for (int i = 1; i < GIFT_CODES.length && i < used.length; i++) {
+            codesUsed[i] = used[i];
+        }
     }
 
     public void loadAuto(boolean owned) {
@@ -363,21 +389,79 @@ public class Progression {
     }
 
     // ---------- Code des options ----------
+    // Indice du code dans GIFT_CODES (sans tenir compte des majuscules ni des espaces autour), ou -1
+    public static int giftCodeIndex(String code) {
+        if (code == null) {
+            return -1;
+        }
+        for (int i = 0; i < GIFT_CODES.length; i++) {
+            if (code.trim().equalsIgnoreCase(GIFT_CODES[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // Récompense d'un code, en toutes lettres (« +99999 gemmes », « +4 orbes de sagesse »)
+    public static String giftCodeReward(String code) {
+        int i = giftCodeIndex(code);
+        if (i < 0) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        if (GIFT_CODE_GEM_REWARDS[i] > 0) {
+            sb.append("+").append(GIFT_CODE_GEM_REWARDS[i]).append(" gemmes");
+        }
+        if (GIFT_CODE_ORB_REWARDS[i] > 0) {
+            if (sb.length() > 0) {
+                sb.append(" et ");
+            }
+            sb.append("+").append(GIFT_CODE_ORB_REWARDS[i])
+                    .append(GIFT_CODE_ORB_REWARDS[i] > 1 ? " orbes de sagesse" : " orbe de sagesse");
+        }
+        return sb.toString();
+    }
+
     public int redeemCode(String code) {
-        if (code == null || !code.trim().equalsIgnoreCase(GIFT_CODE)) {
+        int i = giftCodeIndex(code);
+        if (i < 0) {
             return CODE_WRONG;
         }
-        if (codeUsed) {
+        if (codesUsed[i]) {
             return CODE_ALREADY_USED;
         }
-        codeUsed = true;
-        gems += GIFT_CODE_GEMS;
+        codesUsed[i] = true;
+        gems += GIFT_CODE_GEM_REWARDS[i];
+        wisdomOrbs += GIFT_CODE_ORB_REWARDS[i];
         return CODE_OK;
     }
 
     // ---------- Château ----------
     public int getCastleHpLevel() { return castleHpLevel; }
     public int getCastleResLevel() { return castleResLevel; }
+    public int getCastleGoldLevel() { return castleGoldLevel; }
+
+    // Trésor de départ : PO en plus au début de chaque partie
+    public int startGoldBonus() {
+        return CASTLE_GOLD_PER_LEVEL * castleGoldLevel;
+    }
+
+    public int castleGoldCost() {
+        return 35 * (castleGoldLevel + 1);
+    }
+
+    public boolean canUpgradeCastleGold() {
+        return castleGoldLevel < CASTLE_GOLD_MAX_LEVEL && gems >= castleGoldCost();
+    }
+
+    public boolean upgradeCastleGold() {
+        if (!canUpgradeCastleGold()) {
+            return false;
+        }
+        gems -= castleGoldCost();
+        castleGoldLevel++;
+        return true;
+    }
 
     public float castleHpMultiplier() {
         return 1f + CASTLE_HP_PER_LEVEL * castleHpLevel;
@@ -519,26 +603,44 @@ public class Progression {
     }
 
     // ---------- Succès ----------
-    public boolean isAchieved(int id) { return achievements[id]; }
+    // Paliers obtenus dans cette famille (0 = aucun ; le palier en cours est donc le n° tier + 1)
+    public int getAchievementTier(int family) { return achievementTiers[family]; }
 
+    // Au moins un palier obtenu (succès unique : obtenu)
+    public boolean isAchieved(int family) { return achievementTiers[family] > 0; }
+
+    // Tous les paliers de la famille sont obtenus (succès unique déjà obtenu)
+    public boolean isAchievementMaxed(int family) {
+        return achievementTiers[family] >= Achievement.maxTiers(family);
+    }
+
+    // Total des paliers obtenus, toutes familles confondues
     public int achievedCount() {
         int n = 0;
-        for (boolean a : achievements) {
-            if (a) {
-                n++;
-            }
+        for (int t : achievementTiers) {
+            n += t;
         }
         return n;
     }
 
-    // Marque le succès comme obtenu et donne les gemmes. Retourne false s'il l'était déjà.
-    public boolean achieve(int id) {
-        if (achievements[id]) {
+    // Valide le palier en cours de la famille et donne ses gemmes. Retourne false si tout est déjà obtenu.
+    public boolean achieve(int family) {
+        if (isAchievementMaxed(family)) {
             return false;
         }
-        achievements[id] = true;
-        gems += Achievement.reward(id);
+        gems += Achievement.reward(family, achievementTiers[family]);
+        achievementTiers[family]++;
         return true;
+    }
+
+    // Paliers sauvegardés par famille (une valeur négative garde la valeur actuelle,
+    // par exemple celle convertie depuis une ancienne sauvegarde par loadStats)
+    public void loadAchievementTiers(int[] tiers) {
+        for (int f = 0; f < Achievement.COUNT && f < tiers.length; f++) {
+            if (tiers[f] >= 0) {
+                achievementTiers[f] = Math.min(tiers[f], Achievement.maxTiers(f));
+            }
+        }
     }
 
     // ---------- Actions ----------
@@ -737,6 +839,10 @@ public class Progression {
         this.speed3 = speed3;
     }
 
+    public void loadCastleGold(int level) {
+        castleGoldLevel = Math.max(0, Math.min(CASTLE_GOLD_MAX_LEVEL, level));
+    }
+
     public void loadArtifacts(boolean[] ownedArtifacts, int[] equipped) {
         for (int id = 0; id < Artifact.COUNT && id < ownedArtifacts.length; id++) {
             artifacts[id] = ownedArtifacts[id];
@@ -758,8 +864,8 @@ public class Progression {
         this.knights = Math.max(0, knights);
         this.maxLevelMage = maxLevelMage;
         this.chestsOpened = Math.max(0, chestsOpened);
-        for (int i = 0; i < Achievement.COUNT && i < done.length; i++) {
-            achievements[i] = done[i];
-        }
+        // Anciennes sauvegardes : les 22 succès uniques sont convertis en paliers (sans redonner de gemmes)
+        int[] tiers = Achievement.tiersFromLegacy(done);
+        System.arraycopy(tiers, 0, achievementTiers, 0, Achievement.COUNT);
     }
 }

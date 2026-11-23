@@ -40,17 +40,18 @@ public class GameplayTweaksTest {
     @Test
     public void magePrice_risesByTwo_exceptRandom() {
         GameModel m = withRun(1000, 1f, 0, 3);
-        assertEquals(GameModel.MAGE_COST, m.getMageCost());
+        // Feu : mage commun (10 PO, +2 par mage choisi) ; l'Eau (rare) compte aussi dans les achats
+        assertEquals(GameModel.MAGE_COST, m.getMageCost(Mage.FIRE));
         m.recruitMage(Mage.FIRE);
-        assertEquals(GameModel.MAGE_COST + 2, m.getMageCost());
+        assertEquals(GameModel.MAGE_COST + 2, m.getMageCost(Mage.FIRE));
         m.recruitMage(Mage.WATER);
-        assertEquals(GameModel.MAGE_COST + 4, m.getMageCost());
+        assertEquals(GameModel.MAGE_COST + 4, m.getMageCost(Mage.FIRE));
         int gold = m.getGold();
         assertTrue(m.recruitRandom());
         assertEquals(gold - GameModel.RANDOM_MAGE_COST, m.getGold()); // prix fixe
-        assertEquals(GameModel.MAGE_COST + 4, m.getMageCost());       // et pas compté
+        assertEquals(GameModel.MAGE_COST + 4, m.getMageCost(Mage.FIRE)); // et pas compté
         m.startLevel(2);
-        assertEquals(GameModel.MAGE_COST, m.getMageCost());           // nouvelle partie : prix de départ
+        assertEquals(GameModel.MAGE_COST, m.getMageCost(Mage.FIRE));     // nouvelle partie : prix de départ
     }
 
     @Test

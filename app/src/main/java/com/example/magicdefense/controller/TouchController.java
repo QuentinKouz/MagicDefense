@@ -527,6 +527,9 @@ public class TouchController {
             case MenuList.CASTLE_RES:
                 model.upgradeCastleRes();
                 break;
+            case MenuList.CASTLE_GOLD:
+                model.upgradeCastleGold();
+                break;
             case MenuList.ULTIMATE:
                 if (model.getProgression().ownsUltimate(a)) {
                     model.equipUltimate(a);
