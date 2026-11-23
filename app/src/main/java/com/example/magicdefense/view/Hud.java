@@ -60,8 +60,8 @@ public class Hud {
     public final RectF volumeTrack = new RectF(); // rail du curseur des bruitages (seuls left, right et centerY servent)
     public final RectF musicVolumeTrack = new RectF(); // rail du curseur de la musique
     // Hauteur (depuis le haut de la fenêtre) du titre de chaque réglage, en dp
-    public static final float OPT_VIBRATION_Y = 78, OPT_MUSIC_Y = 153, OPT_LEFT_Y = 228, OPT_EFFECTS_Y = 303,
-            OPT_MUSIC_VOLUME_Y = 378, OPT_VOLUME_Y = 455;
+    public static final float OPT_VIBRATION_Y = 76, OPT_MUSIC_Y = 162, OPT_LEFT_Y = 248, OPT_EFFECTS_Y = 334,
+            OPT_MUSIC_VOLUME_Y = 422, OPT_VOLUME_Y = 502;
 
     // Boutons de l'écran Victoire
     public static final int VICTORY_NEXT = 0;
@@ -239,7 +239,7 @@ public class Hud {
         }
 
         // Fenêtre d'options : vibrations, musique, mode gaucher, effets, volumes musique / bruitages, retour
-        float oH = 668 * d;
+        float oH = 722 * d;
         float oTop = popupTop(h, oH);
         optionsPopup.set(pLeft, oTop, pLeft + pw, oTop + oH);
 

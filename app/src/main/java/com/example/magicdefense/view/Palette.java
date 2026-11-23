@@ -25,7 +25,7 @@ public class Palette {
             "Empoisonne : dégâts sur la durée", "Repousse les ennemis", "Invoque des chevaliers gardiens",
             "Construit un mur, lance des marteaux", "Renforce tous les mages, rayons sur tous",
             "Exécute les blessés, grande zone qui ralentit",
-            "Fioles de zone, bombe nucléaire sur tout le terrain",
+            "Fioles de zone, bombe nucléaire",
     };
 
     // Réactions élémentaires (indice = Reaction.xxx)
