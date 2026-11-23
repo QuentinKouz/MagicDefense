@@ -128,10 +128,10 @@ public class GameModel {
     private int meteorTimer = 0;    // > 0 : la météorite tombe
     private int meteorBlast = 0;    // > 0 : explosion de la météorite
     private float meteorX, meteorY;
-    private boolean sensorNight = false;       // le capteur de luminosité veut la nuit
-    private boolean nightMode = false;         // nuit effective (capteur, niveau de nuit, cycle du mode infini)
+    private boolean nightMode = false;         // nuit effective (niveau de nuit, cycle du mode infini)
     private boolean vibrationEnabled = true;   // option du joueur : vibrations
     private boolean musicEnabled = true;       // option du joueur : musique de fond
+    private boolean attackEffects = true;      // option du joueur : effets des attaques (Non = dessin minimal)
     private boolean leftHanded = false;        // option du joueur : interface en miroir
     private int gameSpeed = 1;                 // ×1, ×2, ×3
     private boolean autoMode = false;          // lance seul l'ultime et les compétences
@@ -184,7 +184,9 @@ public class GameModel {
     private static final int TOAST_TIER_BASE = 100000; // file : famille × base + palier
     private int uiFrame = 0;
 
-    private float soundVolume = 1f; // position du curseur, de 0 à 1
+    private float soundVolume = 1f; // curseur des bruitages, de 0 à 1 (volume interne du jeu)
+    private float musicVolume = 1f; // curseur de la musique, de 0 à 1 (volume interne du jeu)
+    private float lastKillX, lastKillY; // position du dernier gobelin tué (pièce qui s'envole)
 
     private GameState optionsReturnState = GameState.PAUSED; // écran à retrouver en quittant les options
     private int modeBannerTimer = 0; // > 0 : le bandeau jour/nuit est affiché
@@ -345,16 +347,10 @@ public class GameModel {
         return nightMode;
     }
 
-    // Le capteur de luminosité (en plus des niveaux de nuit et du cycle du mode infini)
-    public void setNightMode(boolean night) {
-        sensorNight = night;
-        refreshNight();
-    }
-
+    // La nuit ne vient que des niveaux de nuit et du cycle jour / nuit du mode infini
     private void refreshNight() {
-        boolean forced = (state == GameState.PLAYING || state == GameState.PAUSED || state == GameState.OPTIONS
+        boolean newMode = (state == GameState.PLAYING || state == GameState.PAUSED || state == GameState.OPTIONS
                 || state == GameState.VICTORY || state == GameState.GAME_OVER) && spec.isNight(wave);
-        boolean newMode = sensorNight || forced;
         if (newMode != nightMode && state == GameState.PLAYING) {
             modeBannerTimer = MODE_BANNER_DURATION; // le mode change pendant la partie : on prévient
         }
@@ -383,6 +379,18 @@ public class GameModel {
 
     public void toggleMusic() {
         musicEnabled = !musicEnabled;
+    }
+
+    public boolean isAttackEffectsEnabled() {
+        return attackEffects;
+    }
+
+    public void setAttackEffectsEnabled(boolean on) {
+        attackEffects = on;
+    }
+
+    public void toggleAttackEffects() {
+        attackEffects = !attackEffects;
     }
 
     public boolean isLeftHanded() {
@@ -671,6 +679,18 @@ public class GameModel {
         soundVolume = Math.max(0f, Math.min(1f, volume)); // toujours entre 0 et 1
     }
 
+    public float getMusicVolume() {
+        return musicVolume;
+    }
+
+    public void setMusicVolume(float volume) {
+        musicVolume = Math.max(0f, Math.min(1f, volume));
+    }
+
+    // Où est mort le dernier gobelin (lu par la vue dans onEnemyKilled : pièce qui s'envole)
+    public float getLastKillX() { return lastKillX; }
+    public float getLastKillY() { return lastKillY; }
+
     public GameState getOptionsReturnState() {
         return optionsReturnState;
     }
@@ -748,7 +768,7 @@ public class GameModel {
         startNextWave();
         waitingForWave = true;   // la 1re vague attend que le joueur la lance
         state = GameState.PLAYING;
-        nightMode = sensorNight || spec.isNight(wave); // pas de bandeau au lancement
+        nightMode = spec.isNight(wave); // pas de bandeau au lancement
         if (spec.nightLevel) {
             announce("NIVEAU DE NUIT", "Gobelins plus rapides, +20 % d'or", false);
         }
@@ -1588,6 +1608,8 @@ public class GameModel {
                 if (dead.isBoss()) {
                     progression.addBoss();
                 }
+                lastKillX = dead.x;
+                lastKillY = dead.y;
                 if (listener != null) {
                     listener.onEnemyKilled();
                 }
@@ -2957,7 +2979,7 @@ public class GameModel {
                 }
             }
         }
-        nightMode = sensorNight || spec.isNight(wave);
+        nightMode = spec.isNight(wave);
         state = GameState.PAUSED;
         resumed = true;
         return true;

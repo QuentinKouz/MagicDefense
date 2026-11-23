@@ -20,7 +20,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setVolumeControlStream(AudioManager.STREAM_MUSIC); // les touches de volume règlent le jeu
+        // Les touches de volume règlent le volume multimédia du téléphone (pas la sonnerie) ;
+        // les curseurs des options règlent, eux, le volume interne du jeu, indépendamment
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
         EdgeToEdge.enable(this); // le jeu occupe tout l'écran, y compris sous les barres
         gameView = new GameView(this);
         setContentView(gameView);

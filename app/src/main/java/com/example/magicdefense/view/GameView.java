@@ -12,7 +12,7 @@ import com.example.magicdefense.controller.TouchController;
 import com.example.magicdefense.model.Board;
 import com.example.magicdefense.model.GameModel;
 import com.example.magicdefense.model.GameState;
-import com.example.magicdefense.controller.LightSensor;
+import com.example.magicdefense.model.MusicMood;
 import com.example.magicdefense.data.SaveManager;
 
 // La vue Android : fait tourner la boucle et relie modèle, dessin et touchers
@@ -22,12 +22,13 @@ public class GameView extends View {
     private final Hud hud;
     private final GameRenderer renderer;
     private final TouchController touchController;
-    private final LightSensor lightSensor;
     private final Haptics haptics;
     private final SaveManager saveManager;
     private final SoundManager sounds;
     private final MusicPlayer music;
-    private float volumeBeforeMute = 0.5f; // volume à retrouver en réactivant le son
+    // Volumes (bruitages, musique) à retrouver en réactivant le son
+    private float soundBeforeMute = 1f;
+    private float musicBeforeMute = 1f;
 
     public GameView(Context context) {
         super(context);
@@ -39,27 +40,31 @@ public class GameView extends View {
         saveManager = new SaveManager(context);
         saveManager.load(model); // reprend la progression sauvegardée
         touchController = new TouchController(model, board, hud, density);
-        lightSensor = new LightSensor(context);
         haptics = new Haptics(context);
         sounds = new SoundManager(context);
         music = new MusicPlayer(context);
         touchController.setOnButtonClick(() -> {
-            sounds.setSystemVolume(model.getSoundVolume()); // applique le volume avant l'aperçu
+            sounds.setVolume(model.getSoundVolume()); // applique le volume interne avant l'aperçu
             sounds.click();
         });
         // Bouton CODE des options : petite fenêtre Android avec un champ de texte
         touchController.setOnEnterCode(() -> showCodeDialog(context));
-        // Bouton son de l'accueil : coupe, ou remet le volume d'avant
+        // Bouton son : coupe bruitages et musique du jeu, ou remet les volumes d'avant
+        // (volumes internes : le volume du téléphone n'est jamais modifié)
         touchController.setOnToggleMute(() -> {
-            float current = sounds.getSystemVolume();
-            if (current > 0) {
-                volumeBeforeMute = current;
-                sounds.setSystemVolume(0);
+            if (model.getSoundVolume() > 0 || model.getMusicVolume() > 0) {
+                soundBeforeMute = model.getSoundVolume();
+                musicBeforeMute = model.getMusicVolume();
+                model.setSoundVolume(0);
+                model.setMusicVolume(0);
             } else {
-                sounds.setSystemVolume(volumeBeforeMute);
+                boolean none = soundBeforeMute <= 0 && musicBeforeMute <= 0;
+                model.setSoundVolume(none ? 0.5f : soundBeforeMute);
+                model.setMusicVolume(none ? 0.5f : musicBeforeMute);
+                sounds.setVolume(model.getSoundVolume());
                 sounds.click(); // on entend tout de suite que le son est revenu
             }
-            model.setSoundVolume(sounds.getSystemVolume());
+            saveManager.save(model);
         });
         model.setListener(new GameModel.GameListener() {
             @Override
@@ -94,6 +99,7 @@ public class GameView extends View {
             @Override
             public void onEnemyKilled() {
                 sounds.kill();
+                renderer.spawnCoin(model.getLastKillX(), model.getLastKillY()); // pièce qui s'envole vers les PO
             }
 
             @Override
@@ -152,7 +158,6 @@ public class GameView extends View {
                 saveManager.save(model); // coffres, fragments, rangs : sauvegardés tout de suite
             }
         });
-        model.setSoundVolume(sounds.getSystemVolume()); // le curseur part du volume actuel du téléphone
     }
 
     // Saisie d'un code (options de l'accueil) : le modèle vérifie, un message donne le résultat
@@ -223,16 +228,17 @@ public class GameView extends View {
     private final Runnable gameLoop = new Runnable() {
         @Override
         public void run() {
-            // Les touches du téléphone font bouger le curseur et l'icône (sauf pendant un glissement)
-            if (!touchController.isDraggingVolume()) {
-                model.setSoundVolume(sounds.getSystemVolume());
-            }
-            music.setEnabled(model.isMusicEnabled()); // option "Musique" des réglages
+            // Volumes internes du jeu (curseurs des options ; pendant un glissement, la position du doigt)
+            sounds.setVolume(touchController.isDraggingSoundVolume()
+                    ? touchController.getDragVolume() : model.getSoundVolume());
+            float musicVolume = touchController.isDraggingMusicVolume()
+                    ? touchController.getDragVolume() : model.getMusicVolume();
+            // Option "Musique", piste selon la situation (normale / nuit / boss) avec fondu
+            music.update(model.isMusicEnabled(), MusicMood.of(model), musicVolume);
             haptics.setEnabled(model.isVibrationEnabled()); // option "Vibrations"
             if (hud.isLeftHanded() != model.isLeftHanded()) {
                 relayout(getWidth(), getHeight()); // option "Mode gaucher" : interface en miroir
             }
-            model.setNightMode(lightSensor.isNight());
             model.updateUi();       // animations des menus, bandeaux de succès (une fois par image)
             touchController.tick(); // glissement entre les pages, inertie des listes
             // Vitesse du jeu : ×2 ou ×3 = 2 ou 3 étapes de jeu par image
@@ -248,14 +254,12 @@ public class GameView extends View {
     public void startGame() {
         removeCallbacks(gameLoop); // évite deux boucles en parallèle
         post(gameLoop);
-        lightSensor.start();
         music.resume();
     }
 
     public void stopGame() {
         model.pause();
         touchController.cancel();
-        lightSensor.stop();
         music.pause(); // pas de musique quand l'appli est en arrière-plan
         saveManager.save(model); // sauvegarde quand l'appli passe en arrière-plan (options comprises)
         removeCallbacks(gameLoop);

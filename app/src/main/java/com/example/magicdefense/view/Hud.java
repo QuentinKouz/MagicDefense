@@ -47,16 +47,20 @@ public class Hud {
     // Boutons de la fenêtre d'options
     public static final int OPTIONS_VIBRATION = 0;
     public static final int OPTIONS_BACK = 1;
-    public static final int OPTIONS_VOLUME = 2;
+    public static final int OPTIONS_VOLUME = 2;        // curseur des bruitages
     public static final int OPTIONS_MUSIC_TOGGLE = 3;
     public static final int OPTIONS_LEFT_HANDED = 4;
     public static final int OPTIONS_CODE = 5;   // seulement depuis l'accueil (pas dans la pause)
+    public static final int OPTIONS_EFFECTS = 6;       // effets des attaques Non / Oui
+    public static final int OPTIONS_MUSIC_VOLUME = 7;  // curseur de la musique
 
     public final RectF optionsPopup = new RectF();
-    public final RectF[] optionsButtons = new RectF[6];
-    public final RectF volumeTrack = new RectF(); // rail du curseur (seuls left, right et centerY servent)
+    public final RectF[] optionsButtons = new RectF[8];
+    public final RectF volumeTrack = new RectF(); // rail du curseur des bruitages (seuls left, right et centerY servent)
+    public final RectF musicVolumeTrack = new RectF(); // rail du curseur de la musique
     // Hauteur (depuis le haut de la fenêtre) du titre de chaque réglage, en dp
-    public static final float OPT_VIBRATION_Y = 95, OPT_MUSIC_Y = 185, OPT_LEFT_Y = 275, OPT_VOLUME_Y = 365;
+    public static final float OPT_VIBRATION_Y = 78, OPT_MUSIC_Y = 153, OPT_LEFT_Y = 228, OPT_EFFECTS_Y = 303,
+            OPT_MUSIC_VOLUME_Y = 378, OPT_VOLUME_Y = 455;
 
     // Boutons de l'écran Victoire
     public static final int VICTORY_NEXT = 0;
@@ -231,8 +235,8 @@ public class Hud {
                     px + diameter / 2, rowY + diameter / 2);
         }
 
-        // Fenêtre d'options : vibrations, musique, mode gaucher, volume, retour
-        float oH = 595 * d;
+        // Fenêtre d'options : vibrations, musique, mode gaucher, effets, volumes musique / bruitages, retour
+        float oH = 668 * d;
         float oTop = popupTop(h, oH);
         optionsPopup.set(pLeft, oTop, pLeft + pw, oTop + oH);
 
@@ -240,12 +244,11 @@ public class Hud {
         toggleRow(optionsButtons[OPTIONS_VIBRATION], pLeft, pw, oTop, OPT_VIBRATION_Y);
         toggleRow(optionsButtons[OPTIONS_MUSIC_TOGGLE], pLeft, pw, oTop, OPT_MUSIC_Y);
         toggleRow(optionsButtons[OPTIONS_LEFT_HANDED], pLeft, pw, oTop, OPT_LEFT_Y);
+        toggleRow(optionsButtons[OPTIONS_EFFECTS], pLeft, pw, oTop, OPT_EFFECTS_Y);
 
-        // Volume : toute la ligne est touchable ; le rail laisse la place aux haut-parleurs
-        optionsButtons[OPTIONS_VOLUME].set(pLeft + 16 * d, oTop + (OPT_VOLUME_Y + 5) * d,
-                pLeft + pw - 16 * d, oTop + (OPT_VOLUME_Y + 75) * d);
-        float railY = oTop + (OPT_VOLUME_Y + 40) * d;
-        volumeTrack.set(pLeft + 60 * d, railY, pLeft + pw - 60 * d, railY);
+        // Volumes : toute la ligne est touchable ; le rail laisse la place aux haut-parleurs
+        sliderRow(optionsButtons[OPTIONS_MUSIC_VOLUME], musicVolumeTrack, pLeft, pw, oTop, OPT_MUSIC_VOLUME_Y);
+        sliderRow(optionsButtons[OPTIONS_VOLUME], volumeTrack, pLeft, pw, oTop, OPT_VOLUME_Y);
 
         // RETOUR
         float backW = pw * 0.6f;
@@ -347,6 +350,14 @@ public class Hud {
     private void toggleRow(RectF r, float pLeft, float pw, float oTop, float titleY) {
         float d = board.density;
         r.set(pLeft + 16 * d, oTop + (titleY + 20) * d, pLeft + pw - 16 * d, oTop + (titleY + 70) * d);
+    }
+
+    // Ligne d'un curseur de volume (zone touchable) et son rail, sous le titre placé à titleY
+    private void sliderRow(RectF r, RectF track, float pLeft, float pw, float oTop, float titleY) {
+        float d = board.density;
+        r.set(pLeft + 16 * d, oTop + (titleY + 5) * d, pLeft + pw - 16 * d, oTop + (titleY + 70) * d);
+        float railY = oTop + (titleY + 38) * d;
+        track.set(pLeft + 60 * d, railY, pLeft + pw - 60 * d, railY);
     }
 
     // Haut d'une fenêtre centrée vers 40 % de l'écran, sans dépasser en haut ni en bas

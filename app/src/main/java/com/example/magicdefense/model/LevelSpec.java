@@ -184,7 +184,7 @@ public class LevelSpec {
         return lv > HANDMADE_LEVELS && lv % NIGHT_LEVEL_EVERY == NIGHT_LEVEL_OFFSET;
     }
 
-    // Cette vague se joue-t-elle de nuit ? (en plus du capteur de luminosité)
+    // Cette vague se joue-t-elle de nuit ? (seule source de la nuit)
     public boolean isNight(int wave) {
         if (endless) {
             return wave > 0 && wave % ENDLESS_NIGHT_EVERY == 0;

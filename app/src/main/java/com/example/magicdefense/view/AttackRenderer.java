@@ -88,6 +88,37 @@ public class AttackRenderer {
         this.frame = frame;
     }
 
+    // Option « Effets des attaques » sur Non : dessin minimal (petit rond, trait, anneau),
+    // sans particules, dégradés ni éclairs multiples, pour soulager les téléphones modestes.
+    // Le jeu lui-même ne change pas.
+    private boolean lowFx = false;
+
+    // Couleur de chaque zone au sol en effets réduits (indice = Zone.type)
+    private static final int[] LOW_FX_ZONE_COLORS = {
+            Color.rgb(255, 110, 30),  // lave
+            Color.rgb(220, 230, 240), // vapeur
+            Color.rgb(110, 80, 50),   // boue
+            Color.rgb(110, 170, 60),  // marécage
+            Color.rgb(255, 140, 40),  // anneau de flammes
+            Color.rgb(150, 150, 155), // béton
+            Color.rgb(30, 25, 20),    // goudron
+            Color.rgb(30, 40, 110),   // abysse
+            Color.rgb(60, 20, 80),    // flammes noires
+    };
+
+    public void setLowFx(boolean on) {
+        lowFx = on;
+    }
+
+    public boolean isLowFx() {
+        return lowFx;
+    }
+
+    // Couleur de l'élément d'un mage (blanc si inconnu)
+    private static int elementColor(int type) {
+        return type >= 0 && type < Palette.ELEMENT_COLORS.length ? Palette.ELEMENT_COLORS[type] : Color.WHITE;
+    }
+
     private static RadialGradient gradient(int[] colors, float[] stops) {
         return new RadialGradient(0, 0, 100, colors, stops, Shader.TileMode.CLAMP);
     }
@@ -113,6 +144,12 @@ public class AttackRenderer {
 
     public void drawProjectile(Canvas canvas, Projectile p) {
         float size = p.radius * 1.3f * ATTACK_SIZE[p.level - 1];
+        if (lowFx) {
+            // Effets réduits : simple petit rond de la couleur de l'élément
+            paint.setColor(elementColor(p.type));
+            canvas.drawCircle(p.x, p.y, Math.max(3 * density, size * 0.45f), paint);
+            return;
+        }
         switch (p.type) {
             case Mage.FIRE:
                 drawFireball(canvas, p, size);
@@ -720,6 +757,13 @@ public class AttackRenderer {
         if (dx * dx + dy * dy < 1) {
             return;
         }
+        if (lowFx) {
+            // Effets réduits : un seul trait droit de la couleur de l'élément
+            paint.setColor(withAlpha(elementColor(b.type), alpha));
+            paint.setStrokeWidth(2.5f * density);
+            canvas.drawLine(b.fromX, b.fromY, b.toX, b.toY, paint);
+            return;
+        }
         if (b.type == Mage.LIGHT) {
             drawLightBeam(canvas, b, alpha);
             return;
@@ -856,6 +900,9 @@ public class AttackRenderer {
 
     // Explosion (Feu), éclats de cristal (Terre), étincelles (Foudre), aux couleurs du niveau
     public void drawHit(Canvas canvas, HitEffect hit) {
+        if (lowFx) {
+            return; // effets réduits : pas d'impact (braises, éclats, étincelles)
+        }
         float t = hit.getProgress();
         int alpha = (int) (255 * (1 - t));
         float u = (3 + 0.6f * hit.level) * density;
@@ -1001,6 +1048,9 @@ public class AttackRenderer {
         paint.setColor(withAlpha(c, alpha));
         canvas.drawCircle(r.x, r.y, r.radius * (0.3f + 0.7f * t), paint);
         paint.setStyle(Paint.Style.FILL);
+        if (lowFx) {
+            return; // effets réduits : l'anneau seul, sans particules ni nom
+        }
 
         // Particules
         int n = 8;
@@ -1118,6 +1168,14 @@ public class AttackRenderer {
         float t = z.getProgress();
         float fade = t > 0.8f ? (1 - t) / 0.2f : 1f; // s'estompe sur la fin
         int age = z.getAge();
+        if (lowFx) {
+            // Effets réduits : une simple tache au sol (la zone reste visible, elle compte pour le jeu)
+            int col = z.type >= 0 && z.type < LOW_FX_ZONE_COLORS.length ? LOW_FX_ZONE_COLORS[z.type] : Color.GRAY;
+            paint.setColor(withAlpha(col, (int) (110 * fade)));
+            tmpRect.set(z.x - z.radius, z.y - z.radius * 0.6f, z.x + z.radius, z.y + z.radius * 0.6f);
+            canvas.drawOval(tmpRect, paint);
+            return;
+        }
         if (z.type == Zone.CONCRETE || z.type == Zone.TAR || z.type == Zone.ABYSS) {
             // Béton gris, goudron noir brillant, abysse bleu nuit qui tourbillonne
             int outer = z.type == Zone.CONCRETE ? Color.rgb(120, 120, 125)
@@ -1246,6 +1304,15 @@ public class AttackRenderer {
         float r = s.radius * (0.3f + 0.7f * t);    // de 30 % à 100 % du rayon
         int alpha = (int) (255 * (1 - t));         // de opaque à invisible
 
+        if (lowFx) {
+            // Effets réduits : un simple anneau qui s'élargit
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2 * density);
+            paint.setColor(withAlpha(elementColor(s.type), alpha));
+            canvas.drawCircle(s.x, s.y, r, paint);
+            paint.setStyle(Paint.Style.FILL);
+            return;
+        }
         if (s.type == Mage.DARK) {
             // Ténèbres : vague d'ombre, anneau violet et volutes qui retombent
             paint.setColor(Color.argb(alpha / 3, 40, 15, 60));
